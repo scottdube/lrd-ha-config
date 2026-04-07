@@ -1,0 +1,85 @@
+- trigger:
+    - platform: homeassistant
+      event: start
+    - platform: time_pattern
+      hours: "/1"
+  action:
+    - action: weather.get_forecasts
+      target:
+        entity_id: weather.lake_ridge_dr
+      data:
+        type: daily
+      response_variable: forecast_data
+  sensor:
+    - name: Pool Forecast High
+      unique_id: pool_forecast_high
+      state: >
+        {% set forecast = forecast_data['weather.lake_ridge_dr'].forecast %}
+        {% if forecast and forecast | length > 0 %}
+          {{ forecast[0].temperature | float(70) }}
+        {% else %}
+          70
+        {% endif %}
+      unit_of_measurement: "°F"
+      device_class: temperature
+      icon: mdi:thermometer-high
+
+    - name: Pool Swimming Day
+      unique_id: pool_swimming_day
+      state: >
+        {% set forecast = forecast_data['weather.lake_ridge_dr'].forecast %}
+        {% if forecast and forecast | length > 0 %}
+          {% set high = forecast[0].temperature | float(70) %}
+          {% if high >= 78 %}
+            Yes - Forecast {{ high }}°F
+          {% else %}
+            No - Forecast {{ high }}°F
+          {% endif %}
+        {% else %}
+          Unknown
+        {% endif %}
+      icon: mdi:swim
+
+    - name: Pool Heater Needed
+      unique_id: pool_heater_needed
+      state: >
+        {% set forecast = forecast_data['weather.lake_ridge_dr'].forecast %}
+        {% set air_temp = state_attr('weather.lake_ridge_dr', 'temperature') | float(70) %}
+        {% if forecast and forecast | length > 0 %}
+          {% set high = forecast[0].temperature | float(70) %}
+          {% set swimming = high >= 78 %}
+          {% set heatpump_ok = air_temp >= 55 %}
+          {% if swimming and heatpump_ok %}
+            Yes
+          {% elif not swimming %}
+            No - Cold day {{ high }}°F forecast
+          {% elif not heatpump_ok %}
+            No - Air temp too low {{ air_temp }}°F
+          {% endif %}
+        {% else %}
+          Unknown
+        {% endif %}
+      icon: mdi:heat-wave
+
+- sensor:
+    - name: Pool Rain Status
+      unique_id: pool_rain_status
+      state: >
+        {% set today = states('sensor.lake_ridge_dr_precipitation_today') | float(0) %}
+        {% set yesterday = states('sensor.lake_ridge_dr_precipitation_yesterday') | float(0) %}
+        {% if today >= 1.0 or yesterday >= 1.0 %}
+          Boost - {{ today }}" today {{ yesterday }}" yesterday
+        {% else %}
+          Normal - {{ today }}" today {{ yesterday }}" yesterday
+        {% endif %}
+      icon: mdi:weather-rainy
+
+    - name: Pool Automation Status
+      unique_id: pool_automation_status
+      state: >
+        {% set pump = states('switch.pool_pool_filter_pump') %}
+        {% set heater = states('water_heater.pool_pool_heater_heater') %}
+        {% set waterfall = states('switch.pool_pool_waterfall') %}
+        {% set light = states('switch.pool_pool_light') %}
+        Pump:{{ pump }} Heater:{{ heater }} Waterfall:{{ waterfall }} Light:{{ light }}
+      icon: mdi:pool

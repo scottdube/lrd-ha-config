@@ -1,0 +1,200 @@
+blueprint:
+  name: Garage Door Open Alert
+  description: >
+    Alerts when a garage door is left open via mobile notification and Alexa
+    announcements. Time-of-day and weather-aware with configurable delays.
+    Weather context included in announcements. Repeats until door closes.
+  domain: automation
+  input:
+    door_sensor:
+      name: Garage Door Sensor
+      description: Binary sensor for the garage door tilt sensor
+      selector:
+        entity:
+          domain: binary_sensor
+    notification_target:
+      name: Mobile Notification Target
+      description: Mobile app notify target (e.g. notify.mobile_app_iphone_sd)
+      selector:
+        text:
+    alexa_targets:
+      name: Alexa Media Player Targets
+      description: List of media_player entities to announce on
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    weather_entity:
+      name: Weather Entity
+      description: Weather entity to use for rain and wind data
+      selector:
+        entity:
+          domain: weather
+    day_start:
+      name: Daytime Start
+      description: Start of daytime window
+      default: "07:00:00"
+      selector:
+        time:
+    day_end:
+      name: Daytime End
+      description: End of daytime window
+      default: "21:00:00"
+      selector:
+        time:
+    day_delay:
+      name: Daytime Delay (minutes)
+      description: Minutes before alerting during daytime with no weather event
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: minutes
+    night_delay:
+      name: Nighttime Delay (minutes)
+      description: Minutes before alerting during nighttime with no weather event
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: minutes
+    weather_delay:
+      name: Weather Event Delay (minutes)
+      description: Minutes before alerting when rain or wind detected
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: minutes
+    wind_threshold:
+      name: Wind Gust Threshold (mph)
+      description: Wind gust speed above which weather delay applies
+      default: 14
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: mph
+    wind_direction_min:
+      name: Wind Direction Minimum (degrees)
+      description: Minimum wind bearing for adverse wind (default 270 for north-facing door)
+      default: 270
+      selector:
+        number:
+          min: 0
+          max: 359
+          unit_of_measurement: degrees
+    wind_direction_max:
+      name: Wind Direction Maximum (degrees)
+      description: Maximum wind bearing for adverse wind (default 90 for north-facing door)
+      default: 90
+      selector:
+        number:
+          min: 0
+          max: 359
+          unit_of_measurement: degrees
+    repeat_interval:
+      name: Repeat Interval (minutes)
+      description: How often to repeat the alert while door remains open
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: minutes
+
+variables:
+  door_sensor: !input door_sensor
+  weather_entity: !input weather_entity
+  wind_threshold: !input wind_threshold
+  wind_direction_min: !input wind_direction_min
+  wind_direction_max: !input wind_direction_max
+  day_start: !input day_start
+  day_end: !input day_end
+  day_delay: !input day_delay
+  night_delay: !input night_delay
+  weather_delay: !input weather_delay
+  repeat_interval: !input repeat_interval
+  is_raining: >
+    {{ states(weather_entity) in ['rainy', 'pouring'] }}
+  wind_gust: >
+    {{ state_attr(weather_entity, 'wind_gust_speed') | float(0) }}
+  wind_bearing: >
+    {{ state_attr(weather_entity, 'wind_bearing') | float(0) }}
+  adverse_wind: >
+    {% set g = state_attr(weather_entity, 'wind_gust_speed') | float(0) %}
+    {% set b = state_attr(weather_entity, 'wind_bearing') | float(0) %}
+    {% set min = wind_direction_min | float %}
+    {% set max = wind_direction_max | float %}
+    {% if min > max %}
+      {{ g > wind_threshold and (b >= min or b <= max) }}
+    {% else %}
+      {{ g > wind_threshold and (b >= min and b <= max) }}
+    {% endif %}
+  weather_event: >
+    {{ is_raining or adverse_wind }}
+  is_daytime: >
+    {{ now().strftime('%H:%M:%S') >= day_start and now().strftime('%H:%M:%S') < day_end }}
+  initial_delay: >
+    {% if weather_event %}
+      {{ weather_delay }}
+    {% elif is_daytime %}
+      {{ day_delay }}
+    {% else %}
+      {{ night_delay }}
+    {% endif %}
+  weather_context: >
+    {% if is_raining and adverse_wind %}
+      It is currently raining and there are adverse winds.
+    {% elif is_raining %}
+      It is currently raining.
+    {% elif adverse_wind %}
+      There are currently adverse winds.
+    {% else %}
+      
+    {% endif %}
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    from: "off"
+    to: "on"
+
+condition: []
+
+action:
+  - delay:
+      minutes: "{{ initial_delay }}"
+  - repeat:
+      while:
+        - condition: template
+          value_template: "{{ is_state(door_sensor, 'on') }}"
+      sequence:
+        - parallel:
+            - action: "{{ notification_target }}"
+              data:
+                title: Garage Door Alert
+                message: >
+                  Garage door has been open for {{ repeat.index * repeat_interval }} minute(s).
+                  {{ weather_context }}
+                data:
+                  push:
+                    interruption-level: time-sensitive
+            - action: notify.alexa_media
+              data:
+                message: >
+                  Attention: The garage door has been open for 
+                  {{ repeat.index * repeat_interval }} minutes.
+                  {{ weather_context }}
+                  Please close it.
+                target: !input alexa_targets
+                data:
+                  type: announce
+        - delay:
+            minutes: "{{ repeat_interval }}"
+
+mode: single
+max_exceeded: silent

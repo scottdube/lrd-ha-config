@@ -1,0 +1,51 @@
+bed_time_script:
+  sequence:
+  - action: input_boolean.turn_on
+    metadata: {}
+    target:
+      entity_id: input_boolean.bed_time
+    data: {}
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 3
+      milliseconds: 0
+  - action: input_boolean.turn_off
+    metadata: {}
+    target:
+      entity_id: input_boolean.bed_time
+    data: {}
+  alias: Bed Time
+  description: ''
+let_s_go_golfing:
+  alias: Let's Go Golfing
+  description: Sets up garage for golf simulator use
+  sequence:
+  - action: light.turn_off
+    target:
+      entity_id: light.garage_lights
+  - action: light.turn_on
+    target:
+      entity_id: light.wall_dimmer_switch3
+    data:
+      brightness_pct: 25
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.golfing
+  mode: single
+  icon: mdi:golf
+take_me_to_the_19th_hole:
+  alias: Take Me to the 19th Hole
+  description: Restores garage after golf simulator use
+  sequence:
+  - action: light.turn_off
+    target:
+      entity_id: light.wall_dimmer_switch3
+  - action: light.turn_on
+    target:
+      entity_id: light.garage_lights
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.golfing
+  mode: single
+  icon: mdi:glass-mug-variant

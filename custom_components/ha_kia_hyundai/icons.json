@@ -1,0 +1,5 @@
+{
+  "services": {
+    "start_climate": "mdi:home-thermometer"
+  }
+}

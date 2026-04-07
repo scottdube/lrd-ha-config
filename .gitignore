@@ -1,0 +1,39 @@
+# Secrets and sensitive files
+secrets.yaml
+known_devices.yaml
+
+# HA runtime files
+home-assistant.log
+home-assistant.log.fault
+.HA_VERSION
+.storage/
+.cloud/
+.cache/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Custom components (large, reinstallable)
+# Comment out if you want to track these
+# custom_components/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Lock files
+*.lock
+
+# Zigbee database
+zigbee.db
+zigbee.db-shm
+zigbee.db-wal

@@ -1,0 +1,490 @@
+blueprint:
+  name: Pool Automation
+  description: >
+    Intelligent pool automation replacing OmniLogic scheduler.
+    Controls pump, heater/cooler, waterfall, pool light, and chlorinator
+    based on weather forecast, actual conditions, and rain accumulation.
+
+    REQUIREMENTS:
+    - Hayward OmniLogic HACS integration (djtimca/haomnilogic)
+      https://github.com/djtimca/haomnilogic
+    - WeatherFlow Cloud integration for forecast data
+      (Settings > Integrations > WeatherFlow Cloud)
+    - Pool Forecast High template sensor (sensor.pool_forecast_high)
+      from /config/templates.yaml
+    - Hayward OmniPL or OmniLogic controller
+    - Hayward HeatPro heat pump with cooling capability
+      configured in AUTO mode on the unit
+
+    SETUP:
+    1. Disable all OmniLogic schedules before activating
+    2. Set heat pump to AUTO mode on the unit itself
+    3. Ensure template sensors are loaded and showing valid data
+    4. Configure all inputs to match your equipment entities
+  author: LRD
+  domain: automation
+  homeassistant:
+    min_version: "2024.6.0"
+  input:
+    basic_config:
+      name: Basic Configuration
+      input:
+        water_temp_sensor:
+          name: Water Temperature Sensor
+          description: Pool water temperature sensor
+          default: sensor.pool_pool_water_temperature
+          selector:
+            entity:
+              domain: sensor
+              device_class: temperature
+        heater_entity:
+          name: Heater Entity
+          description: Pool heater water heater entity
+          default: water_heater.pool_pool_heater_heater
+          selector:
+            entity:
+              domain: water_heater
+        pump_switch:
+          name: Pump Switch
+          description: Pool filter pump switch entity
+          default: switch.pool_pool_filter_pump
+          selector:
+            entity:
+              domain: switch
+        waterfall_switch:
+          name: Waterfall Switch
+          description: Pool waterfall switch entity
+          default: switch.pool_pool_waterfall
+          selector:
+            entity:
+              domain: switch
+        chlorinator_switch:
+          name: Chlorinator Switch
+          description: Pool chlorinator switch entity
+          default: switch.pool_pool_chlorinator
+          selector:
+            entity:
+              domain: switch
+        weather_entity:
+          name: Weather Entity
+          description: WeatherFlow weather entity for current air temperature
+          default: weather.lake_ridge_dr
+          selector:
+            entity:
+              domain: weather
+        forecast_high_sensor:
+          name: Forecast High Sensor
+          description: >
+            Template sensor providing today's forecast high temperature.
+            See /config/templates.yaml - sensor.pool_forecast_high
+          default: sensor.pool_forecast_high
+          selector:
+            entity:
+              domain: sensor
+              device_class: temperature
+
+    temperature_config:
+      name: Temperature Settings
+      input:
+        target_temp:
+          name: Target Pool Temperature (°F)
+          description: >
+            Target water temperature. Unit heats below and cools above
+            with 2°F differential automatically.
+          default: 89
+          selector:
+            number:
+              min: 75
+              max: 95
+              unit_of_measurement: "°F"
+        min_swim_temp:
+          name: Minimum Forecast Temp for Swimming (°F)
+          description: If forecast high is below this temperature heater and pump turn off
+          default: 78
+          selector:
+            number:
+              min: 60
+              max: 90
+              unit_of_measurement: "°F"
+        min_heatpump_air_temp:
+          name: Minimum Air Temp for Heat Pump (°F)
+          description: Heat pump efficiency drops significantly below this temperature
+          default: 55
+          selector:
+            number:
+              min: 45
+              max: 65
+              unit_of_measurement: "°F"
+
+    pump_config:
+      name: Pump Settings
+      input:
+        normal_pump_speed:
+          name: Normal Pump Speed (%)
+          description: Pump speed during normal filtration
+          default: 65
+          selector:
+            number:
+              min: 30
+              max: 100
+              unit_of_measurement: "%"
+        heater_pump_speed:
+          name: Heater Pump Speed (%)
+          description: Minimum pump speed when heater or cooler is running
+          default: 75
+          selector:
+            number:
+              min: 50
+              max: 100
+              unit_of_measurement: "%"
+        pump_start_time:
+          name: Pump Start Time
+          description: Time to turn pump on daily
+          default: "11:00:00"
+          selector:
+            time:
+        waterfall_start_time:
+          name: Waterfall Start Time
+          description: Time to turn waterfall on daily
+          default: "08:00:00"
+          selector:
+            time:
+        waterfall_end_time:
+          name: Waterfall End Time
+          description: Time to turn waterfall off and pump off if heater not running
+          default: "20:00:00"
+          selector:
+            time:
+
+    chlorinator_config:
+      name: Chlorinator Settings
+      input:
+        normal_chlor_percent:
+          name: Normal Chlorinator %
+          description: Normal chlorinator output percentage
+          default: 20
+          selector:
+            number:
+              min: 0
+              max: 100
+              unit_of_measurement: "%"
+        boost_chlor_percent:
+          name: Rain Boost Chlorinator %
+          description: Chlorinator output percentage after significant rainfall
+          default: 50
+          selector:
+            number:
+              min: 0
+              max: 100
+              unit_of_measurement: "%"
+        rain_threshold:
+          name: Rain Threshold (inches)
+          description: Daily rainfall amount that triggers chlorinator boost
+          default: 1.0
+          selector:
+            number:
+              min: 0.25
+              max: 3.0
+              step: 0.25
+              unit_of_measurement: "in"
+        rain_sensor_today:
+          name: Rain Sensor Today
+          description: Precipitation today sensor
+          default: sensor.lake_ridge_dr_precipitation_today
+          selector:
+            entity:
+              domain: sensor
+        rain_sensor_yesterday:
+          name: Rain Sensor Yesterday
+          description: Precipitation yesterday sensor
+          default: sensor.lake_ridge_dr_precipitation_yesterday
+          selector:
+            entity:
+              domain: sensor
+
+    light_config:
+      name: Pool Light Settings
+      input:
+        pool_light_switch:
+          name: Pool Light Switch
+          description: Pool light switch entity
+          default: switch.pool_pool_light
+          selector:
+            entity:
+              domain: switch
+        illuminance_sensor:
+          name: Illuminance Sensor
+          description: >
+            Tempest illuminance sensor used to detect dusk.
+            Primary trigger for pool light.
+          default: sensor.st_00184974_illuminance
+          selector:
+            entity:
+              domain: sensor
+              device_class: illuminance
+        light_lux_threshold:
+          name: Illuminance Threshold (lux)
+          description: >
+            Turn pool light on when illuminance drops below this value.
+            Typical dusk value is 200-500 lux.
+          default: 500
+          selector:
+            number:
+              min: 50
+              max: 2000
+              unit_of_measurement: lux
+        light_lux_debounce:
+          name: Illuminance Debounce (minutes)
+          description: >
+            Minutes illuminance must remain below threshold before
+            turning light on. Prevents passing clouds from triggering.
+          default: 5
+          selector:
+            number:
+              min: 1
+              max: 30
+              unit_of_measurement: minutes
+        light_off_time:
+          name: Pool Light Off Time
+          description: Time to turn pool light off
+          default: "22:00:00"
+          selector:
+            time:
+
+variables:
+  water_temp_sensor: !input water_temp_sensor
+  heater_entity: !input heater_entity
+  pump_switch: !input pump_switch
+  waterfall_switch: !input waterfall_switch
+  chlorinator_switch: !input chlorinator_switch
+  pool_light_switch: !input pool_light_switch
+  weather_entity: !input weather_entity
+  forecast_high_sensor: !input forecast_high_sensor
+  target_temp: !input target_temp
+  min_swim_temp: !input min_swim_temp
+  min_heatpump_air_temp: !input min_heatpump_air_temp
+  normal_pump_speed: !input normal_pump_speed
+  heater_pump_speed: !input heater_pump_speed
+  normal_chlor_percent: !input normal_chlor_percent
+  boost_chlor_percent: !input boost_chlor_percent
+  rain_threshold: !input rain_threshold
+  rain_sensor_today: !input rain_sensor_today
+  rain_sensor_yesterday: !input rain_sensor_yesterday
+  light_lux_threshold: !input light_lux_threshold
+  waterfall_end_time: !input waterfall_end_time
+  current_air_temp: >
+    {{ state_attr(weather_entity, 'temperature') | float(70) }}
+  forecast_high: >
+    {{ states(forecast_high_sensor) | float(70) }}
+  rain_today: >
+    {{ states(rain_sensor_today) | float(0) }}
+  rain_yesterday: >
+    {{ states(rain_sensor_yesterday) | float(0) }}
+  significant_rain: >
+    {{ rain_today >= rain_threshold or rain_yesterday >= rain_threshold }}
+  swimming_day: >
+    {{ forecast_high >= min_swim_temp }}
+  heatpump_ok: >
+    {{ current_air_temp >= min_heatpump_air_temp }}
+  heater_needed: >
+    {{ swimming_day and heatpump_ok }}
+
+trigger:
+  - platform: time
+    at: !input pump_start_time
+    id: pump_start
+  - platform: time
+    at: !input waterfall_start_time
+    id: waterfall_start
+  - platform: time
+    at: !input waterfall_end_time
+    id: waterfall_end
+  - platform: time
+    at: "00:01:00"
+    id: midnight_eval
+  - platform: state
+    entity_id: !input water_temp_sensor
+    id: temp_check
+    for:
+      minutes: 5
+  - platform: state
+    entity_id: !input heater_entity
+    from: "on"
+    to: "off"
+    id: heater_idle
+  - platform: numeric_state
+    entity_id: !input illuminance_sensor
+    below: !input light_lux_threshold
+    for:
+      minutes: !input light_lux_debounce
+    id: light_on_lux
+  - platform: sun
+    event: sunset
+    offset: "00:30:00"
+    id: light_on_sunset
+  - platform: time
+    at: !input light_off_time
+    id: light_off
+
+condition: []
+
+action:
+  - choose:
+
+      # PUMP START - default 11am
+      - conditions:
+          - condition: trigger
+            id: pump_start
+        sequence:
+          - condition: template
+            value_template: "{{ swimming_day }}"
+          - action: switch.turn_on
+            target:
+              entity_id: !input pump_switch
+          - action: omnilogic.set_pump_speed
+            target:
+              entity_id: !input pump_switch
+            data:
+              speed: "{{ normal_pump_speed }}"
+          - condition: template
+            value_template: "{{ heater_needed }}"
+          - action: water_heater.set_operation_mode
+            target:
+              entity_id: !input heater_entity
+            data:
+              operation_mode: "on"
+          - action: water_heater.set_temperature
+            target:
+              entity_id: !input heater_entity
+            data:
+              temperature: "{{ target_temp }}"
+          - action: omnilogic.set_chlor_timed_percent
+            target:
+              entity_id: !input chlorinator_switch
+            data:
+              timed_percent: >
+                {% if significant_rain %}
+                  {{ boost_chlor_percent }}
+                {% else %}
+                  {{ normal_chlor_percent }}
+                {% endif %}
+
+      # WATERFALL START - default 8am
+      - conditions:
+          - condition: trigger
+            id: waterfall_start
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input waterfall_switch
+
+      # WATERFALL END / PUMP EVAL - default 8pm
+      - conditions:
+          - condition: trigger
+            id: waterfall_end
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: !input waterfall_switch
+          - condition: template
+            value_template: "{{ not is_state(heater_entity, 'on') }}"
+          - action: switch.turn_off
+            target:
+              entity_id: !input pump_switch
+          - action: water_heater.set_operation_mode
+            target:
+              entity_id: !input heater_entity
+            data:
+              operation_mode: "off"
+
+      # HEATER WENT IDLE - turn pump off if after waterfall end time
+      - conditions:
+          - condition: trigger
+            id: heater_idle
+          - condition: time
+            after: !input waterfall_end_time
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: !input pump_switch
+
+      # MIDNIGHT EVALUATION - check forecast for next day
+      - conditions:
+          - condition: trigger
+            id: midnight_eval
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not swimming_day }}"
+                sequence:
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input pump_switch
+                  - action: water_heater.set_operation_mode
+                    target:
+                      entity_id: !input heater_entity
+                    data:
+                      operation_mode: "off"
+
+      # TEMPERATURE CHECK - adjust pump speed based on heater state
+      - conditions:
+          - condition: trigger
+            id: temp_check
+          - condition: state
+            entity_id: !input pump_switch
+            state: "on"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ is_state(heater_entity, 'on') }}"
+                sequence:
+                  - action: omnilogic.set_pump_speed
+                    target:
+                      entity_id: !input pump_switch
+                    data:
+                      speed: "{{ heater_pump_speed }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not is_state(heater_entity, 'on') }}"
+                sequence:
+                  - action: omnilogic.set_pump_speed
+                    target:
+                      entity_id: !input pump_switch
+                    data:
+                      speed: "{{ normal_pump_speed }}"
+
+      # POOL LIGHT ON - illuminance based (primary)
+      - conditions:
+          - condition: trigger
+            id: light_on_lux
+          - condition: template
+            value_template: "{{ is_state(pool_light_switch, 'off') }}"
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input pool_light_switch
+
+      # POOL LIGHT ON - sunset fallback (backup)
+      - conditions:
+          - condition: trigger
+            id: light_on_sunset
+          - condition: template
+            value_template: "{{ is_state(pool_light_switch, 'off') }}"
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input pool_light_switch
+
+      # POOL LIGHT OFF - fixed time
+      - conditions:
+          - condition: trigger
+            id: light_off
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: !input pool_light_switch
+
+mode: parallel
+max_exceeded: silent

@@ -1,0 +1,176 @@
+blueprint:
+  name: Door Activated Lights with Motion Keep-Alive
+  description: >
+    Turns on lights when a door opens and turns them off after a configurable
+    timer. An optional motion sensor can extend the timer on each trigger.
+    An optional inhibit boolean prevents activation during specific modes
+    (e.g. golf simulator, movie mode, sleeping).
+    Supports multiple lights and is designed to work alongside other automations.
+    Suitable for any door/room/light combination.
+  domain: automation
+  homeassistant:
+    min_version: "2024.6.0"
+  input:
+    basic_config:
+      name: Basic Configuration
+      input:
+        door_sensor:
+          name: Door Sensor
+          description: Binary sensor for the door (opens = on)
+          selector:
+            entity:
+              domain: binary_sensor
+        door_name:
+          name: Door Name
+          description: Name of this door for identification (e.g. Kitchen to Garage)
+          default: Door
+          selector:
+            text:
+        lights:
+          name: Lights
+          description: Lights or switches to control (up to 10)
+          selector:
+            entity:
+              domain:
+                - light
+                - switch
+              multiple: true
+        brightness:
+          name: Brightness (%)
+          description: >
+            Brightness level when lights turn on.
+            Applies to lights only, ignored for switches.
+          default: 100
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        timer_duration:
+          name: Timer Duration (minutes)
+          description: Minutes before lights turn off after door opens or last motion
+          default: 5
+          selector:
+            number:
+              min: 1
+              max: 60
+              unit_of_measurement: minutes
+
+    motion_config:
+      name: Motion Sensor (optional)
+      collapsed: true
+      input:
+        # MULTIPLE CAMERAS OR SENSORS:
+        # To combine multiple motion sensors or cameras into one input,
+        # create a Template Binary Sensor helper:
+        # Settings → Helpers → Create Helper → Template → Binary Sensor
+        # Name: e.g. "Garage Person Detected"
+        # Template: {{ is_state('binary_sensor.camera_1', 'on') or
+        #              is_state('binary_sensor.camera_2', 'on') }}
+        # Device class: Motion
+        # Then select that combined helper here as the motion sensor.
+        # Example: binary_sensor.garage_person_detected
+        motion_sensor:
+          name: Motion Sensor
+          description: >
+            Optional motion sensor to extend the timer while area is occupied.
+            For multiple cameras combine them into a Template Binary Sensor helper first.
+            Leave blank if not needed.
+          default: []
+          selector:
+            entity:
+              domain: binary_sensor
+              device_class: motion
+        motion_extension:
+          name: Motion Extension (minutes)
+          description: Minutes to extend the timer on each motion trigger
+          default: 2
+          selector:
+            number:
+              min: 1
+              max: 30
+              unit_of_measurement: minutes
+
+    inhibit_config:
+      name: Inhibit Mode (optional)
+      collapsed: true
+      input:
+        inhibit_boolean:
+          name: Inhibit Boolean
+          description: >
+            Optional input_boolean that prevents activation when on.
+            Use for modes like golf simulator, movie mode, sleeping, etc.
+            Leave blank if not needed.
+          default: []
+          selector:
+            entity:
+              domain: input_boolean
+
+variables:
+  door_sensor: !input door_sensor
+  lights: !input lights
+  brightness: !input brightness
+  timer_duration: !input timer_duration
+  motion_sensor: !input motion_sensor
+  motion_extension: !input motion_extension
+  inhibit_boolean: !input inhibit_boolean
+  has_motion_sensor: >
+    {% set ms = motion_sensor %}
+    {{ ms is not none and ms != '' and ms != [] }}
+  is_inhibited: >
+    {% set ib = inhibit_boolean %}
+    {% if ib is none or ib == '' or ib == [] %}
+      {{ false }}
+    {% else %}
+      {{ is_state(ib | string, 'on') }}
+    {% endif %}
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    from: "off"
+    to: "on"
+    id: door_opened
+  - platform: state
+    entity_id: !input motion_sensor
+    from: "off"
+    to: "on"
+    id: motion_detected
+
+condition:
+  - condition: template
+    value_template: "{{ not is_inhibited }}"
+
+action:
+  - choose:
+      # DOOR OPENED - turn on lights and start timer
+      - conditions:
+          - condition: trigger
+            id: door_opened
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input lights
+            data:
+              brightness_pct: "{{ brightness }}"
+          - delay:
+              minutes: "{{ timer_duration }}"
+          - action: light.turn_off
+            target:
+              entity_id: !input lights
+
+      # MOTION DETECTED - extend timer if lights are on
+      - conditions:
+          - condition: trigger
+            id: motion_detected
+          - condition: template
+            value_template: "{{ has_motion_sensor }}"
+        sequence:
+          - delay:
+              minutes: "{{ motion_extension }}"
+          - action: light.turn_off
+            target:
+              entity_id: !input lights
+
+mode: restart
+max_exceeded: silent

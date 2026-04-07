@@ -1,0 +1,125 @@
+start_climate:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ha_kia_hyundai
+    climate:
+      required: true
+      example: true
+      default: true
+      selector:
+        boolean:
+    temperature:
+      required: false
+      example: 72
+      default: 72
+      selector:
+        number:
+          min: 62
+          max: 82
+          step: 1
+          mode: box
+          unit_of_measurement: Degrees
+    defrost:
+      required: true
+      example: false
+      default: false
+      selector:
+        boolean:
+    heating:
+      required: true
+      example: false
+      default: false
+      selector:
+        boolean:
+    duration:
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          mode: box
+          unit_of_measurement: minutes
+    driver_seat:
+      required: false
+      example: High Heat
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - High Heat
+            - Medium Heat
+            - Low Heat
+            - High Cool
+            - Medium Cool
+            - Low Cool
+    passenger_seat:
+      required: false
+      example: High Heat
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - High Heat
+            - Medium Heat
+            - Low Heat
+            - High Cool
+            - Medium Cool
+            - Low Cool
+    left_rear_seat:
+      required: false
+      example: High Heat
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - High Heat
+            - Medium Heat
+            - Low Heat
+            - High Cool
+            - Medium Cool
+            - Low Cool
+    right_rear_seat:
+      required: false
+      example: High Heat
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - High Heat
+            - Medium Heat
+            - Low Heat
+            - High Cool
+            - Medium Cool
+            - Low Cool
+set_charge_limits:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ha_kia_hyundai
+    dc_limit:
+      required: true
+      example: 50
+      default: 90
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 10
+          unit_of_measurement: "%"
+    ac_limit:
+      required: true
+      example: 50
+      default: 90
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 10
+          unit_of_measurement: "%"
