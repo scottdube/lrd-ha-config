@@ -65,12 +65,12 @@
     - name: Pool Rain Status
       unique_id: pool_rain_status
       state: >
-        {% set today = states('sensor.lake_ridge_dr_precipitation_today') | float(0) %}
-        {% set yesterday = states('sensor.lake_ridge_dr_precipitation_yesterday') | float(0) %}
+        {% set today = (states('sensor.lake_ridge_dr_precipitation_today') | float(0)) / 25.4 %}
+        {% set yesterday = (states('sensor.lake_ridge_dr_precipitation_yesterday') | float(0)) / 25.4 %}
         {% if today >= 1.0 or yesterday >= 1.0 %}
-          Boost - {{ today }}" today {{ yesterday }}" yesterday
+          Boost - {{ today | round(2) }}" today {{ yesterday | round(2) }}" yesterday
         {% else %}
-          Normal - {{ today }}" today {{ yesterday }}" yesterday
+          Normal - {{ today | round(2) }}" today {{ yesterday | round(2) }}" yesterday
         {% endif %}
       icon: mdi:weather-rainy
 
