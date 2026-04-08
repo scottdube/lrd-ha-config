@@ -1,4 +1,3 @@
-
 # Loads default set of integrations. Do not remove.
 default_config:
 
@@ -10,3 +9,8 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 template: !include config/templates.yaml
+notify:
+  - name: pool_temp_log
+    platform: file
+    filename: /config/pool_temp_log.csv
+    timestamp: false

@@ -4,6 +4,8 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.5.0  Fixed pump start bug and last temp assumption
+#
 # v1.4.0 - Switched to OmniLogic Local integration for all control actions.
 #          Local integration provides faster response and works independently
 #          of Hayward cloud. Cloud integration retained for ORP/salt/pH
@@ -45,9 +47,9 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.4.0"
+  name: "Pool Automation v1.5.0"
   description: >
-    Pool Automation v1.4.0
+    Pool Automation v1.5.0
 
     Intelligent pool automation using OmniLogic Local for all control
     actions and WeatherFlow for environmental inputs. Cloud integration
@@ -334,7 +336,7 @@ variables:
   waterfall_start_time: !input waterfall_start_time
   waterfall_end_time: !input waterfall_end_time
   current_water_temp: >
-    {{ states(water_temp_sensor) | float(89) }}
+    {{ states(water_temp_sensor) | float(75) }}
   current_air_temp: >
     {{ state_attr(weather_entity, 'temperature') | float(70) }}
   forecast_high: >
@@ -450,7 +452,6 @@ action:
                   - condition: template
                     value_template: >
                       {{ not pump_is_on
-                         and swimming_day
                          and current_minutes >= pump_should_start_minutes }}
                 sequence:
                   - action: switch.turn_on
