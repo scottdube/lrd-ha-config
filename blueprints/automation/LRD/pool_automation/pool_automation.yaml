@@ -1,9 +1,23 @@
 # =============================================================================
 # Pool Automation Blueprint
-# Repository: https://github.com/scottdube/lrd-ha-blueprints
+# Repository: https://github.com/scottdube/lrd-ha-config
 # =============================================================================
 #
 # CHANGELOG:
+# v1.4.0 - Switched to OmniLogic Local integration for all control actions.
+#          Local integration provides faster response and works independently
+#          of Hayward cloud. Cloud integration retained for ORP/salt/pH
+#          monitoring only. Replaced omnilogic.set_pump_speed service with
+#          number.set_value on local pump speed entity. Replaced
+#          omnilogic.set_chlor_timed_percent with number.set_value on local
+#          chlorinator percent entity.
+#
+#          INTEGRATION SPLIT:
+#          LOCAL  - All control: pump, heater, waterfall, chlorinator, light
+#          LOCAL  - Water temp, air temp sensors
+#          CLOUD  - ORP, salt level, pH (monitoring only, not in blueprint)
+#          WFLOW  - Forecast high, rain accumulation, illuminance, air temp
+#
 # v1.3.0 - Dynamic pump start time based on target ready time and minimum
 #          filter hours. 10-minute polling replaces fixed pump start trigger.
 #          Rain sensor mm to inch conversion added.
@@ -15,11 +29,11 @@
 #          and light control.
 #
 # REQUIREMENTS:
-# - Hayward OmniLogic HACS integration (djtimca/haomnilogic)
+# - OmniLogic Local HACS integration (cryptk/haomnilogic-local)
+# - Hayward OmniLogic HACS integration (djtimca/haomnilogic) - monitoring only
 # - WeatherFlow Cloud integration
 # - sensor.pool_forecast_high template sensor (see /config/templates.yaml)
 # - input_datetime.pool_pump_actual_start helper
-#   (Settings > Helpers > Date and Time > Pool Pump Actual Start)
 # - Hayward OmniPL or OmniLogic controller
 # - Hayward HeatPro heat pump in AUTO mode
 #
@@ -31,15 +45,19 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.3.0"
+  name: "Pool Automation v1.4.0"
   description: >
-    Pool Automation v1.3.0
+    Pool Automation v1.4.0
 
-    Intelligent pool automation replacing OmniLogic scheduler.
-    Controls pump, heater/cooler, waterfall, pool light, and chlorinator
-    based on weather forecast, actual conditions, and rain accumulation.
-    Dynamically calculates pump start time based on target ready time,
-    current water temperature, and minimum filtration hours.
+    Intelligent pool automation using OmniLogic Local for all control
+    actions and WeatherFlow for environmental inputs. Cloud integration
+    retained for ORP/salt/pH monitoring only.
+
+    INTEGRATION SPLIT:
+    LOCAL  - All control: pump, heater, waterfall, chlorinator, light
+    LOCAL  - Water temp and air temp sensors
+    CLOUD  - ORP, salt level, pH (monitoring only, not used here)
+    WFLOW  - Forecast high, rain accumulation, illuminance, air temp
   author: LRD
   domain: automation
   homeassistant:
@@ -50,40 +68,54 @@ blueprint:
       input:
         water_temp_sensor:
           name: Water Temperature Sensor
-          description: Pool water temperature sensor
-          default: sensor.pool_pool_water_temperature
+          description: Pool water temperature sensor (local integration)
+          default: sensor.omnilogic_pool_watersensor
           selector:
             entity:
               domain: sensor
               device_class: temperature
         heater_entity:
           name: Heater Entity
-          description: Pool heater water heater entity
-          default: water_heater.pool_pool_heater_heater
+          description: Pool heater entity (local integration)
+          default: water_heater.omnilogic_pool_heater
           selector:
             entity:
               domain: water_heater
         pump_switch:
           name: Pump Switch
-          description: Pool filter pump switch entity
-          default: switch.pool_pool_filter_pump
+          description: Pool filter pump switch (local integration)
+          default: switch.omnilogic_pool_filter_pump
           selector:
             entity:
               domain: switch
+        pump_speed_entity:
+          name: Pump Speed Entity
+          description: Pool filter pump speed number entity (local integration)
+          default: number.omnilogic_pool_filter_pump_speed
+          selector:
+            entity:
+              domain: number
         waterfall_switch:
           name: Waterfall Switch
-          description: Pool waterfall switch entity
-          default: switch.pool_pool_waterfall
+          description: Pool waterfall switch (local integration)
+          default: switch.omnilogic_pool_waterfall
           selector:
             entity:
               domain: switch
         chlorinator_switch:
           name: Chlorinator Switch
-          description: Pool chlorinator switch entity
-          default: switch.pool_pool_chlorinator
+          description: Pool chlorinator switch (local integration)
+          default: switch.omnilogic_pool_chlorinator
           selector:
             entity:
               domain: switch
+        chlorinator_percent_entity:
+          name: Chlorinator Percent Entity
+          description: Pool chlorinator timed percent number entity (local integration)
+          default: number.omnilogic_pool_chlorinator_timed_percent
+          selector:
+            entity:
+              domain: number
         weather_entity:
           name: Weather Entity
           description: WeatherFlow weather entity for current air temperature
@@ -219,14 +251,14 @@ blueprint:
               unit_of_measurement: "in"
         rain_sensor_today:
           name: Rain Sensor Today
-          description: Precipitation today sensor
+          description: Precipitation today sensor (WeatherFlow)
           default: sensor.lake_ridge_dr_precipitation_today
           selector:
             entity:
               domain: sensor
         rain_sensor_yesterday:
           name: Rain Sensor Yesterday
-          description: Precipitation yesterday sensor
+          description: Precipitation yesterday sensor (WeatherFlow)
           default: sensor.lake_ridge_dr_precipitation_yesterday
           selector:
             entity:
@@ -237,14 +269,14 @@ blueprint:
       input:
         pool_light_switch:
           name: Pool Light Switch
-          description: Pool light switch entity
-          default: switch.pool_pool_light
+          description: Pool light switch (local integration)
+          default: switch.omnilogic_pool_light
           selector:
             entity:
               domain: switch
         illuminance_sensor:
           name: Illuminance Sensor
-          description: Tempest illuminance sensor used to detect dusk
+          description: Tempest illuminance sensor used to detect dusk (WeatherFlow)
           default: sensor.st_00184974_illuminance
           selector:
             entity:
@@ -279,8 +311,10 @@ variables:
   water_temp_sensor: !input water_temp_sensor
   heater_entity: !input heater_entity
   pump_switch: !input pump_switch
+  pump_speed_entity: !input pump_speed_entity
   waterfall_switch: !input waterfall_switch
   chlorinator_switch: !input chlorinator_switch
+  chlorinator_percent_entity: !input chlorinator_percent_entity
   pool_light_switch: !input pool_light_switch
   weather_entity: !input weather_entity
   forecast_high_sensor: !input forecast_high_sensor
@@ -422,11 +456,11 @@ action:
                   - action: switch.turn_on
                     target:
                       entity_id: !input pump_switch
-                  - action: omnilogic.set_pump_speed
+                  - action: number.set_value
                     target:
-                      entity_id: !input pump_switch
+                      entity_id: !input pump_speed_entity
                     data:
-                      speed: "{{ normal_pump_speed }}"
+                      value: "{{ normal_pump_speed }}"
                   - action: input_datetime.set_datetime
                     target:
                       entity_id: input_datetime.pool_pump_actual_start
@@ -444,11 +478,11 @@ action:
                       entity_id: !input heater_entity
                     data:
                       temperature: "{{ target_temp }}"
-                  - action: omnilogic.set_chlor_timed_percent
+                  - action: number.set_value
                     target:
-                      entity_id: !input chlorinator_switch
+                      entity_id: !input chlorinator_percent_entity
                     data:
-                      timed_percent: >
+                      value: >
                         {% if significant_rain %}
                           {{ boost_chlor_percent }}
                         {% else %}
@@ -519,20 +553,20 @@ action:
                           - condition: template
                             value_template: "{{ is_state(heater_entity, 'on') }}"
                         sequence:
-                          - action: omnilogic.set_pump_speed
+                          - action: number.set_value
                             target:
-                              entity_id: !input pump_switch
+                              entity_id: !input pump_speed_entity
                             data:
-                              speed: "{{ heater_pump_speed }}"
+                              value: "{{ heater_pump_speed }}"
                       - conditions:
                           - condition: template
                             value_template: "{{ not is_state(heater_entity, 'on') }}"
                         sequence:
-                          - action: omnilogic.set_pump_speed
+                          - action: number.set_value
                             target:
-                              entity_id: !input pump_switch
+                              entity_id: !input pump_speed_entity
                             data:
-                              speed: "{{ normal_pump_speed }}"
+                              value: "{{ normal_pump_speed }}"
 
       # HEATER WENT IDLE - turn pump off if after waterfall end and filtration complete
       - conditions:
