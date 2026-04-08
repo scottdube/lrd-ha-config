@@ -4,6 +4,12 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.6.0  Waterfall now operates independently of pump_is_on. Waterfall
+#          window check no longer requires pump to be running — if pump is
+#          off when waterfall window opens, pump is started automatically
+#          at the correct speed before waterfall is enabled. Eliminates
+#          waterfall dropout when pump state is momentarily false.
+#
 #  v1.5.0  Fixed pump start bug and last temp assumption
 #
 # v1.4.0 - Switched to OmniLogic Local integration for all control actions.
@@ -47,9 +53,9 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.5.0"
+  name: "Pool Automation v1.6.0"
   description: >
-    Pool Automation v1.5.0
+    Pool Automation v1.6.0
 
     Intelligent pool automation using OmniLogic Local for all control
     actions and WeatherFlow for environmental inputs. Cloud integration
@@ -490,18 +496,40 @@ action:
                           {{ normal_chlor_percent }}
                         {% endif %}
 
-              # WATERFALL START - pump is on and time reached
+              # WATERFALL ON - within waterfall window
+              # Pump independence: if pump is off when waterfall window opens,
+              # start pump at correct speed before enabling waterfall.
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ pump_is_on
-                         and current_minutes >= waterfall_start_minutes
-                         and current_minutes < waterfall_end_minutes
-                         and is_state(waterfall_switch, 'off') }}
+                      {{ current_minutes >= waterfall_start_minutes
+                         and current_minutes < waterfall_end_minutes }}
                 sequence:
-                  - action: switch.turn_on
-                    target:
-                      entity_id: !input waterfall_switch
+                  - if:
+                      - condition: template
+                        value_template: "{{ not pump_is_on }}"
+                    then:
+                      - action: switch.turn_on
+                        target:
+                          entity_id: !input pump_switch
+                      - action: number.set_value
+                        target:
+                          entity_id: !input pump_speed_entity
+                        data:
+                          value: >
+                            {{ heater_pump_speed if heater_needed else normal_pump_speed }}
+                      - action: input_datetime.set_datetime
+                        target:
+                          entity_id: input_datetime.pool_pump_actual_start
+                        data:
+                          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+                  - if:
+                      - condition: template
+                        value_template: "{{ is_state(waterfall_switch, 'off') }}"
+                    then:
+                      - action: switch.turn_on
+                        target:
+                          entity_id: !input waterfall_switch
 
               # WATERFALL END - time reached
               - conditions:

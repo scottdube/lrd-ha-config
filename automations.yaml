@@ -468,15 +468,22 @@
               interruption-level: time-sensitive
   mode: single
   max_exceeded: silent
-- id: '1775612901348'
-  alias: Pool Automation v1.4.0
+- id: '1775654657353'
+  alias: Pool Automation v1.5.0
   description: ''
   use_blueprint:
     path: LRD/pool_automation/pool_automation.yaml
     input:
-      target_temp: 90
+      target_temp: 88
       min_swim_temp: 77
-      min_heatpump_air_temp: 57
-      normal_pump_speed: 57
+      min_heatpump_air_temp: 56
+      normal_pump_speed: 55
       heater_pump_speed: 77
-      normal_chlor_percent: 22
+      waterfall_start_time: 08:00:00
+- id: '1775690863923'
+  alias: Pool Automation v1.6.0
+  description: ''
+  use_blueprint:
+    path: LRD/pool_automation/pool_automation.yaml
+    input:
+      waterfall_start_time: 08:00:00
