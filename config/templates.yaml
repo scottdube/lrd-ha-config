@@ -31,9 +31,9 @@
         {% if forecast and forecast | length > 0 %}
           {% set high = forecast[0].temperature | float(70) %}
           {% if high >= 78 %}
-            Yes - Forecast {{ high }}°F
+            Yes
           {% else %}
-            No - Forecast {{ high }}°F
+            No
           {% endif %}
         {% else %}
           Unknown

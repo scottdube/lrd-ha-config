@@ -487,3 +487,15 @@
     path: LRD/pool_automation/pool_automation.yaml
     input:
       waterfall_start_time: 08:00:00
+
+- alias: Pool Temp Logger
+  id: pool_temp_logger
+  trigger:
+    - platform: time_pattern
+      minutes: "/10"
+  condition:
+    - condition: state
+      entity_id: switch.omnilogic_pool_filter_pump
+      state: "on"
+  action:
+    - action: shell_command.pool_log

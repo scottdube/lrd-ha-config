@@ -9,15 +9,15 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 template: !include config/templates.yaml
+
 shell_command:
-  log_pool_temp: >
+  pool_log: >
     python3 /config/pool_temp_logger.py
     "{{ states('sensor.omnilogic_pool_watersensor') }}"
     "{{ state_attr('weather.lake_ridge_dr', 'temperature') }}"
     "{{ states('water_heater.omnilogic_pool_heater') }}"
     "{{ states('switch.omnilogic_pool_filter_pump') }}"
+    "{{ states('number.omnilogic_pool_filter_pump_speed') }}"
     "{{ states('switch.omnilogic_pool_waterfall') }}"
     "{{ states('sensor.pool_forecast_high') }}"
     "{{ states('sensor.pool_swimming_day') }}"
-  create_pool_temp_log: >
-    python3 /config/pool_temp_logger.py "0" "0" "off" "off" "off" "0" "No"
