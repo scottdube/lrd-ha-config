@@ -2,11 +2,32 @@ blueprint:
   name: Door Activated Lights with Motion Keep-Alive
   description: >
     Turns on lights when a door opens and turns them off after a configurable
-    timer. An optional motion sensor can extend the timer on each trigger.
-    An optional inhibit boolean prevents activation during specific modes
-    (e.g. golf simulator, movie mode, sleeping).
+    timer. A motion sensor keeps lights on while occupied and starts a countdown
+    when motion stops. An optional inhibit boolean prevents activation during
+    specific modes (e.g. golf simulator, movie mode, sleeping).
     Supports multiple lights and is designed to work alongside other automations.
     Suitable for any door/room/light combination.
+
+    CHANGELOG:
+    v1.0 - Initial release. Single door sensor, motion keep-alive, inhibit boolean.
+    v1.1 - Fixed motion trigger (replaced broken template trigger with state trigger).
+         - Fixed motion branch (added lights_are_on guard to prevent spurious off).
+         - Added support for multiple door sensors (multi-select on primary input).
+         - Consolidated door sensors into single multi-select to avoid empty trigger issue.
+    v1.2 - Fixed lights_are_on evaluation timing bug. Variable was being set at trigger
+         - time before condition check, always resolving false. Moved inline to condition.
+    v1.3 - Fixed trigger/action/condition key names to plural required by HA 2024.6+.
+    v1.4 - Replaced delay-based timer with timer helper entity. Fixes motion keep-alive
+         - never expiring when motion sensor stays on or pulses repeatedly. Motion now
+         - triggers on off state (motion stopped) instead of on state. Lights stay on
+         - while motion is detected, countdown starts when motion stops.
+         - Requires one timer helper entity per automation instance.
+    v1.5 (2026-04-11) - Added optional dark-only activation using lux sensor (primary) with sun
+         - elevation fallback. Added optional skip-if-lights-on condition to prevent
+         - brightness changes and spurious timer starts when lights are already on.
+         - Fixed evaluation timing bug on is_dark and lights_already_on — moved both
+         - inline to conditions on door_opened branch (same class of bug as v1.2).
+
   domain: automation
   homeassistant:
     min_version: "2024.6.0"
@@ -15,14 +36,18 @@ blueprint:
       name: Basic Configuration
       input:
         door_sensor:
-          name: Door Sensor
-          description: Binary sensor for the door (opens = on)
+          name: Door Sensor(s)
+          description: >
+            One or more door/tilt binary sensors (opens = on).
+            Select all doors that should trigger this automation
+            e.g. kitchen door + garage door 1 + garage door 2.
           selector:
             entity:
               domain: binary_sensor
+              multiple: true
         door_name:
           name: Door Name
-          description: Name of this door for identification (e.g. Kitchen to Garage)
+          description: Name for identification (e.g. Garage)
           default: Door
           selector:
             text:
@@ -48,32 +73,97 @@ blueprint:
               unit_of_measurement: "%"
         timer_duration:
           name: Timer Duration (minutes)
-          description: Minutes before lights turn off after door opens or last motion
+          description: >
+            Minutes before lights turn off after door opens with no motion detected.
+            If motion is detected this timer is replaced by Motion Timeout below.
           default: 5
           selector:
             number:
               min: 1
               max: 60
               unit_of_measurement: minutes
+        light_timer:
+          name: Light Timer
+          description: >
+            Timer helper for this automation instance.
+            Create one per door: Settings → Helpers → Add → Timer.
+            Name it e.g. "Garage Lights Timer". Set duration to 0.
+          selector:
+            entity:
+              domain: timer
+
+    dark_condition_config:
+      name: Dark Condition (optional)
+      collapsed: true
+      input:
+        only_when_dark:
+          name: Only activate when dark
+          description: >
+            If enabled, door trigger will only activate lights when it is dark.
+            Uses lux sensor as primary check (if configured), falls back to
+            sun elevation if lux sensor is unavailable or not configured.
+          default: false
+          selector:
+            boolean:
+        lux_sensor:
+          name: Lux Sensor
+          description: >
+            Optional illuminance sensor used as the primary dark check.
+            Recommended: use your WeatherFlow Tempest or similar outdoor sensor.
+            Leave blank to rely solely on sun elevation fallback.
+          default: []
+          selector:
+            entity:
+              domain: sensor
+              device_class: illuminance
+        lux_threshold:
+          name: Lux Threshold
+          description: >
+            Lights activate only when lux reading is at or below this value.
+            Typical values: 200–500 lux for outdoor/lanai dusk conditions.
+            For daytime testing set this to a high value (e.g. 100000) to
+            force the condition to always pass.
+          default: 300
+          selector:
+            number:
+              min: 0
+              max: 100000
+              unit_of_measurement: lux
+        sun_elevation_threshold:
+          name: Sun Elevation Fallback Threshold (degrees)
+          description: >
+            Used when lux sensor is unavailable or not configured.
+            0 = exactly at horizon. Negative values = below horizon (fully dark).
+            Recommended: 0 to -3 for natural dusk activation.
+          default: 0
+          selector:
+            number:
+              min: -90
+              max: 90
+              unit_of_measurement: "°"
+
+    lights_on_config:
+      name: Skip If Lights On (optional)
+      collapsed: true
+      input:
+        skip_if_lights_on:
+          name: Skip if lights already on
+          description: >
+            If enabled, the automation will not activate if any target light
+            is already on. Prevents brightness changes and timer starts when
+            lights are already controlled by another automation or manually.
+          default: false
+          selector:
+            boolean:
 
     motion_config:
       name: Motion Sensor (optional)
       collapsed: true
       input:
-        # MULTIPLE CAMERAS OR SENSORS:
-        # To combine multiple motion sensors or cameras into one input,
-        # create a Template Binary Sensor helper:
-        # Settings → Helpers → Create Helper → Template → Binary Sensor
-        # Name: e.g. "Garage Person Detected"
-        # Template: {{ is_state('binary_sensor.camera_1', 'on') or
-        #              is_state('binary_sensor.camera_2', 'on') }}
-        # Device class: Motion
-        # Then select that combined helper here as the motion sensor.
-        # Example: binary_sensor.garage_person_detected
         motion_sensor:
           name: Motion Sensor
           description: >
-            Optional motion sensor to extend the timer while area is occupied.
+            Optional motion sensor to keep lights on while occupied.
             For multiple cameras combine them into a Template Binary Sensor helper first.
             Leave blank if not needed.
           default: []
@@ -81,9 +171,11 @@ blueprint:
             entity:
               domain: binary_sensor
               device_class: motion
-        motion_extension:
-          name: Motion Extension (minutes)
-          description: Minutes to extend the timer on each motion trigger
+        motion_timeout:
+          name: Motion Timeout (minutes)
+          description: >
+            Minutes after motion stops before lights turn off.
+            Only applies when a motion sensor is configured.
           default: 2
           selector:
             number:
@@ -107,13 +199,18 @@ blueprint:
               domain: input_boolean
 
 variables:
-  door_sensor: !input door_sensor
   lights: !input lights
   brightness: !input brightness
   timer_duration: !input timer_duration
+  light_timer: !input light_timer
   motion_sensor: !input motion_sensor
-  motion_extension: !input motion_extension
+  motion_timeout: !input motion_timeout
   inhibit_boolean: !input inhibit_boolean
+  only_when_dark: !input only_when_dark
+  lux_sensor: !input lux_sensor
+  lux_threshold: !input lux_threshold
+  sun_elevation_threshold: !input sun_elevation_threshold
+  skip_if_lights_on: !input skip_if_lights_on
   has_motion_sensor: >
     {% set ms = motion_sensor %}
     {{ ms is not none and ms != '' and ms != [] }}
@@ -125,7 +222,7 @@ variables:
       {{ is_state(ib | string, 'on') }}
     {% endif %}
 
-trigger:
+triggers:
   - platform: state
     entity_id: !input door_sensor
     from: "off"
@@ -133,44 +230,99 @@ trigger:
     id: door_opened
   - platform: state
     entity_id: !input motion_sensor
+    from: "on"
+    to: "off"
+    id: motion_stopped
+  - platform: state
+    entity_id: !input motion_sensor
     from: "off"
     to: "on"
-    id: motion_detected
+    id: motion_started
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input light_timer
+    id: timer_finished
 
-condition:
+conditions:
   - condition: template
     value_template: "{{ not is_inhibited }}"
 
-action:
+actions:
   - choose:
-      # DOOR OPENED - turn on lights and start timer
+      # DOOR OPENED - check dark condition and lights-on condition, then activate
       - conditions:
           - condition: trigger
             id: door_opened
+          - condition: template
+            value_template: >
+              {% if not only_when_dark %}
+                {{ true }}
+              {% else %}
+                {% set has_lux = lux_sensor is not none and lux_sensor != '' and lux_sensor != [] %}
+                {% if has_lux %}
+                  {% set lux_state = states(lux_sensor | string) %}
+                  {% if lux_state not in ['unknown', 'unavailable'] %}
+                    {{ lux_state | float(9999) <= lux_threshold }}
+                  {% else %}
+                    {{ state_attr('sun.sun', 'elevation') | float(0) <= sun_elevation_threshold }}
+                  {% endif %}
+                {% else %}
+                  {{ state_attr('sun.sun', 'elevation') | float(0) <= sun_elevation_threshold }}
+                {% endif %}
+              {% endif %}
+          - condition: template
+            value_template: >
+              {{ not skip_if_lights_on or
+                 expand(lights) | selectattr('state', 'eq', 'on') | list | count == 0 }}
         sequence:
           - action: light.turn_on
             target:
               entity_id: !input lights
             data:
               brightness_pct: "{{ brightness }}"
-          - delay:
-              minutes: "{{ timer_duration }}"
-          - action: light.turn_off
+          - action: timer.start
             target:
-              entity_id: !input lights
+              entity_id: !input light_timer
+            data:
+              duration: "{{ timer_duration * 60 }}"
 
-      # MOTION DETECTED - extend timer if lights are on
+      # MOTION STARTED - cancel timer, lights stay on
       - conditions:
           - condition: trigger
-            id: motion_detected
+            id: motion_started
           - condition: template
-            value_template: "{{ has_motion_sensor }}"
+            value_template: >
+              {{ has_motion_sensor and
+                 expand(lights) | selectattr('state', 'eq', 'on') | list | count > 0 }}
         sequence:
-          - delay:
-              minutes: "{{ motion_extension }}"
+          - action: timer.cancel
+            target:
+              entity_id: !input light_timer
+
+      # MOTION STOPPED - start countdown to turn off
+      - conditions:
+          - condition: trigger
+            id: motion_stopped
+          - condition: template
+            value_template: >
+              {{ has_motion_sensor and
+                 expand(lights) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: !input light_timer
+            data:
+              duration: "{{ motion_timeout * 60 }}"
+
+      # TIMER FINISHED - turn off lights
+      - conditions:
+          - condition: trigger
+            id: timer_finished
+        sequence:
           - action: light.turn_off
             target:
               entity_id: !input lights
 
-mode: restart
+mode: parallel
 max_exceeded: silent

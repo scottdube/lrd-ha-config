@@ -4,37 +4,22 @@
 # =============================================================================
 #
 # CHANGELOG:
-#  v1.6.0  Waterfall now operates independently of pump_is_on. Waterfall
-#          window check no longer requires pump to be running — if pump is
-#          off when waterfall window opens, pump is started automatically
-#          at the correct speed before waterfall is enabled. Eliminates
-#          waterfall dropout when pump state is momentarily false.
+#  v1.7.0  Heater management moved from pump-start to poll loop. Heater is
+#          now enforced every 10 minutes: on if swim day and pump running,
+#          off if not swim day. Heat pump thermostat controls all cycling.
+#          HA only controls pump speed (77% when heater needed, 55% when not).
+#          Eliminates missed heater starts due to pump-start timing issues.
+#          Removed heater_idle trigger - no longer needed.
+#
+#  v1.6.0  Waterfall now operates independently of pump_is_on.
 #
 #  v1.5.0  Fixed pump start bug and last temp assumption
 #
 # v1.4.0 - Switched to OmniLogic Local integration for all control actions.
-#          Local integration provides faster response and works independently
-#          of Hayward cloud. Cloud integration retained for ORP/salt/pH
-#          monitoring only. Replaced omnilogic.set_pump_speed service with
-#          number.set_value on local pump speed entity. Replaced
-#          omnilogic.set_chlor_timed_percent with number.set_value on local
-#          chlorinator percent entity.
-#
-#          INTEGRATION SPLIT:
-#          LOCAL  - All control: pump, heater, waterfall, chlorinator, light
-#          LOCAL  - Water temp, air temp sensors
-#          CLOUD  - ORP, salt level, pH (monitoring only, not in blueprint)
-#          WFLOW  - Forecast high, rain accumulation, illuminance, air temp
-#
-# v1.3.0 - Dynamic pump start time based on target ready time and minimum
-#          filter hours. 10-minute polling replaces fixed pump start trigger.
-#          Rain sensor mm to inch conversion added.
-# v1.2.0 - Added pool light illuminance-based trigger with sunset fallback.
-#          Added heater_idle pump shutoff trigger. Parallel mode.
-# v1.1.0 - Added weather-aware chlorinator boost. Added forecast high sensor
-#          input. Fixed heater control to use set_operation_mode.
-# v1.0.0 - Initial release. Basic pump, heater, waterfall, chlorinator,
-#          and light control.
+# v1.3.0 - Dynamic pump start time. Rain sensor mm to inch conversion.
+# v1.2.0 - Pool light illuminance trigger. Heater_idle pump shutoff.
+# v1.1.0 - Weather-aware chlorinator boost. Forecast high sensor.
+# v1.0.0 - Initial release.
 #
 # REQUIREMENTS:
 # - OmniLogic Local HACS integration (cryptk/haomnilogic-local)
@@ -53,19 +38,18 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.6.0"
+  name: "Pool Automation v1.7.0"
   description: >
-    Pool Automation v1.6.0
+    Pool Automation v1.7.0
 
     Intelligent pool automation using OmniLogic Local for all control
     actions and WeatherFlow for environmental inputs. Cloud integration
     retained for ORP/salt/pH monitoring only.
 
-    INTEGRATION SPLIT:
-    LOCAL  - All control: pump, heater, waterfall, chlorinator, light
-    LOCAL  - Water temp and air temp sensors
-    CLOUD  - ORP, salt level, pH (monitoring only, not used here)
-    WFLOW  - Forecast high, rain accumulation, illuminance, air temp
+    HEATER LOGIC: Heater is set on if swim day, off if not swim day.
+    Heat pump thermostat controls all heat/cool cycling automatically.
+    HA manages pump speed only: heater_pump_speed when heater needed,
+    normal_pump_speed otherwise.
   author: LRD
   domain: automation
   homeassistant:
@@ -195,7 +179,7 @@ blueprint:
               unit_of_measurement: "%"
         heater_pump_speed:
           name: Heater Pump Speed (%)
-          description: Minimum pump speed when heater or cooler is running
+          description: Minimum pump speed when heater needed
           default: 75
           selector:
             number:
@@ -394,6 +378,8 @@ variables:
     {{ now().hour * 60 + now().minute }}
   pump_is_on: >
     {{ is_state(pump_switch, 'on') }}
+  heater_is_on: >
+    {{ not is_state(heater_entity, 'off') }}
   hours_pumped_today: >
     {% set start = states('input_datetime.pool_pump_actual_start') %}
     {% if start and start != 'unknown' and not start.startswith('1970') %}
@@ -410,11 +396,6 @@ trigger:
   - platform: time_pattern
     minutes: "/10"
     id: poll
-  - platform: state
-    entity_id: !input heater_entity
-    from: "on"
-    to: "off"
-    id: heater_idle
   - platform: numeric_state
     entity_id: !input illuminance_sensor
     below: !input light_lux_threshold
@@ -473,18 +454,6 @@ action:
                       entity_id: input_datetime.pool_pump_actual_start
                     data:
                       datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-                  - condition: template
-                    value_template: "{{ heater_needed }}"
-                  - action: water_heater.set_operation_mode
-                    target:
-                      entity_id: !input heater_entity
-                    data:
-                      operation_mode: "on"
-                  - action: water_heater.set_temperature
-                    target:
-                      entity_id: !input heater_entity
-                    data:
-                      temperature: "{{ target_temp }}"
                   - action: number.set_value
                     target:
                       entity_id: !input chlorinator_percent_entity
@@ -543,16 +512,10 @@ action:
                       entity_id: !input waterfall_switch
                   - condition: template
                     value_template: >
-                      {{ not is_state(heater_entity, 'on')
-                         and filtration_complete }}
+                      {{ not heater_is_on and filtration_complete }}
                   - action: switch.turn_off
                     target:
                       entity_id: !input pump_switch
-                  - action: water_heater.set_operation_mode
-                    target:
-                      entity_id: !input heater_entity
-                    data:
-                      operation_mode: "off"
 
               # NOT A SWIMMING DAY - shut everything down
               - conditions:
@@ -572,43 +535,43 @@ action:
                     data:
                       operation_mode: "off"
 
-              # PUMP SPEED ADJUSTMENT - based on heater state
+              # HEATER AND PUMP SPEED MANAGEMENT
+              # Runs every poll when pump is on.
+              # Heater on = swim day. Heat pump thermostat controls cycling.
+              # HA enforces on/off state and sets pump speed accordingly.
               - conditions:
                   - condition: template
                     value_template: "{{ pump_is_on }}"
                 sequence:
-                  - choose:
-                      - conditions:
-                          - condition: template
-                            value_template: "{{ is_state(heater_entity, 'on') }}"
-                        sequence:
-                          - action: number.set_value
-                            target:
-                              entity_id: !input pump_speed_entity
-                            data:
-                              value: "{{ heater_pump_speed }}"
-                      - conditions:
-                          - condition: template
-                            value_template: "{{ not is_state(heater_entity, 'on') }}"
-                        sequence:
-                          - action: number.set_value
-                            target:
-                              entity_id: !input pump_speed_entity
-                            data:
-                              value: "{{ normal_pump_speed }}"
-
-      # HEATER WENT IDLE - turn pump off if after waterfall end and filtration complete
-      - conditions:
-          - condition: trigger
-            id: heater_idle
-          - condition: time
-            after: !input waterfall_end_time
-          - condition: template
-            value_template: "{{ filtration_complete }}"
-        sequence:
-          - action: switch.turn_off
-            target:
-              entity_id: !input pump_switch
+                  - if:
+                      - condition: template
+                        value_template: "{{ heater_needed and is_state(heater_entity, 'off') }}"
+                    then:
+                      - action: water_heater.set_operation_mode
+                        target:
+                          entity_id: !input heater_entity
+                        data:
+                          operation_mode: "on"
+                      - action: water_heater.set_temperature
+                        target:
+                          entity_id: !input heater_entity
+                        data:
+                          temperature: "{{ target_temp }}"
+                  - if:
+                      - condition: template
+                        value_template: "{{ not heater_needed and heater_is_on }}"
+                    then:
+                      - action: water_heater.set_operation_mode
+                        target:
+                          entity_id: !input heater_entity
+                        data:
+                          operation_mode: "off"
+                  - action: number.set_value
+                    target:
+                      entity_id: !input pump_speed_entity
+                    data:
+                      value: >
+                        {{ heater_pump_speed if heater_needed else normal_pump_speed }}
 
       # POOL LIGHT ON - illuminance based (primary)
       - conditions:

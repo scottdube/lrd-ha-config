@@ -37,3 +37,5 @@ node_modules/
 zigbee.db
 zigbee.db-shm
 zigbee.db-wal
+tts/
+www/

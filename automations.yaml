@@ -280,20 +280,6 @@
       wind_threshold: 11
       day_delay: 60
       repeat_interval: 5
-- id: '1775438702635'
-  alias: Garage/Kitchen Door Activated Lights with Motion Keep-Alive
-  description: ''
-  use_blueprint:
-    path: LRD/door_automations/door_activated_lights.yaml
-    input:
-      door_sensor: binary_sensor.garage_door
-      door_name: Garage/Kitchen Door
-      lights:
-      - light.garage_lights
-      timer_duration: 5
-      motion_sensor: binary_sensor.garage_person_detected
-      inhibit_boolean: input_boolean.golfing
-      motion_extension: 5
 - id: '1775487019530'
   alias: Kitchen Cans Sync to Kitchen 4 Cans
   description: Syncs Kitchen Cans state and brightness to Kitchen 4 Cans
@@ -468,34 +454,120 @@
               interruption-level: time-sensitive
   mode: single
   max_exceeded: silent
-- id: '1775654657353'
-  alias: Pool Automation v1.5.0
-  description: ''
-  use_blueprint:
-    path: LRD/pool_automation/pool_automation.yaml
-    input:
-      target_temp: 88
-      min_swim_temp: 77
-      min_heatpump_air_temp: 56
-      normal_pump_speed: 55
-      heater_pump_speed: 77
-      waterfall_start_time: 08:00:00
-- id: '1775690863923'
-  alias: Pool Automation v1.6.0
-  description: ''
-  use_blueprint:
-    path: LRD/pool_automation/pool_automation.yaml
-    input:
-      waterfall_start_time: 08:00:00
-
 - alias: Pool Temp Logger
   id: pool_temp_logger
   trigger:
-    - platform: time_pattern
-      minutes: "/10"
+  - platform: time_pattern
+    minutes: /10
   condition:
-    - condition: state
-      entity_id: switch.omnilogic_pool_filter_pump
-      state: "on"
+  - condition: state
+    entity_id: switch.omnilogic_pool_filter_pump
+    state: 'on'
   action:
-    - action: shell_command.pool_log
+  - action: shell_command.pool_log
+- id: '1775827717239'
+  alias: Pool Automation v1.7.0
+  description: ''
+  use_blueprint:
+    path: LRD/pool_automation/pool_automation.yaml
+    input:
+      min_swim_temp: 78
+      heater_pump_speed: 77
+      waterfall_start_time: 08:00:00
+- id: '1775847529638'
+  alias: Garage Door Activated Lights with Motion Keep-Alive
+  description: ''
+  use_blueprint:
+    path: LRD/door_automations/door_activated_lights.yaml
+    input:
+      door_sensor:
+      - binary_sensor.garage_door
+      - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor
+      - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2
+      door_name: 'Garage Doors '
+      lights:
+      - light.garage_lights
+      timer_duration: 1
+      motion_sensor: binary_sensor.garage_person_detected
+      inhibit_boolean: input_boolean.golfing
+      light_timer: timer.timer_garage_lights
+- id: '1775854500076'
+  alias: Front Door - Start Notification Suppression
+  description: Suppress doorbell notifications when front door opens
+  triggers:
+  - entity_id: binary_sensor.front_door
+    from: 'off'
+    to: 'on'
+    trigger: state
+  conditions: []
+  actions:
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.front_door_notification_suppression
+  mode: single
+- id: '1775854528786'
+  alias: Front Door - Clear Notification Suppression
+  description: Re-enable doorbell notifications 5 minutes after front door closes
+  triggers:
+  - entity_id: binary_sensor.front_door
+    from: 'on'
+    to: 'off'
+    trigger: state
+  conditions: []
+  actions:
+  - delay:
+      minutes: 5
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.front_door_notification_suppression
+  mode: restart
+  max_exceeded: silent
+- id: '1775854571098'
+  alias: Front Door - Doorbell Person/Animal Alert
+  description: Send notification when person or animal detected, suppress if front
+    door recently opened
+  triggers:
+  - entity_id: binary_sensor.g4_doorbell_pro_person_detected
+    from: 'off'
+    to: 'on'
+    id: person_detected
+    trigger: state
+  - entity_id: binary_sensor.g4_doorbell_pro_animal_detected
+    from: 'off'
+    to: 'on'
+    id: animal_detected
+    trigger: state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.front_door_notification_suppression
+    state: 'off'
+  actions:
+  - variables:
+      detection_type: "{% if trigger.id == 'person_detected' %}\n  Person\n{% else
+        %}\n  Animal\n{% endif %}\n"
+  - action: notify.mobile_app_iphone_sd
+    data:
+      title: Front Door Alert
+      message: '{{ detection_type }} detected near front door'
+  mode: parallel
+  max_exceeded: silent
+- id: '1775916297031'
+  alias: Lanai Door Activated Lights with Motion Keep-Alive
+  description: ''
+  use_blueprint:
+    path: LRD/door_automations/door_activated_lights.yaml
+    input:
+      door_sensor:
+      - binary_sensor.lanai_slider_door
+      - binary_sensor.bathroom_lanai_door
+      - binary_sensor.lanai_master
+      door_name: Lanai Doors
+      lights:
+      - light.lanai_wall_dimmer_switch
+      brightness: 58
+      timer_duration: 10
+      light_timer: timer.lanai_lights_timer
+      only_when_dark: true
+      lux_sensor: sensor.st_00184974_illuminance
+      lux_threshold: 300
+      skip_if_lights_on: true
