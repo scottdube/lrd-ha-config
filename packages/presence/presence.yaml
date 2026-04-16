@@ -1,0 +1,26 @@
+# Bluetooth presence detection using ESPresense via MQTT
+
+sensor:
+  - platform: mqtt_room
+    name: ScottPhoneBT
+    device_id: "phone:scottphonebt_2"
+    away_timeout: 180
+    state_topic: "espresense/devices/phone:scottphonebt_2"
+    unique_id: "c4d5e6f7-a8b9-0123-cdef-456789abcdef"
+  - platform: mqtt_room
+    name: ScottWatchBT
+    device_id: "watch:scottswatch"
+    away_timeout: 180
+    state_topic: "espresense/devices/watch:scottswatch"
+    unique_id: "e6f7a8b9-c0d1-2345-efab-678901cdef01"
+
+template:
+  - sensor:
+      - name: "Scott Watch Distance"
+        unique_id: "scott_watch_distance"
+        unit_of_measurement: "m"
+        state: "{{ state_attr('sensor.scottwatchbt', 'distance') }}"
+      - name: "Scott Phone Distance"
+        unique_id: "scott_phone_distance"
+        unit_of_measurement: "m"
+        state: "{{ state_attr('sensor.scottphonebt_2', 'distance') }}"

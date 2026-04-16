@@ -104,7 +104,16 @@ def _seat_settings_genesis(level: SeatSettings | None, vehicle_id: str = "") -> 
         6: 8,  # HeatHigh
     })
 
-    result = mapping.get(level_value, mapping.get(0, 2))
+    # Handle heat-only vehicles (4 entries: Off + 3 heat levels)
+    # SeatSettings enum: 4=HeatLow, 5=HeatMedium, 6=HeatHigh
+    # But 4-entry mapping has indices 0,1,2,3 not 0,4,5,6
+    # Remap heat levels 4/5/6 to indices 1/2/3
+    if len(mapping) == 4 and level_value in [4, 5, 6]:
+        remap = {4: 1, 5: 2, 6: 3}
+        result = mapping.get(remap[level_value], mapping.get(0, 2))
+    else:
+        result = mapping.get(level_value, mapping.get(0, 2))
+
     _LOGGER.debug("_seat_settings_genesis: output value=%s (from mapping: %s)", result, mapping)
     return result
 
@@ -216,6 +225,7 @@ class UsGenesis:
         headers["registrationId"] = vehicle.get("regid", vehicle.get("id", ""))
         headers["gen"] = str(vehicle.get("generation", vehicle.get("gen", "2")))
         headers["vin"] = vehicle.get("vin", vehicle.get("VIN", ""))
+        headers["APPCLOUD-VIN"] = vehicle.get("vin", vehicle.get("VIN", ""))
         return headers
 
     def _is_token_valid(self) -> bool:
@@ -729,12 +739,15 @@ class UsGenesis:
                     "rrSeatHeatState": _seat_settings_genesis(right_rear_seat, vehicle_id),
                 }
         else:
+            # ICE vehicle - match bluelinky payload structure
+            # Always include igniOnDuration, seatHeaterVentInfo, username, vin
             data = {
                 "Ims": 0,
                 "airCtrl": int(climate),
-                "airTemp": {"unit": 1, "value": set_temp},
+                "airTemp": {"unit": 1, "value": str(set_temp)},
                 "defrost": defrost,
                 "heating1": int(heating),
+                "igniOnDuration": duration if duration is not None else 10,
                 "seatHeaterVentInfo": {
                     "drvSeatHeatState": _seat_settings_genesis(driver_seat, vehicle_id),
                     "astSeatHeatState": _seat_settings_genesis(passenger_seat, vehicle_id),
@@ -744,9 +757,6 @@ class UsGenesis:
                 "username": self.username,
                 "vin": vehicle.get("vin"),
             }
-            # Only include duration if user specified it
-            if duration is not None:
-                data["igniOnDuration"] = duration
 
         _LOGGER.debug("Genesis start_climate data: %s", data)
 

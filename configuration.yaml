@@ -1,4 +1,8 @@
 # Loads default set of integrations. Do not remove.
+
+homeassistant:
+  packages: !include_dir_named packages
+
 default_config:
 
 # Load frontend themes from the themes folder
@@ -18,6 +22,11 @@ shell_command:
     "{{ states('water_heater.omnilogic_pool_heater') }}"
     "{{ states('switch.omnilogic_pool_filter_pump') }}"
     "{{ states('number.omnilogic_pool_filter_pump_speed') }}"
-    "{{ states('switch.omnilogic_pool_waterfall') }}"
+    "{{ states('valve.omnilogic_pool_waterfall') }}"
     "{{ states('sensor.pool_forecast_high') }}"
     "{{ states('sensor.pool_swimming_day') }}"
+
+recorder:
+  exclude:
+    entity_globs:
+      - sensor.flightradar24*

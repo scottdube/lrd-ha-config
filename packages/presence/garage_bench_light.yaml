@@ -1,0 +1,25 @@
+automation:
+  - alias: Garage Bench Light
+    description: Turn on bench light when present, off when away
+    triggers:
+      - trigger: state
+        entity_id: sensor.scottwatchbt
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: sensor.scottwatchbt
+                state: garage
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: light.s2_dimmer
+          - conditions:
+              - condition: state
+                entity_id: sensor.scottwatchbt
+                state: not_home
+            sequence:
+              - action: light.turn_off
+                target:
+                  entity_id: light.s2_dimmer
+    mode: single

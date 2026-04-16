@@ -4,6 +4,11 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.8.0  Migrated waterfall from switch to valve platform to support
+#          haomnilogic-local v1.0.0b1+. Updated entity selector domain,
+#          default entity ID, service calls (valve.open_valve/close_valve),
+#          and state checks (open/closed vs on/off).
+#
 #  v1.7.0  Heater management moved from pump-start to poll loop. Heater is
 #          now enforced every 10 minutes: on if swim day and pump running,
 #          off if not swim day. Heat pump thermostat controls all cycling.
@@ -22,7 +27,7 @@
 # v1.0.0 - Initial release.
 #
 # REQUIREMENTS:
-# - OmniLogic Local HACS integration (cryptk/haomnilogic-local)
+# - OmniLogic Local HACS integration (cryptk/haomnilogic-local) v1.0.0b1+
 # - Hayward OmniLogic HACS integration (djtimca/haomnilogic) - monitoring only
 # - WeatherFlow Cloud integration
 # - sensor.pool_forecast_high template sensor (see /config/templates.yaml)
@@ -38,9 +43,9 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.7.0"
+  name: "Pool Automation v1.8.0"
   description: >
-    Pool Automation v1.7.0
+    Pool Automation v1.8.0
 
     Intelligent pool automation using OmniLogic Local for all control
     actions and WeatherFlow for environmental inputs. Cloud integration
@@ -88,12 +93,12 @@ blueprint:
             entity:
               domain: number
         waterfall_switch:
-          name: Waterfall Switch
-          description: Pool waterfall switch (local integration)
-          default: switch.omnilogic_pool_waterfall
+          name: Waterfall Valve
+          description: Pool waterfall valve (local integration)
+          default: valve.omnilogic_pool_waterfall
           selector:
             entity:
-              domain: switch
+              domain: valve
         chlorinator_switch:
           name: Chlorinator Switch
           description: Pool chlorinator switch (local integration)
@@ -494,9 +499,9 @@ action:
                           datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
                   - if:
                       - condition: template
-                        value_template: "{{ is_state(waterfall_switch, 'off') }}"
+                        value_template: "{{ is_state(waterfall_switch, 'closed') }}"
                     then:
-                      - action: switch.turn_on
+                      - action: valve.open_valve
                         target:
                           entity_id: !input waterfall_switch
 
@@ -505,9 +510,9 @@ action:
                   - condition: template
                     value_template: >
                       {{ current_minutes >= waterfall_end_minutes
-                         and is_state(waterfall_switch, 'on') }}
+                         and is_state(waterfall_switch, 'open') }}
                 sequence:
-                  - action: switch.turn_off
+                  - action: valve.close_valve
                     target:
                       entity_id: !input waterfall_switch
                   - condition: template
@@ -526,7 +531,7 @@ action:
                   - action: switch.turn_off
                     target:
                       entity_id: !input pump_switch
-                  - action: switch.turn_off
+                  - action: valve.close_valve
                     target:
                       entity_id: !input waterfall_switch
                   - action: water_heater.set_operation_mode

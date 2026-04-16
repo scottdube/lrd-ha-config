@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from pyomnilogic_local.api import OmniLogicAPI
-import voluptuous as vol
-
-from homeassistant import config_entries
-from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME, CONF_PORT, CONF_SCAN_INTERVAL, CONF_TIMEOUT
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
+from homeassistant.config_entries import ConfigFlow, OptionsFlow
+from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME, CONF_PORT, CONF_TIMEOUT
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from pyomnilogic_local import OmniLogic
 
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
+from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+    from homeassistant.core import HomeAssistant
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,33 +27,27 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_IP_ADDRESS): cv.string,
         vol.Required(CONF_NAME, default="Omnilogic"): cv.string,
         vol.Optional(CONF_PORT, default=10444): cv.port,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(cv.positive_int, vol.Clamp(min=MIN_SCAN_INTERVAL)),
         vol.Optional(CONF_TIMEOUT, default=5.0): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
     }
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
     """Validate the user input allows us to connect.
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-    omni = OmniLogicAPI(data[CONF_IP_ADDRESS], data[CONF_PORT], data[CONF_TIMEOUT])
+    omni = OmniLogic(data[CONF_IP_ADDRESS], data[CONF_PORT], data[CONF_TIMEOUT])
     try:
-        config = await omni.async_get_config()
+        await omni.refresh()
     except TimeoutError as exc:
         raise OmniLogicTimeout from exc
     except Exception as exc:
         raise CannotConnect from exc
 
-    telemetry = await omni.async_get_telemetry()
 
-    # Return info that you want to store in the config entry.
-    return {"config": config, "telemetry": telemetry}
-
-
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+class OptionsFlowHandler(OptionsFlow):
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         if user_input is not None:
             user_input.update({"name": self.config_entry.data[CONF_NAME]})
@@ -68,12 +65,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Required(CONF_IP_ADDRESS, default=self.config_entry.data[CONF_IP_ADDRESS]): cv.string,
                     vol.Required(CONF_PORT, default=self.config_entry.data[CONF_PORT]): cv.port,
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        description="bar",
-                        msg="foo",
-                        default=self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                    ): vol.All(cv.positive_int, vol.Clamp(min=MIN_SCAN_INTERVAL)),
                     vol.Required(CONF_TIMEOUT, default=self.config_entry.data[CONF_TIMEOUT]): vol.All(
                         vol.Coerce(float), vol.Range(min=0.5, max=10.0)
                     ),
@@ -82,12 +73,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
 
-class OmnilogicConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
+class OmnilogicConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for OmniLogic Local."""
 
-    VERSION = 2
+    VERSION = 4
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -121,10 +112,10 @@ class OmnilogicConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
 
     @staticmethod
-    @callback  # type: ignore[misc]
+    @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
+        config_entry: ConfigEntry,
+    ) -> OptionsFlow:
         """Create the options flow."""
         return OptionsFlowHandler()
 

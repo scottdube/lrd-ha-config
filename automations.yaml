@@ -1,569 +1,621 @@
-- id: '1775131171443'
+- id: "1775131171443"
   alias: Lights Off at Sunrise
-  description: ''
+  description: ""
   triggers:
-  - trigger: sun
-    event: sunrise
-    offset: 0
+    - trigger: sun
+      event: sunrise
+      offset: 0
   conditions: []
   actions:
-  - action: light.turn_off
-    metadata: {}
-    target:
-      entity_id:
-      - light.s2_dimmer
-      - light.s2_dimmer_2
-      - light.wall_dimmer_switch3
-      - light.garage_lights
-      - light.front_wall_dimmer_switch
-      - light.garage_outdoor_wall_dimmer_switch
-      - light.smart_plug_dimmerdesk
-      - light.smart_plug_dimmer
-      - light.wall_dimmer_switch
-      - light.dimmer_2
-    data: {}
-  - action: switch.turn_off
-    metadata: {}
-    target:
-      entity_id: switch.funky_lamp
-    data: {}
+    - action: light.turn_off
+      metadata: {}
+      target:
+        entity_id:
+          - light.s2_dimmer
+          - light.s2_dimmer_2
+          - light.wall_dimmer_switch3
+          - light.garage_lights
+          - light.front_wall_dimmer_switch
+          - light.garage_outdoor_wall_dimmer_switch
+          - light.smart_plug_dimmerdesk
+          - light.smart_plug_dimmer
+          - light.wall_dimmer_switch
+          - light.dimmer_2
+      data: {}
+    - action: switch.turn_off
+      metadata: {}
+      target:
+        entity_id: switch.funky_lamp
+      data: {}
   mode: single
-- id: '1775132170002'
+- id: "1775132170002"
   alias: Lights on at Sunset
-  description: ''
+  description: ""
   triggers:
-  - trigger: sun
-    event: sunset
-    offset: 0
+    - trigger: sun
+      event: sunset
+      offset: 0
   conditions: []
   actions:
-  - action: light.turn_on
-    metadata: {}
-    data:
-      brightness_pct: 28
-    target:
-      entity_id: light.smart_plug_dimmerdesk
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.smart_plug_dimmer
-    data:
-      brightness_pct: 40
-  - action: switch.turn_on
-    metadata: {}
-    target:
-      entity_id: switch.funky_lamp
-    data: {}
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.front_wall_dimmer_switch
-    data:
-      brightness_pct: 65
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.garage_outdoor_wall_dimmer_switch
-    data:
-      brightness_pct: 40
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.smart_plug_dimmer_2
-    data:
-      brightness_pct: 65
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.dimmer_2
-    data:
-      brightness_pct: 15
+    - action: light.turn_on
+      metadata: {}
+      data:
+        brightness_pct: 28
+      target:
+        entity_id: light.smart_plug_dimmerdesk
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.smart_plug_dimmer
+      data:
+        brightness_pct: 40
+    - action: switch.turn_on
+      metadata: {}
+      target:
+        entity_id: switch.funky_lamp
+      data: {}
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.front_wall_dimmer_switch
+      data:
+        brightness_pct: 65
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.garage_outdoor_wall_dimmer_switch
+      data:
+        brightness_pct: 40
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.smart_plug_dimmer_2
+      data:
+        brightness_pct: 65
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.dimmer_2
+      data:
+        brightness_pct: 15
   mode: single
-- id: '1775153373574'
+- id: "1775153373574"
   alias: Hot Water Recirc Pump ON
-  description: Turns on recirc pump at 7:30am if someone is home, or when someone
+  description:
+    Turns on recirc pump at 7:30am if someone is home, or when someone
     arrives home
   triggers:
-  - trigger: time
-    at: 07:30:00
-    id: scheduled
-  - trigger: state
-    entity_id:
-    - person.scott
-    - person.mary
-    to: home
-    id: arrived_home
+    - trigger: time
+      at: 07:30:00
+      id: scheduled
+    - trigger: state
+      entity_id:
+        - person.scott
+        - person.mary
+      to: home
+      id: arrived_home
   conditions:
-  - condition: or
-    conditions:
-    - condition: state
-      entity_id: person.scott
-      state: home
-    - condition: state
-      entity_id: person.mary
-      state: home
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: person.scott
+          state: home
+        - condition: state
+          entity_id: person.mary
+          state: home
   actions:
-  - choose:
-    - conditions:
-      - condition: trigger
-        id: arrived_home
-      - condition: time
-        after: 07:30:00
-        before: '23:30:00'
-      sequence:
-      - action: switch.turn_on
-        target:
-          entity_id: switch.hot_water_recirc_pump
-        data: {}
-    - conditions:
-      - condition: trigger
-        id: scheduled
-      sequence:
-      - action: switch.turn_on
-        target:
-          entity_id: switch.hot_water_recirc_pump
-        data: {}
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: arrived_home
+            - condition: time
+              after: 07:30:00
+              before: "23:30:00"
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id: switch.hot_water_recirc_pump
+              data: {}
+        - conditions:
+            - condition: trigger
+              id: scheduled
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id: switch.hot_water_recirc_pump
+              data: {}
   mode: single
-- id: '1775153481762'
+- id: "1775153481762"
   alias: Hot Water Recirc Pump OFF
   description: Turns off recirc pump at 11:30pm or when both people leave home
   triggers:
-  - trigger: time
-    at: '23:30:00'
-    id: scheduled
-  - trigger: state
-    entity_id:
-    - person.scott
-    - person.mary
-    to: not_home
-    id: departed_home
-  conditions:
-  - condition: or
-    conditions:
-    - condition: trigger
+    - trigger: time
+      at: "23:30:00"
       id: scheduled
-    - condition: and
+    - trigger: state
+      entity_id:
+        - person.scott
+        - person.mary
+      to: not_home
+      id: departed_home
+  conditions:
+    - condition: or
       conditions:
-      - condition: state
-        entity_id: person.scott
-        state: not_home
-      - condition: state
-        entity_id: person.mary
-        state: not_home
+        - condition: trigger
+          id: scheduled
+        - condition: and
+          conditions:
+            - condition: state
+              entity_id: person.scott
+              state: not_home
+            - condition: state
+              entity_id: person.mary
+              state: not_home
   actions:
-  - action: switch.turn_off
-    metadata: {}
-    target:
-      entity_id: switch.hot_water_recirc_pump
-    data: {}
+    - action: switch.turn_off
+      metadata: {}
+      target:
+        entity_id: switch.hot_water_recirc_pump
+      data: {}
   mode: single
-- id: '1775154207416'
+- id: "1775154207416"
   alias: Bed Time
-  description: ''
+  description: ""
   triggers:
-  - trigger: state
-    entity_id:
-    - input_boolean.bed_time
-    to:
-    - 'on'
+    - trigger: state
+      entity_id:
+        - input_boolean.bed_time
+      to:
+        - "on"
   conditions: []
   actions:
-  - action: switch.turn_off
-    metadata: {}
-    target:
-      entity_id: switch.funky_lamp
-    data: {}
-  - action: switch.turn_off
-    metadata: {}
-    target:
-      entity_id: switch.hot_water_recirc_pump
-    data: {}
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.wall_dimmer_switch
-    data:
-      brightness_pct: 24
-  - action: light.turn_off
-    metadata: {}
-    target:
-      entity_id:
-      - light.wall_dimmer_switch_bathroom
-      - light.dining_wall_dimmer_switch
-      - light.wall_dimmer_switch3
-      - light.garage_lights
-      - light.wall_dimmer_switch_island
-      - light.kit_cans_wall_dimmer_switch
-      - light.lanai_wall_dimmer_switch
-      - light.living_wall_dimmer_switch
-      - light.wall_dimmer_switch_nook
-      - light.s2_dimmer_2
-      - light.wall_dimmer_switch_under_cab
-      - light.van_wall_dimmer_switch
-      - light.wall_dimmer_switch_kitche_4
-      - light.wall_dimmer_switch_2
-      - light.smart_plug_dimmer_2
-    data: {}
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.garage_outdoor_wall_dimmer_switch
-    data:
-      brightness_pct: 30
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.front_wall_dimmer_switch
-    data:
-      brightness_pct: 45
-  - action: fan.turn_on
-    metadata: {}
-    target:
-      entity_id: fan.in_wall_fan_speed_control_500s_2
-    data:
-      percentage: 33
-  - action: light.turn_on
-    metadata: {}
-    target:
-      entity_id: light.smart_plug_dimmerdesk
-    data:
-      brightness_pct: 24
-  - action: switch.turn_off
-    metadata: {}
-    target:
-      entity_id: switch.hot_water_recirc_pump
-    data: {}
-  - action: fan.turn_off
-    metadata: {}
-    target:
-      entity_id:
-      - fan.in_wall_fan_speed_control_500s_left
-      - fan.lanai_fan_right
-    data: {}
+    - metadata: {}
+      target:
+        entity_id: switch.funky_lamp
+      data: {}
+      action: switch.turn_off
+    - metadata: {}
+      target:
+        entity_id: switch.hot_water_recirc_pump
+      data: {}
+      action: switch.turn_off
+    - metadata: {}
+      target:
+        entity_id: light.wall_dimmer_switch
+      data:
+        brightness_pct: 24
+      action: light.turn_on
+    - metadata: {}
+      target:
+        entity_id:
+          - light.wall_dimmer_switch_bathroom
+          - light.dining_wall_dimmer_switch
+          - light.wall_dimmer_switch3
+          - light.garage_lights
+          - light.wall_dimmer_switch_island
+          - light.kit_cans_wall_dimmer_switch
+          - light.lanai_wall_dimmer_switch
+          - light.living_wall_dimmer_switch
+          - light.wall_dimmer_switch_nook
+          - light.s2_dimmer_2
+          - light.wall_dimmer_switch_under_cab
+          - light.van_wall_dimmer_switch
+          - light.wall_dimmer_switch_kitche_4
+          - light.wall_dimmer_switch_2
+          - light.smart_plug_dimmer_2
+      data: {}
+      action: light.turn_off
+    - metadata: {}
+      target:
+        entity_id: light.garage_outdoor_wall_dimmer_switch
+      data:
+        brightness_pct: 30
+      action: light.turn_on
+    - metadata: {}
+      target:
+        entity_id: light.front_wall_dimmer_switch
+      data:
+        brightness_pct: 45
+      action: light.turn_on
+    - metadata: {}
+      target:
+        entity_id: fan.in_wall_fan_speed_control_500s_2
+      data:
+        percentage: 33
+      action: fan.turn_on
+    - metadata: {}
+      target:
+        entity_id: light.smart_plug_dimmerdesk
+      data:
+        brightness_pct: 24
+      action: light.turn_on
+    - metadata: {}
+      target:
+        entity_id: switch.hot_water_recirc_pump
+      data: {}
+      action: switch.turn_off
+    - metadata: {}
+      target:
+        entity_id:
+          - fan.in_wall_fan_speed_control_500s_left
+          - fan.lanai_fan_right
+      data: {}
+      action: fan.turn_off
   mode: single
-- id: '1775401267177'
+  variables:
+    _cafe_metadata:
+      version: 1
+      strategy: native
+      nodes:
+        trigger_1776086858584_0_0:
+          x: 12
+          y: 12
+        action_1776086858586_1_1:
+          x: 312
+          y: 12
+        action_1776086858586_2_2:
+          x: 540
+          y: -90
+        action_1776086858586_3_3:
+          x: 795
+          y: -90
+        action_1776086858586_4_4:
+          x: 585
+          y: 135
+        action_1776086858586_5_5:
+          x: 840
+          y: 135
+        action_1776086858586_6_6:
+          x: 570
+          y: 315
+        action_1776086858586_7_7:
+          x: 825
+          y: 315
+        action_1776086858586_8_8:
+          x: 555
+          y: 435
+        action_1776086858586_9_9:
+          x: 810
+          y: 435
+        action_1776086858586_10_10:
+          x: 570
+          y: 600
+      graph_id: 104f24ce-8155-4a08-a8da-9335bbc09a05
+      graph_version: 1
+- id: "1775401267177"
   alias: Golf Cart Garage Door Open Alert
-  description: ''
+  description: ""
   use_blueprint:
     path: LRD/door_alerts/garage_door_alert.yaml
     input:
       door_sensor: binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2
       door_name: Golf Cart Garage Door
       alexa_targets:
-      - media_player.dot_1_fl
-      - media_player.echo_dot_master_fl
-      - media_player.echo_show_8
-      - media_player.lanai_2
-      - media_player.mary_s_echo_show
+        - media_player.dot_1_fl
+        - media_player.echo_dot_master_fl
+        - media_player.echo_show_8
+        - media_player.lanai_2
+        - media_player.mary_s_echo_show
       weather_entity: weather.lake_ridge_dr
       wind_buffer: 20
       wind_threshold: 11
       day_delay: 60
       repeat_interval: 5
-- id: '1775401899375'
+- id: "1775401899375"
   alias: Big Garage Door Open Alert
-  description: ''
+  description: ""
   use_blueprint:
     path: LRD/door_alerts/garage_door_alert.yaml
     input:
       door_sensor: binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor
       door_name: Big Garage Door
       alexa_targets:
-      - media_player.dot_1_fl
-      - media_player.echo_show_8
-      - media_player.echo_dot_master_fl
-      - media_player.mary_s_echo_show
-      - media_player.lanai_2
-      - media_player.lab_echo_dot
+        - media_player.dot_1_fl
+        - media_player.echo_show_8
+        - media_player.echo_dot_master_fl
+        - media_player.mary_s_echo_show
+        - media_player.lanai_2
+        - media_player.lab_echo_dot
       weather_entity: weather.lake_ridge_dr
       wind_buffer: 20
       wind_threshold: 11
       day_delay: 60
       repeat_interval: 5
-- id: '1775487019530'
+- id: "1775487019530"
   alias: Kitchen Cans Sync to Kitchen 4 Cans
   description: Syncs Kitchen Cans state and brightness to Kitchen 4 Cans
   triggers:
-  - trigger: state
-    entity_id: light.kit_cans_wall_dimmer_switch
+    - trigger: state
+      entity_id: light.kit_cans_wall_dimmer_switch
   actions:
-  - choose:
-    - conditions:
-      - condition: state
-        entity_id: light.kit_cans_wall_dimmer_switch
-        state: 'on'
-      - condition: template
-        value_template: "{{ states('light.wall_dimmer_switch_kitche_4') != 'on' or\n
-          \  state_attr('light.kit_cans_wall_dimmer_switch', 'brightness') !=\n   state_attr('light.wall_dimmer_switch_kitche_4',
-          'brightness') }}\n"
-      sequence:
-      - action: light.turn_on
-        target:
-          entity_id: light.wall_dimmer_switch_kitche_4
-        data:
-          brightness: '{{ state_attr(''light.kit_cans_wall_dimmer_switch'', ''brightness'')
-            | int(255) }}
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: light.kit_cans_wall_dimmer_switch
+              state: "on"
+            - condition: template
+              value_template:
+                "{{ states('light.wall_dimmer_switch_kitche_4') != 'on' or\n
+                \  state_attr('light.kit_cans_wall_dimmer_switch', 'brightness') !=\n   state_attr('light.wall_dimmer_switch_kitche_4',
+                'brightness') }}\n"
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.wall_dimmer_switch_kitche_4
+              data:
+                brightness:
+                  "{{ state_attr('light.kit_cans_wall_dimmer_switch', 'brightness')
+                  | int(255) }}
 
-            '
-    - conditions:
-      - condition: state
-        entity_id: light.kit_cans_wall_dimmer_switch
-        state: 'off'
-      - condition: template
-        value_template: '{{ states(''light.wall_dimmer_switch_kitche_4'') != ''off''
-          }}
+                  "
+        - conditions:
+            - condition: state
+              entity_id: light.kit_cans_wall_dimmer_switch
+              state: "off"
+            - condition: template
+              value_template:
+                "{{ states('light.wall_dimmer_switch_kitche_4') != 'off'
+                }}
 
-          '
-      sequence:
-      - action: light.turn_off
-        target:
-          entity_id: light.wall_dimmer_switch_kitche_4
+                "
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: light.wall_dimmer_switch_kitche_4
   mode: restart
   max_exceeded: silent
-- id: '1775487067329'
+- id: "1775487067329"
   alias: Kitchen 4 Cans Sync to Kitchen Cans
   description: Syncs Kitchen 4 Cans state and brightness to Kitchen Cans
   triggers:
-  - trigger: state
-    entity_id: light.wall_dimmer_switch_kitche_4
+    - trigger: state
+      entity_id: light.wall_dimmer_switch_kitche_4
   actions:
-  - choose:
-    - conditions:
-      - condition: state
-        entity_id: light.wall_dimmer_switch_kitche_4
-        state: 'on'
-      - condition: template
-        value_template: "{{ states('light.kit_cans_wall_dimmer_switch') != 'on' or\n
-          \  state_attr('light.wall_dimmer_switch_kitche_4', 'brightness') !=\n   state_attr('light.kit_cans_wall_dimmer_switch',
-          'brightness') }}\n"
-      sequence:
-      - action: light.turn_on
-        target:
-          entity_id: light.kit_cans_wall_dimmer_switch
-        data:
-          brightness: '{{ state_attr(''light.wall_dimmer_switch_kitche_4'', ''brightness'')
-            | int(255) }}
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: light.wall_dimmer_switch_kitche_4
+              state: "on"
+            - condition: template
+              value_template:
+                "{{ states('light.kit_cans_wall_dimmer_switch') != 'on' or\n
+                \  state_attr('light.wall_dimmer_switch_kitche_4', 'brightness') !=\n   state_attr('light.kit_cans_wall_dimmer_switch',
+                'brightness') }}\n"
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.kit_cans_wall_dimmer_switch
+              data:
+                brightness:
+                  "{{ state_attr('light.wall_dimmer_switch_kitche_4', 'brightness')
+                  | int(255) }}
 
-            '
-    - conditions:
-      - condition: state
-        entity_id: light.wall_dimmer_switch_kitche_4
-        state: 'off'
-      - condition: template
-        value_template: '{{ states(''light.kit_cans_wall_dimmer_switch'') != ''off''
-          }}
+                  "
+        - conditions:
+            - condition: state
+              entity_id: light.wall_dimmer_switch_kitche_4
+              state: "off"
+            - condition: template
+              value_template:
+                "{{ states('light.kit_cans_wall_dimmer_switch') != 'off'
+                }}
 
-          '
-      sequence:
-      - action: light.turn_off
-        target:
-          entity_id: light.kit_cans_wall_dimmer_switch
+                "
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: light.kit_cans_wall_dimmer_switch
   mode: restart
   max_exceeded: silent
-- id: '1775590492419'
+- id: "1775590492419"
   alias: OmniLogic API Watchdog
   description: Notify when Hayward OmniLogic API becomes unavailable
   triggers:
-  - trigger: state
-    entity_id: switch.pool_pool_filter_pump
-    to: unavailable
-    for:
-      minutes: 5
+    - trigger: state
+      entity_id: switch.pool_pool_filter_pump
+      to: unavailable
+      for:
+        minutes: 5
   conditions: []
   actions:
-  - action: notify.mobile_app_iphone_sd
-    data:
-      title: Pool API Down
-      message: Hayward OmniLogic API has been unavailable for 5 minutes. Pool automation
-        is not running.
+    - action: notify.mobile_app_iphone_sd
       data:
-        push:
-          interruption-level: time-sensitive
-  - action: notify.alexa_media
-    data:
-      message: Warning, the Hayward pool API is down. Pool automation is not running.
-      target:
-      - media_player.great_room_2
+        title: Pool API Down
+        message:
+          Hayward OmniLogic API has been unavailable for 5 minutes. Pool automation
+          is not running.
+        data:
+          push:
+            interruption-level: time-sensitive
+    - action: notify.alexa_media
       data:
-        type: announce
+        message: Warning, the Hayward pool API is down. Pool automation is not running.
+        target:
+          - media_player.great_room_2
+        data:
+          type: announce
   mode: single
   max_exceeded: silent
-- id: '1775590532666'
+- id: "1775590532666"
   alias: OmniLogic API Watchdog
   description: Notify when Hayward OmniLogic API becomes unavailable or recovers
   triggers:
-  - trigger: state
-    entity_id: switch.pool_pool_filter_pump
-    to: unavailable
-    for:
-      minutes: 5
-    id: api_down
-  - trigger: state
-    entity_id: switch.pool_pool_filter_pump
-    from: unavailable
-    to: 'on'
-    id: api_recovered
-  - trigger: state
-    entity_id: switch.pool_pool_filter_pump
-    from: unavailable
-    to: 'off'
-    id: api_recovered_off
+    - trigger: state
+      entity_id: switch.pool_pool_filter_pump
+      to: unavailable
+      for:
+        minutes: 5
+      id: api_down
+    - trigger: state
+      entity_id: switch.pool_pool_filter_pump
+      from: unavailable
+      to: "on"
+      id: api_recovered
+    - trigger: state
+      entity_id: switch.pool_pool_filter_pump
+      from: unavailable
+      to: "off"
+      id: api_recovered_off
   conditions: []
   actions:
-  - choose:
-    - conditions:
-      - condition: trigger
-        id: api_down
-      sequence:
-      - action: notify.mobile_app_iphone_sd
-        data:
-          title: Pool API Down
-          message: Hayward OmniLogic API has been unavailable for 5 minutes. Pool
-            automation is not running.
-          data:
-            push:
-              interruption-level: time-sensitive
-      - action: notify.alexa_media
-        data:
-          message: Warning, the Hayward pool API is down. Pool automation is not running.
-          target:
-          - media_player.great_room_2
-          data:
-            type: announce
-    - conditions:
-      - condition: trigger
-        id: api_recovered
-      sequence:
-      - action: notify.mobile_app_iphone_sd
-        data:
-          title: Pool API Restored
-          message: Hayward OmniLogic API is back online. Pool automation resuming.
-          data:
-            push:
-              interruption-level: time-sensitive
-    - conditions:
-      - condition: trigger
-        id: api_recovered_off
-      sequence:
-      - action: notify.mobile_app_iphone_sd
-        data:
-          title: Pool API Restored
-          message: Hayward OmniLogic API is back online. Pool automation resuming.
-          data:
-            push:
-              interruption-level: time-sensitive
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: api_down
+          sequence:
+            - action: notify.mobile_app_iphone_sd
+              data:
+                title: Pool API Down
+                message:
+                  Hayward OmniLogic API has been unavailable for 5 minutes. Pool
+                  automation is not running.
+                data:
+                  push:
+                    interruption-level: time-sensitive
+            - action: notify.alexa_media
+              data:
+                message: Warning, the Hayward pool API is down. Pool automation is not running.
+                target:
+                  - media_player.great_room_2
+                data:
+                  type: announce
+        - conditions:
+            - condition: trigger
+              id: api_recovered
+          sequence:
+            - action: notify.mobile_app_iphone_sd
+              data:
+                title: Pool API Restored
+                message: Hayward OmniLogic API is back online. Pool automation resuming.
+                data:
+                  push:
+                    interruption-level: time-sensitive
+        - conditions:
+            - condition: trigger
+              id: api_recovered_off
+          sequence:
+            - action: notify.mobile_app_iphone_sd
+              data:
+                title: Pool API Restored
+                message: Hayward OmniLogic API is back online. Pool automation resuming.
+                data:
+                  push:
+                    interruption-level: time-sensitive
   mode: single
   max_exceeded: silent
 - alias: Pool Temp Logger
   id: pool_temp_logger
   trigger:
-  - platform: time_pattern
-    minutes: /10
+    - platform: time_pattern
+      minutes: /10
   condition:
-  - condition: state
-    entity_id: switch.omnilogic_pool_filter_pump
-    state: 'on'
+    - condition: state
+      entity_id: switch.omnilogic_pool_filter_pump
+      state: "on"
   action:
-  - action: shell_command.pool_log
-- id: '1775827717239'
+    - action: shell_command.pool_log
+- id: "1775827717239"
   alias: Pool Automation v1.7.0
-  description: ''
+  description: ""
   use_blueprint:
     path: LRD/pool_automation/pool_automation.yaml
     input:
       min_swim_temp: 78
       heater_pump_speed: 77
       waterfall_start_time: 08:00:00
-- id: '1775847529638'
+      waterfall_switch: valve.omnilogic_pool_waterfall_2
+- id: "1775847529638"
   alias: Garage Door Activated Lights with Motion Keep-Alive
-  description: ''
+  description: ""
   use_blueprint:
     path: LRD/door_automations/door_activated_lights.yaml
     input:
       door_sensor:
-      - binary_sensor.garage_door
-      - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor
-      - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2
-      door_name: 'Garage Doors '
+        - binary_sensor.garage_door
+        - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor
+        - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2
+      door_name: "Garage Doors "
       lights:
-      - light.garage_lights
+        - light.garage_lights
       timer_duration: 1
       motion_sensor: binary_sensor.garage_person_detected
       inhibit_boolean: input_boolean.golfing
       light_timer: timer.timer_garage_lights
-- id: '1775854500076'
+- id: "1775854500076"
   alias: Front Door - Start Notification Suppression
   description: Suppress doorbell notifications when front door opens
   triggers:
-  - entity_id: binary_sensor.front_door
-    from: 'off'
-    to: 'on'
-    trigger: state
+    - entity_id: binary_sensor.front_door
+      from: "off"
+      to: "on"
+      trigger: state
   conditions: []
   actions:
-  - action: input_boolean.turn_on
-    target:
-      entity_id: input_boolean.front_door_notification_suppression
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.front_door_notification_suppression
   mode: single
-- id: '1775854528786'
+- id: "1775854528786"
   alias: Front Door - Clear Notification Suppression
   description: Re-enable doorbell notifications 5 minutes after front door closes
   triggers:
-  - entity_id: binary_sensor.front_door
-    from: 'on'
-    to: 'off'
-    trigger: state
+    - entity_id: binary_sensor.front_door
+      from: "on"
+      to: "off"
+      trigger: state
   conditions: []
   actions:
-  - delay:
-      minutes: 5
-  - action: input_boolean.turn_off
-    target:
-      entity_id: input_boolean.front_door_notification_suppression
+    - delay:
+        minutes: 5
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.front_door_notification_suppression
   mode: restart
   max_exceeded: silent
-- id: '1775854571098'
+- id: "1775854571098"
   alias: Front Door - Doorbell Person/Animal Alert
-  description: Send notification when person or animal detected, suppress if front
+  description:
+    Send notification when person or animal detected, suppress if front
     door recently opened
   triggers:
-  - entity_id: binary_sensor.g4_doorbell_pro_person_detected
-    from: 'off'
-    to: 'on'
-    id: person_detected
-    trigger: state
-  - entity_id: binary_sensor.g4_doorbell_pro_animal_detected
-    from: 'off'
-    to: 'on'
-    id: animal_detected
-    trigger: state
+    - entity_id: binary_sensor.g4_doorbell_pro_person_detected
+      from: "off"
+      to: "on"
+      id: person_detected
+      trigger: state
+    - entity_id: binary_sensor.g4_doorbell_pro_animal_detected
+      from: "off"
+      to: "on"
+      id: animal_detected
+      trigger: state
   conditions:
-  - condition: state
-    entity_id: input_boolean.front_door_notification_suppression
-    state: 'off'
+    - condition: state
+      entity_id: input_boolean.front_door_notification_suppression
+      state: "off"
   actions:
-  - variables:
-      detection_type: "{% if trigger.id == 'person_detected' %}\n  Person\n{% else
-        %}\n  Animal\n{% endif %}\n"
-  - action: notify.mobile_app_iphone_sd
-    data:
-      title: Front Door Alert
-      message: '{{ detection_type }} detected near front door'
+    - variables:
+        detection_type:
+          "{% if trigger.id == 'person_detected' %}\n  Person\n{% else
+          %}\n  Animal\n{% endif %}\n"
+    - action: notify.mobile_app_iphone_sd
+      data:
+        title: Front Door Alert
+        message: "{{ detection_type }} detected near front door"
   mode: parallel
   max_exceeded: silent
-- id: '1775916297031'
+- id: "1775916297031"
   alias: Lanai Door Activated Lights with Motion Keep-Alive
-  description: ''
+  description: ""
   use_blueprint:
     path: LRD/door_automations/door_activated_lights.yaml
     input:
       door_sensor:
-      - binary_sensor.lanai_slider_door
-      - binary_sensor.bathroom_lanai_door
-      - binary_sensor.lanai_master
+        - binary_sensor.lanai_slider_door
+        - binary_sensor.bathroom_lanai_door
+        - binary_sensor.lanai_master
       door_name: Lanai Doors
       lights:
-      - light.lanai_wall_dimmer_switch
+        - light.lanai_wall_dimmer_switch
       brightness: 58
       timer_duration: 10
       light_timer: timer.lanai_lights_timer
@@ -571,3 +623,14 @@
       lux_sensor: sensor.st_00184974_illuminance
       lux_threshold: 300
       skip_if_lights_on: true
+
+- alias: "Reload OmniLogic Local on HA Start"
+  id: reload_omnilogic_local_on_start
+  triggers:
+    - trigger: homeassistant
+      event: start
+  actions:
+    - delay: "00:01:00"
+    - action: homeassistant.reload_config_entry
+      target:
+        entity_id: sensor.omnilogic_pool_watersensor

@@ -1,0 +1,6 @@
+espresense/devices/phone:scottsphonebt/garage,{"mac":"699cbdd61021","id":"phone:scottsphonebt","name":"scottsphonebt","rssi@1m":-62,"rssi":-74.28,"rxAdj":20,"rssiVar":28.70,"distance":2.85,"var":1.76,"int":617}
+espresense/devices/phone:scottsphonebt/garage,{"mac":"699cbdd61021","id":"phone:scottsphonebt","name":"scottsphonebt","rssi@1m":-62,"rssi":-73.21,"rxAdj":20,"rssiVar":28.23,"distance":2.60,"var":1.50,"int":617}
+espresense/devices/phone:scottsphonebt/garage,{"mac":"699cbdd61021","id":"phone:scottsphonebt","name":"scottsphonebt","rssi@1m":-62,"rssi":-73.85,"rxAdj":20,"rssiVar":25.53,"distance":2.75,"var":1.42,"int":618}
+espresense/devices/phone:scottsphonebt/garage,{"mac":"699cbdd61021","id":"phone:scottsphonebt","name":"scottsphonebt","rssi@1m":-62,"rssi":-73.79,"rxAdj":20,"rssiVar":26.33,"distance":2.73,"var":1.43,"int":619}
+espresense/devices/phone:scottsphonebt/garage,{"mac":"699cbdd61021","id":"phone:scottsphonebt","name":"scottsphonebt","rssi@1m":-62,"rssi":-75.17,"rxAdj":20,"rssiVar":49.39,"distance":3.07,"var":7.10,"int":618}
+espresense/devices/phone:scottsphonebt/garage,{"mac":"699cbdd61021","id":"phone:scottsphonebt","name":"scottsphonebt","rssi@1m":-62,"rssi":-74.73,"rxAdj":20,"rssiVar":48.89,"distance":2.96,"var":6.77,"int":617}

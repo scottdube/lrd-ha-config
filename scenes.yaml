@@ -1,0 +1,30 @@
+- id: '1775951065540'
+  name: Set lights for dusk
+  entities:
+    light.kit_cans_wall_dimmer_switch:
+      supported_color_modes:
+      - brightness
+      color_mode: brightness
+      brightness: 201
+      friendly_name: Kitchen Cans
+      supported_features: 32
+      state: 'on'
+    light.wall_dimmer_switch_under_cab:
+      supported_color_modes:
+      - brightness
+      color_mode: brightness
+      brightness: 255
+      friendly_name: Under Cabinet Lights
+      supported_features: 32
+      state: 'on'
+    light.living_wall_dimmer_switch:
+      supported_color_modes:
+      - brightness
+      color_mode: brightness
+      brightness: 129
+      friendly_name: Living Room Cans
+      supported_features: 32
+      state: 'on'
+  metadata:
+    light.living_wall_dimmer_switch:
+      entity_only: true
