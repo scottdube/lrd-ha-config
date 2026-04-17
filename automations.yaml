@@ -623,14 +623,3 @@
       lux_sensor: sensor.st_00184974_illuminance
       lux_threshold: 300
       skip_if_lights_on: true
-
-- alias: "Reload OmniLogic Local on HA Start"
-  id: reload_omnilogic_local_on_start
-  triggers:
-    - trigger: homeassistant
-      event: start
-  actions:
-    - delay: "00:01:00"
-    - action: homeassistant.reload_config_entry
-      target:
-        entity_id: sensor.omnilogic_pool_watersensor

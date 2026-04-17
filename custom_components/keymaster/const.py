@@ -5,7 +5,7 @@ from enum import StrEnum
 from homeassistant.const import Platform
 
 DOMAIN = "keymaster"
-VERSION = "v0.3.1"
+VERSION = "v0.3.2"
 ISSUE_URL = "https://github.com/FutureTense/keymaster"
 
 # Strategy module constants
