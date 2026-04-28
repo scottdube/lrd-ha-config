@@ -26,10 +26,12 @@ Bring-up tasks left over from the move from one-off Claude chats to the Cowork p
 
 **Done when:** voice-satellites/ has real content; esphome/voice-garage.yaml no longer at root.
 
-### 1.3 Relocate pool_temp_logger.py to a `pool/` domain
+### 1.3 Relocate pool_temp_logger.py to a `pool/` domain ✅
 Decision: pool gets its own root-level domain folder to host current logger plus future predictive-heating analysis.
 
-- [ ] Create folder structure:
+Completed 2026-04-28. New path live, automation cycle verified, CSV gitignored.
+
+- [x] Create folder structure:
   ```
   pool/
   ├── README.md            — what's here, data location, schema, ML plans
@@ -40,29 +42,27 @@ Decision: pool gets its own root-level domain folder to host current logger plus
   └── analysis/
       └── .gitkeep         — future notebooks/models
   ```
-- [ ] Move `pool_temp_logger.py` → `pool/scripts/temp_logger.py`
-- [ ] Update `configuration.yaml` `shell_command.pool_log` path: `python3 /config/pool/scripts/temp_logger.py`
-- [ ] Update `LOG_FILE` in the script if you want the CSV to also relocate (recommend keeping it at `/config/pool_temp_log.csv` for now — it's runtime data)
-- [ ] Add `pool_temp_log.csv` to `.gitignore`
-- [ ] Clean known-bad rows from existing CSV: drop `water_temp=unknown` (39 rows, 2026-04-08 → 2026-04-10, attributable to mix of WiFi packet loss and a separately-fixed integration bug) and `pump_speed=unavailable` (2 rows, 2026-04-15). One-liner on the NUC:
+- [x] Move `pool_temp_logger.py` → `pool/scripts/temp_logger.py`
+- [x] Update `configuration.yaml` `shell_command.pool_log` path: `python3 /config/pool/scripts/temp_logger.py`
+- [x] LOG_FILE kept at `/config/pool_temp_log.csv` (runtime data location unchanged)
+- [x] Add `pool_temp_log.csv` to `.gitignore`
+- [x] Clean known-bad rows from existing CSV: dropped `water_temp=unknown` (39 rows, 2026-04-08 → 2026-04-10, attributable to mix of WiFi packet loss and a separately-fixed integration bug) and `pump_speed=unavailable` (2 rows, 2026-04-15). One-liner on the NUC:
   ```bash
   cd /config && cp pool_temp_log.csv pool_temp_log.csv.bak && \
     awk -F',' 'NR==1 || ($2!="unknown" && $6!="unavailable")' pool_temp_log.csv > pool_temp_log.csv.tmp && \
     mv pool_temp_log.csv.tmp pool_temp_log.csv
   ```
-- [ ] Restart HA, confirm next 10-min poll writes a fresh row
-- [ ] `git status` should NOT show pool_temp_log.csv as modified after the next pump cycle
+- [x] Restart HA, confirm next 10-min poll writes a fresh row (verified 2026-04-28 12:40:13 row from new path)
+- [x] `git status` should NOT show pool_temp_log.csv as modified after the next pump cycle (verified)
 
-**Done when:** new row appears in CSV after restart AND the CSV is no longer tracked by git.
+**Done when:** new row appears in CSV after restart AND the CSV is no longer tracked by git. ✅
 
-### 1.4 Resolve `scratch/setup-instructions.md`
-By its own deletion criteria: repo connected ✓, configs imported ✓, but device-inventory and 3+ integration notes still gaps. Two options:
-- [ ] **A.** Delete it. This cleanup-plan.md replaces it as the bring-up tracker.
-- [ ] **B.** Update its bottom section to reflect what's actually left.
+### 1.4 Resolve `scratch/setup-instructions.md` ✅
+Deleted 2026-04-28. Cleanup-plan.md supersedes as the bring-up tracker.
 
-Recommend A. (Cleanup-plan supersedes.)
+- [x] **A.** Delete it. This cleanup-plan.md replaces it as the bring-up tracker.
 
-**Done when:** the file's status is unambiguous.
+**Done when:** the file's status is unambiguous. ✅
 
 ---
 
