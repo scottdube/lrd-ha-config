@@ -12,9 +12,9 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **Blueprint version:** v1.8.0 (deployed)
 - **Heater logic:** set-and-hold — heater on if swim day, off if not. Heat pump owns all cycling. HA controls pump speed only (77% when heater needed, 55% otherwise).
 - **Waterfall:** runs independently of pump_is_on (v1.6 change).
-- **Integration:** OmniLogic Local on beta `1.0.0b7`. Cloud retained for ORP/salt/pH monitoring only.
-- **Open issue:** WiFi packet loss to OmniLogic controller (~30-40% per ping test). **Ethernet run pending** — until then, expect occasional fragment timeouts during HA restart.
-- **Open dialogue:** GitHub issue #173 with maintainer (cryptk/haomnilogic-local). Maintainer confirmed diagnostics are correct; environmental issue suspected.
+- **Integration:** OmniLogic Local on `1.0.4` (stable). Cloud retained for ORP/salt/pH monitoring only.
+- **Network:** Temporary ethernet run to OmniLogic controller is in place and functioning perfectly. Permanent run mostly done — waiting on Shepard Electric to route through exterior wall (currently dangling from soffit).
+- **Issue #173 resolved** in newer releases of `cryptk/haomnilogic-local`.
 
 ### Voice assistant satellites (ESPHome)
 - **First unit:** garage. Wired and flashed. Pipeline configured.
@@ -32,6 +32,9 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 
 ## Recently completed
 
+- **Temporary ethernet run to OmniLogic controller** in place and functioning perfectly. WiFi packet loss issue (~30-40%) eliminated. Permanent run mostly done — Shepard Electric to finish exterior wall pass-through.
+- **OmniLogic Local upgraded to `1.0.4`** (stable, off beta).
+- **GitHub issue #173 (cryptk/haomnilogic-local)** resolved by dev team in newer integration releases.
 - **Switch→valve domain migration** for OmniLogic waterfall (blueprint v1.8.0).
 - **Lanai lights blueprint v1.5** — door-activated with lux/sun fallback, skip-if-on guard. All 4 test paths verified. Live.
 - **HA → IoT VLAN migration** done. NUC at 192.168.11.155.

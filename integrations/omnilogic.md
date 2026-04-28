@@ -7,8 +7,8 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 ## Local integration (control)
 
 - **HACS repo:** [`cryptk/haomnilogic-local`](https://github.com/cryptk/haomnilogic-local)
-- **Status:** Beta
-- **Current version:** `1.0.0b7`
+- **Status:** Stable
+- **Current version:** `1.0.4`
 - **Communication:** UDP, direct LAN to controller
 - **Controller IP:** `192.168.11.19` (DHCP reservation in UniFi)
 - **Network:** IoT VLAN
@@ -26,12 +26,12 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 `*.omnilogic_pool_*` (vs cloud's `*.pool_pool_*`). Easy to confuse. Always grep for `omnilogic_pool_` when wiring blueprints.
 
 ### Known issues
-- **WiFi packet loss to controller (~30-40% per ping test).** Causes UDP fragment timeouts during HA restart. Workaround: HA recovers on its own after retries. Real fix: ethernet run to controller (pending).
-- **Beta version churn.** Schema/domain changes occur between beta releases. Check release notes; audit blueprint for entity references after every upgrade. Audit unavailable entities in registry.
+- **Version churn.** Schema/domain changes have occurred between releases historically. Check release notes; audit blueprint for entity references after every upgrade. Audit unavailable entities in registry.
 - **Stale entities post-rename.** When devices are re-included or domains change, ghost entities persist with `_2` suffix. Manual cleanup required.
 
-### Open dialogue
-GitHub issue #173 with maintainer. Maintainer has confirmed diagnostics are correct and the integration logic works against simulated data — environmental factors (WiFi packet loss) suspected for state-update issues.
+### Resolved
+- **WiFi packet loss to controller (~30-40% per ping test).** Resolved by temporary ethernet run to controller (functioning perfectly). Permanent run mostly done — waiting on Shepard Electric to route through exterior wall instead of dangling from soffit.
+- **GitHub issue #173.** Resolved by maintainer in newer integration releases.
 
 ---
 
@@ -75,5 +75,5 @@ When the integration goes weird, in order of escalation:
 1. **Reload integration** — Settings → Devices & Services → OmniLogic Local → Reload
 2. **Restart HA** — handles deeper state issues
 3. **Audit registry** — Settings → Devices & Services → entities, filter `omnilogic`, look for `unavailable`
-4. **Check controller WiFi** — UniFi → Client Devices → packet loss / signal strength
-5. **Diagnostic dump** — for #173 or new issues, integration → ⋮ menu → Download diagnostics
+4. **Check controller link** — UniFi → Client Devices → confirm controller is on ethernet, check switch port for errors
+5. **Diagnostic dump** — for new issues, integration → ⋮ menu → Download diagnostics
