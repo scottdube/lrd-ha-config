@@ -16,7 +16,7 @@ template: !include config/templates.yaml
 
 shell_command:
   pool_log: >
-    python3 /config/pool_temp_logger.py
+    python3 /config/pool/scripts/temp_logger.py
     "{{ states('sensor.omnilogic_pool_watersensor') }}"
     "{{ state_attr('weather.lake_ridge_dr', 'temperature') }}"
     "{{ states('water_heater.omnilogic_pool_heater') }}"

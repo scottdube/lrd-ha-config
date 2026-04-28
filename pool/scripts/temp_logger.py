@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+"""
+Pool temperature logger.
+
+Invoked by Home Assistant via shell_command.pool_log every 10 minutes while
+the pool filter pump is running. Appends one row to /config/pool_temp_log.csv.
+
+Wiring:
+  configuration.yaml      shell_command.pool_log
+  automations.yaml        automation id: pool_temp_logger
+  See pool/README.md for the full data flow and pool/docs/data-schema.md for
+  column definitions.
+
+This script is intentionally minimal: HA passes state values as positional
+args; we serialize them. Any None/unknown handling lives in the downstream
+analysis layer, not here.
+"""
 import os
 import sys
 import csv

@@ -30,6 +30,9 @@ custom_components/
 *.db-shm
 *.db-wal
 
+# Pool runtime data (logger appends every 10 min while pump is on)
+pool_temp_log.csv
+
 # Lock files
 *.lock
 
