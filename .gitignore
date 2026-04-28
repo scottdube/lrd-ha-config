@@ -23,7 +23,7 @@ node_modules/
 
 # Custom components (large, reinstallable)
 # Comment out if you want to track these
-# custom_components/
+custom_components/
 
 # Database files
 *.db
@@ -39,3 +39,4 @@ zigbee.db-shm
 zigbee.db-wal
 tts/
 www/
+.DS_Store
