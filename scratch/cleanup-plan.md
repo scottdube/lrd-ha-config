@@ -20,14 +20,18 @@ Completed 2026-04-28.
 
 **Done when:** README structure block is a true map of the repo. ✅
 
-### 1.2 Voice-satellites becomes the home for voice work (Option A)
-- [ ] Move `esphome/voice-garage.yaml` → `voice-satellites/esphome/voice-garage.yaml`
-- [ ] Decide fate of root-level `esphome/` folder (delete if no other configs land there)
-- [ ] Create `voice-satellites/enclosures/README.md` pointing to Fusion CAD location (cloud or external)
-- [ ] Optional: drop a stub `voice-satellites/README.md` summarizing what's planned (5 more units: kitchen, master bedroom, lanai, ?, ?)
-- [ ] Update README.md if the `esphome/` change affects the structure block
+### 1.2 Voice-satellites becomes the home for voice work (Option A) ✅
+Completed 2026-04-28.
 
-**Done when:** voice-satellites/ has real content; esphome/voice-garage.yaml no longer at root.
+- [x] Move `esphome/voice-garage.yaml` → `voice-satellites/esphome/voice-garage.yaml`
+- [x] Decide fate of root-level `esphome/` folder — deleted (only contained voice-garage.yaml + ESPHome's stock .gitignore, which moved with it)
+- [x] Create `voice-satellites/enclosures/README.md` (Fusion CAD location flagged as TODO for Scott to fill in)
+- [x] Drop a stub `voice-satellites/README.md` summarizing current state, hardware on hand, planned locations
+- [x] Update root README.md structure block
+
+**Done when:** voice-satellites/ has real content; esphome/voice-garage.yaml no longer at root. ✅
+
+**Follow-up for Scott:** fill in the Fusion CAD location in `voice-satellites/enclosures/README.md` (currently TODO).
 
 ### 1.3 Relocate pool_temp_logger.py to a `pool/` domain ✅
 Decision: pool gets its own root-level domain folder to host current logger plus future predictive-heating analysis.
@@ -71,16 +75,22 @@ Deleted 2026-04-28. Cleanup-plan.md supersedes as the bring-up tracker.
 
 ## Phase 2 — Integration notes scaffolding (~45 min)
 
-### 2.1 Stub the missing integration notes
-Use `integrations/omnilogic.md` headings as template (HACS source / version / network / known issues / quirks). 5-line stubs are fine — point is the file exists.
+### 2.1 Stub the missing integration notes ✅
+Completed 2026-04-28. Stubs ended up beefier than 5-line minimums; Z-Wave JS in particular got real content.
 
-- [ ] `integrations/zwave-js.md`
-- [ ] `integrations/weatherflow.md`
-- [ ] `integrations/midea-ac-lan.md`
-- [ ] `integrations/unifi-protect.md`
-- [ ] `integrations/nabu-casa.md`
+- [x] `integrations/zwave-js.md` — fleshed (controller, known patterns, escalation steps)
+- [x] `integrations/weatherflow.md` — fleshed (cloud + local plan, entity table, mm/inch quirk)
+- [x] `integrations/midea-ac-lan.md` — stub with TODOs for entity ID and quirks
+- [x] `integrations/unifi-protect.md` — stub with TODOs for camera enumeration and motion alert wiring
+- [x] `integrations/nabu-casa.md` — stub with TODOs for entity audit and renewal date
 
-**Done when:** `integrations/` has 6 files (omnilogic + 5 new).
+**Done when:** `integrations/` has 6 files (omnilogic + 5 new). ✅
+
+**Follow-up TODOs embedded in the new files** (review when you next touch each integration):
+- weatherflow: capture Tempest station ID; verify exact integration name
+- midea-ac-lan: verify HACS fork; capture climate.* entity ID
+- unifi-protect: enumerate cameras with locations + entities; wire motion alerts
+- nabu-casa: subscription renewal date; audit 573 exposed-to-Assist entities
 
 ### 2.2 Per-integration detail fill (ongoing, no deadline)
 Treat each `integrations/<name>.md` as a target of opportunity. When you touch the integration in real work, fill in what you learn. Not a single task — a habit.

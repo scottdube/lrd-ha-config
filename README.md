@@ -43,8 +43,10 @@ home-assistant/
 │   ├── scripts/                 # temp_logger.py invoked via shell_command
 │   ├── docs/                    # CSV schema, known-bad ranges
 │   └── analysis/                # future notebooks/models
-├── voice-satellites/            # ESPHome configs + enclosure design (in flight)
-├── esphome/                     # legacy location for voice-garage.yaml; planned move to voice-satellites/esphome/
+├── voice-satellites/            # ESPHome configs, enclosures, per-unit notes
+│   ├── esphome/                 # voice-garage.yaml + future unit configs
+│   ├── docs/                    # per-unit build notes
+│   └── enclosures/              # CAD pointers / STL exports
 ├── custom_components/           # HACS-installed integrations (gitignored — large, reinstallable)
 ├── www/                         # frontend resources / community Lovelace cards (gitignored)
 ├── tts/                         # TTS audio cache (gitignored)
