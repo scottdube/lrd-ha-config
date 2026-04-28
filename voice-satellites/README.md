@@ -41,7 +41,7 @@ voice-satellites/
 
 ## ESPHome dashboard wiring
 
-The ESPHome Builder add-on hardcodes its working directory to `/config/esphome/` (no configurable path option as of 2026-04-28). To make the dashboard see configs in their new home here, a symlink lives on the NUC:
+The ESPHome Builder app hardcodes its working directory to `/config/esphome/` (no configurable path option as of 2026-04-28). To make the dashboard see configs in their new home here, a symlink lives on the NUC:
 
 ```
 /config/esphome -> /config/voice-satellites/esphome

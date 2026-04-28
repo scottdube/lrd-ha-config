@@ -28,6 +28,11 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **Status:** pcap-based traffic characterization running. Initial findings suggest only 3-4 inbound rules needed if migrated.
 - **Decision pending.** Don't move HA until ADR-008 is committed.
 
+### Z-Wave fleet housekeeping
+- **Toilet fan (ZEN75, node 256) is dead** after a strange firmware update. Needs reinclusion or recovery. `device-inventory.md` had this as `?` — now confirmed.
+- **Kwikset 916 (node 038) battery at 30%** — replacement window opening. Other Kwikset (node 008) at 100%.
+- **HS-WX300 fleet FW divergence** — node 034 is on v2.2.0 while the other 15 HS-WX300s are on v2.1.13. **Decision: roll the remaining 15 forward to v2.2.0.** Changelog (verified 2026-04-28 via HomeSeer docs) is SDK v7.18.1 → v7.18.8 plus a fix for a Silicon Labs SDK bug where R2 (800 Series) WX300s "can stop responding to Z-Wave commands if not manually controlled for some time." Low-risk update, behaviorally identical, fixes a real intermittent failure mode. Firmware file: `https://homeseer.com/updates4/WX300-R2_2_2_0.zip`. Update via Z-Wave JS UI → Node → Firmware Update. 15 devices × ~5 min each.
+
 ---
 
 ## Recently completed
@@ -60,7 +65,7 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 
 ### Integrations to evaluate
 - **ChefsTemp** — feature-request email drafted but not sent (waiting on Breezo support reply first). BLE proxy possible if API not granted.
-- **WeatherFlow Local** — discovery should work now that HA is on IoT VLAN with Tempest.
+- ~~WeatherFlow Local~~ — done. Both local and cloud integrations active; see `integrations/weatherflow.md`.
 
 ### Cleanup
 - Audit 573 entities exposed to Assist — too many.

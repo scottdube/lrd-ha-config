@@ -3,7 +3,7 @@
 Home Assistant configuration, automations, integrations, and adjacent maker work for the LRD smart home.
 
 **HA host:** NUC @ 192.168.11.155, IoT VLAN, HA OS 17.2 / Core 2026.4.1
-**Network:** UDM Pro, WireGuard for remote access, Nabu Casa as backup remote
+**Network:** UDM SE, WireGuard for remote access, Nabu Casa as backup remote
 **Canonical config repo:** [`scottdube/lrd-ha-config`](https://github.com/scottdube/lrd-ha-config) (this repo)
 **Public blueprints:** [`scottdube/lrd-ha-blueprints`](https://github.com/scottdube/lrd-ha-blueprints)
 

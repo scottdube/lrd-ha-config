@@ -18,7 +18,7 @@ HA Cloud subscription. Provides Cloud STT/TTS, remote access (backup path), and 
 |---|---|---|
 | Cloud TTS | Voice satellite responses, Echo Speaks alternative | **Davis voice, High quality** (per ADR-003) |
 | Cloud STT | Voice satellite speech recognition | Used by garage voice satellite |
-| Remote access | Backup remote path | Primary remote access is WireGuard via UDM Pro; Nabu Casa is failover |
+| Remote access | Backup remote path | Primary remote access is WireGuard via UDM SE; Nabu Casa is failover |
 | Alexa Smart Home | TODO confirm if used or disabled | Echo Speaks (HACS) handles TTS; Alexa skill exposure is separate |
 | Google Assistant | TODO confirm | |
 
@@ -40,7 +40,7 @@ HA Cloud subscription. Provides Cloud STT/TTS, remote access (backup path), and 
 
 ## Why this exists
 
-WireGuard via UDM Pro is the primary remote-access path. Nabu Casa serves as backup remote, plus the cloud TTS/STT we don't run locally (yet). On-device wake word is microWakeWord (per ADR-003); server-side openWakeWord remains for Hey Nabu but adds latency.
+WireGuard via UDM SE is the primary remote-access path. Nabu Casa serves as backup remote, plus the cloud TTS/STT we don't run locally (yet). On-device wake word is microWakeWord (per ADR-003); server-side openWakeWord remains for Hey Nabu but adds latency.
 
 ---
 

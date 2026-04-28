@@ -121,6 +121,28 @@ This is the single highest-payoff cleanup item. It's the file you'll grep at 11p
 
 **Done when:** grep is empty.
 
+### 4.5 HS-WX300 fleet FW rollout v2.1.13 → v2.2.0 (~90 min, 15 devices × ~5 min)
+
+Verdict from comparing release notes 2026-04-28: worth doing. v2.2.0 is SDK v7.18.1 → v7.18.8 + a fix for a Silicon Labs SDK bug where R2 (800 Series) WX300s "stop responding to Z-Wave commands if not manually controlled for some time." Low-risk update, no behavioral changes.
+
+**Important:** the Z-Wave JS UI per-device "firmware up to date" indicator may show **all 15 as current** even though they're on v2.1.13 and v2.2.0 exists. This is a known Z-Wave ecosystem quirk: the indicator compares against the OpenSmartHouse / Z-Wave JS device DB, which may not have v2.2.0 indexed yet (HomeSeer's release was relatively recent). The actual fix is a manual flash:
+
+1. Download the firmware file from HomeSeer: `https://homeseer.com/updates4/WX300-R2_2_2_0.zip` — unzip to `.gbl`.
+2. In Z-Wave JS UI → Control Panel, click each HS-WX300 node.
+3. In the node detail pane, find the "Firmware Update" section.
+4. Choose "Update Firmware via File" (not the built-in OTA list, which is what shows "up to date").
+5. Upload the `.gbl` file, start, wait.
+6. After flash, verify FW reads `v2.2.0` in the Control Panel row.
+
+Sequence the flash from controller-nearest nodes outward. Take a Z-Wave JS controller backup before starting (Settings → Backup).
+
+- [ ] Download `WX300-R2_2_2_0.gbl` to NUC
+- [ ] Z-Wave JS controller backup
+- [ ] Flash 15 nodes: 003, 005, 016, 018, 019, 020, 022, 023, 025, 026, 027, 029, 030, 031, 033
+- [ ] Verify all show v2.2.0 in Control Panel after completion
+
+**Done when:** all 16 HS-WX300 nodes (including 034 already on v2.2.0) report v2.2.0.
+
 ### 4.2 Rename `light.dimmer_2_2` (cosmetic)
 - [ ] Settings → Devices & Services → Fibaro FGD212 → entity rename → "Lamp Post - Unused Channel"
 
