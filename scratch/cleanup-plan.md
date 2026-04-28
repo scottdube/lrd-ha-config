@@ -9,13 +9,16 @@ Bring-up tasks left over from the move from one-off Claude chats to the Cowork p
 
 ## Phase 1 — Foundation (~60 min total, any order)
 
-### 1.1 Reconcile `README.md` to actual structure
-- [ ] Add `custom_components/`, `tts/`, `www/`, `esphome/`, `config/` to the structure block
-- [ ] Change `automations/` → `automations.yaml`
-- [ ] Either remove `dashboards/` from the structure block or document where dashboards live
-- [ ] Add `pool/` (will exist after 1.3)
+### 1.1 Reconcile `README.md` to actual structure ✅
+Completed 2026-04-28.
 
-**Done when:** README structure block is a true map of the repo.
+- [x] Add `custom_components/`, `tts/`, `www/`, `esphome/`, `config/` to the structure block
+- [x] Change `automations/` → `automations.yaml`
+- [x] Document dashboards: HA UI/storage-based (not YAML in repo)
+- [x] Add `pool/`
+- [x] Bonus: noted runtime gitignored files inline; clarified Mac/NUC clone relationship at top
+
+**Done when:** README structure block is a true map of the repo. ✅
 
 ### 1.2 Voice-satellites becomes the home for voice work (Option A)
 - [ ] Move `esphome/voice-garage.yaml` → `voice-satellites/esphome/voice-garage.yaml`

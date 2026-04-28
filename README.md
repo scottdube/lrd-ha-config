@@ -19,23 +19,41 @@ This project covers all Home Assistant work — configuration, automations, blue
 
 ## Repository structure
 
+This repo IS `/config` on the NUC. Studio Code Server commits and pushes from there directly. The Mac clone (used by Cowork) mirrors via standard pull/push.
+
 ```
 home-assistant/
 ├── README.md                    # this file
+├── configuration.yaml           # HA root config (entry point)
+├── automations.yaml             # all automations
+├── scripts.yaml                 # scripts
+├── scenes.yaml                  # scenes
+├── config/
+│   └── templates.yaml           # template sensors (included from configuration.yaml)
 ├── docs/
-│   ├── ha-chat-index.md         # index of past Claude chats by topic
 │   ├── current-state.md         # active working notes / open threads
+│   ├── ha-chat-index.md         # index of past Claude chats by topic
 │   ├── device-inventory.md      # hardware inventory and pairing state
 │   ├── decisions/               # lightweight ADRs
 │   └── reference/               # screenshots, external docs, manuals
-├── blueprints/                  # custom blueprints (current versions)
-├── automations/                 # automations.yaml content
+├── blueprints/                  # custom blueprints (current versions, see LRD/)
 ├── packages/                    # HA packages (presence, etc.)
-├── dashboards/                  # dashboard YAML
 ├── integrations/                # per-integration notes (forks, quirks, configs)
-├── voice-satellites/            # ESPHome configs and enclosure design
-└── scratch/                     # in-progress / experimental work
+├── pool/                        # pool scripts, data schema, future predictive-heating analysis
+│   ├── scripts/                 # temp_logger.py invoked via shell_command
+│   ├── docs/                    # CSV schema, known-bad ranges
+│   └── analysis/                # future notebooks/models
+├── voice-satellites/            # ESPHome configs + enclosure design (in flight)
+├── esphome/                     # legacy location for voice-garage.yaml; planned move to voice-satellites/esphome/
+├── custom_components/           # HACS-installed integrations (gitignored — large, reinstallable)
+├── www/                         # frontend resources / community Lovelace cards (gitignored)
+├── tts/                         # TTS audio cache (gitignored)
+└── scratch/                     # in-progress / experimental work (e.g., cleanup-plan.md)
 ```
+
+**Dashboards:** managed in the HA UI (storage-based, in `.storage/`), not as YAML in this repo. `.storage/` is gitignored as runtime state.
+
+**Runtime data files (gitignored):** `pool_temp_log.csv`, `home-assistant.log*`, `*.db*`, etc. See `.gitignore`.
 
 ---
 
