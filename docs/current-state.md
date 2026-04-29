@@ -18,11 +18,17 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 
 ### Voice assistant satellites (ESPHome)
 - **First unit:** garage. Wired and flashed. Recovered 2026-04-28 from a stuck `voice_assistant.on_error` (pipeline pointed at a removed Ollama conversation entity — see ADR-003 for the canonical-vs-alternative pipeline policy).
-- **Pipeline:** HA Cloud STT/TTS (Davis voice, High quality) — canonical. Ollama and OpenAI supported as alternative pipelines but not default.
+- **Pipeline (LRD Voice Assistant):** HA Cloud STT, HA Cloud TTS (Davis voice, High quality), OpenAI Conversation as agent with "Prefer handling commands locally" ON (local first, OpenAI fallback). Per ADR-003 revised 2026-04-28. Ollama is supported as an alternative agent but not default.
 - **Open issue:** Sporadic audio quality (clears up intermittently). Suspected I2S clock drift on ESP32-S3 with esp-idf driver. **Next step:** test fixed MCLK pin on MAX98357A.
 - **Enclosure:** golf-ball-on-tee design in Fusion 360 for garage unit. Prototyping in alt-color PLA before final print. M3 heat-set inserts: 4.91mm OD, need 4.5mm holes.
 - **Hardware on hand:** 6× ESP32-S3 N16R8, 5× MAX98357A, 5× INMP441. 5 more units to build.
 - **ESPHome firmware location:** `esphome/` at repo root → maps to `/config/esphome/` on the NUC. The earlier `voice-satellites/esphome/` location was reverted because ESPHome dashboard's `rel_path()` validation is incompatible with directory-level symlinks.
+
+### Nabu Casa subscription decision (URGENT)
+- **Trial expires 2026-05-04** (~6 days). Decision required: subscribe or lapse.
+- **What lapse breaks:** Cloud STT/TTS (voice satellites go red), Alexa Smart Home control of HA (18 entities), primary remote access (WireGuard not currently configured as alternative), stable `*.ui.nabu.casa` URL.
+- **Cost:** annual subscription. See `integrations/nabu-casa.md` for full impact analysis.
+- **Recommended:** subscribe given the cross-cutting dependencies. Local Whisper + Piper is a feasible long-term alternative for STT/TTS but isn't built; Alexa bridge has no local equivalent.
 
 ### Network → HA boundary (cross-project)
 - **ADR-008** (in network-docs project) — analysis underway for moving HA NUC from IoT VLAN to LRD-Servers VLAN.
@@ -69,10 +75,11 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - ~~WeatherFlow Local~~ — done. Both local and cloud integrations active; see `integrations/weatherflow.md`.
 
 ### Cleanup
-- Audit 573 entities exposed to Assist — too many.
-- Turn off "Expose new entities" default.
+- ~~Audit 573 entities exposed to Assist~~ — done. Now 45 exposed.
+- ~~Turn off "Expose new entities" default~~ — done (Assist, Alexa, Google all OFF for new entities).
 - Phantom entity on Fibaro Dimmer 2 (`light.dimmer_2_2`) — unexposed but worth final rename for clarity.
 - **Periodic voice pipeline audit** — Settings → Voice Assistants → confirm each pipeline's conversation agent still exists. Stale agent references silently break devices. See ADR-003 operational notes.
+- **Disable or finish Google Assistant cloud bridge** — currently enabled in HA Cloud but never linked to Google Home app. Either complete the smartphone setup or turn off the toggle to clean up.
 
 ---
 

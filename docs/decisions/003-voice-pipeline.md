@@ -1,7 +1,7 @@
-# ADR-003: Voice pipeline — HA Cloud canonical; Ollama and OpenAI as alternatives
+# ADR-003: Voice pipeline — HA Cloud STT/TTS + OpenAI conversation (local-first); Ollama as alternative
 
-**Status:** Accepted (with revisit pending)
-**Date:** 2026-04 (updated 2026-04-28)
+**Status:** Accepted (revised 2026-04-28 evening to match production reality)
+**Date:** 2026-04 (revised 2026-04-28)
 **Decider:** Scott
 
 ## Context
@@ -22,16 +22,20 @@ Ollama was set up and used as an alternative conversation agent (`conversation.o
 
 ## Decision
 
-**Canonical pipeline (production / default for all satellites):**
-- STT: HA Cloud
+**Canonical pipeline for voice satellites (LRD Voice Assistant):**
+- STT: HA Cloud (American English)
 - TTS: HA Cloud (Davis voice, High quality)
-- Conversation agent: **Home Assistant Cloud** (or **Home Assistant** built-in) — must be an agent that's always available.
+- Conversation agent: **OpenAI Conversation** with **"Prefer handling commands locally"** ON. Local HA agent gets first crack at every command; OpenAI handles only what local can't (general questions, ambiguous requests). This minimizes OpenAI API spend while preserving GPT-class fallback quality.
+
+**System default pipeline** (Settings → Voice Assistants ⭐ "Home Assistant Cloud"):
+- STT/conversation/TTS all HA Cloud. Acts as the safe fallback that any new device defaults to before being assigned to LRD Voice Assistant. Always available as long as the HA Cloud subscription is active.
 
 **Supported alternative pipelines** (per-device or experimental, NOT default):
-- **Ollama conversation agent** — fully supported. Available as a non-default pipeline option for experimentation or specific use cases. Acceptable to assign to a satellite *as long as someone monitors the Ollama agent's availability* and accepts that an outage will surface as red LEDs / VA Errors on the affected device.
-- **OpenAI conversation agent** — supported in principle; on hold until the I2S audio quality issue is resolved and OpenAI TTS playback stability can be re-tested.
+- **Ollama conversation agent** — fully supported as an alternative pipeline option. Acceptable to assign to a satellite *as long as someone monitors the Ollama agent's availability* and accepts that an outage will surface as red LEDs / VA Errors on the affected device. The 2026-04-28 incident: a stale `conversation.ollama_conversation` reference in an active pipeline put garage VA into a tight retry loop.
 
-**Rule:** if a satellite is in production rotation and you don't want to monitor the conversation agent's uptime daily, the canonical pipeline is what it should use. Drift from canonical without active monitoring caused this incident.
+**Rule:** if a satellite is assigned to a non-default pipeline (LRD Voice Assistant or Ollama), the assigned conversation agent's availability must be monitored. The system default (HA Cloud) is what new/recovery devices should default to.
+
+**OpenAI TTS** specifically (separate from OpenAI as conversation agent) is NOT in production due to playback compatibility issues with the ESP32-S3 + MAX98357A audio chain. HA Cloud TTS works cleanly on that hardware. Re-evaluate OpenAI TTS once the I2S audio quality issue (separate problem) is resolved.
 
 ## Consequences
 

@@ -98,10 +98,12 @@ Completed 2026-04-28. Stubs ended up beefier than 5-line minimums; Z-Wave JS in 
 **Done when:** `integrations/` has 6 files (omnilogic + 5 new). ✅
 
 **Follow-up TODOs embedded in the new files** (review when you next touch each integration):
-- weatherflow: capture Tempest station ID; verify exact integration name
-- midea-ac-lan: verify HACS fork; capture climate.* entity ID
-- unifi-protect: enumerate cameras with locations + entities; wire motion alerts
-- nabu-casa: subscription renewal date; audit 573 exposed-to-Assist entities
+- ~~weatherflow: capture Tempest station ID; verify exact integration name~~ — done (ST-00184974, weatherflow + weatherflow_cloud both active)
+- ~~midea-ac-lan: verify HACS fork; capture climate.* entity ID~~ — done (wuwentao fork, climate.garage_mini_split, 192.168.11.228)
+- ~~unifi-protect: enumerate cameras with locations + entities~~ — done (11 cameras catalogued); motion alerts wiring still backlog
+- ~~nabu-casa: subscription renewal date; audit 573 exposed-to-Assist entities~~ — done (trial expires 2026-05-04 ⚠️ urgent; exposure now 45 entities)
+
+**Phase 2 complete 2026-04-28.**
 
 ### 2.2 Per-integration detail fill (ongoing, no deadline)
 Treat each `integrations/<name>.md` as a target of opportunity. When you touch the integration in real work, fill in what you learn. Not a single task — a habit.
