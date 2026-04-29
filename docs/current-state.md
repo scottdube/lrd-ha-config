@@ -24,7 +24,7 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **Hardware on hand:** 6× ESP32-S3 N16R8, 5× MAX98357A, 5× INMP441. 5 more units to build.
 - **ESPHome firmware location:** `esphome/` at repo root → maps to `/config/esphome/` on the NUC. The earlier `voice-satellites/esphome/` location was reverted because ESPHome dashboard's `rel_path()` validation is incompatible with directory-level symlinks.
 
-### Nabu Casa subscription decision (URGENT)
+### Nabu Casa subscription decision (URGENT)**
 - **Trial expires 2026-05-04** (~6 days). Decision required: subscribe or lapse.
 - **What lapse breaks:** Cloud STT/TTS (voice satellites go red), Alexa Smart Home control of HA (18 entities), primary remote access (WireGuard not currently configured as alternative), stable `*.ui.nabu.casa` URL.
 - **Cost:** annual subscription. See `integrations/nabu-casa.md` for full impact analysis.
