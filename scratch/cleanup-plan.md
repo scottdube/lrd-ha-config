@@ -33,6 +33,17 @@ Completed 2026-04-28.
 
 **Follow-up for Scott:** fill in the Fusion CAD location in `voice-satellites/enclosures/README.md` (currently TODO).
 
+#### 1.2 partial revert (2026-04-28 evening)
+The `voice-satellites/esphome/` location turned out to be incompatible with ESPHome's dashboard. Its `rel_path()` security check captures `absolute_config_dir` un-resolved but resolves submitted paths through symlinks; with `/config/esphome -> /config/voice-satellites/esphome`, the resolved path is no longer a subpath of the un-resolved root, and validate / compile silently fail with `ValueError`. Tried both directory-level and file-level symlink workarounds; the directory-level one breaks compile, the file-level secrets symlink works fine.
+
+Outcome: ESPHome configs moved BACK to repo root `esphome/` (which maps to `/config/esphome/` on the NUC, where the dashboard expects them). `voice-satellites/` retains `docs/`, `enclosures/`, and `README.md` for non-firmware artifacts. Voice satellite work still owns the surrounding context, just not the YAML location.
+
+- [x] Move `voice-satellites/esphome/voice-garage.yaml` → `esphome/voice-garage.yaml` (git mv)
+- [x] Move `voice-satellites/esphome/.gitignore` → `esphome/.gitignore` (git mv)
+- [x] Remove now-empty `voice-satellites/esphome/`
+- [x] Update `voice-satellites/README.md` to drop the broken symlink workaround and document the new structure
+- [x] Update root `README.md` structure block
+
 ### 1.3 Relocate pool_temp_logger.py to a `pool/` domain ✅
 Decision: pool gets its own root-level domain folder to host current logger plus future predictive-heating analysis.
 

@@ -17,11 +17,12 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **Issue #173 resolved** in newer releases of `cryptk/haomnilogic-local`.
 
 ### Voice assistant satellites (ESPHome)
-- **First unit:** garage. Wired and flashed. Pipeline configured.
-- **Pipeline:** HA Cloud STT/TTS (Davis voice, High quality). OpenAI tested but billing/quality issues — reverted to HA Cloud.
+- **First unit:** garage. Wired and flashed. Recovered 2026-04-28 from a stuck `voice_assistant.on_error` (pipeline pointed at a removed Ollama conversation entity — see ADR-003 for the canonical-vs-alternative pipeline policy).
+- **Pipeline:** HA Cloud STT/TTS (Davis voice, High quality) — canonical. Ollama and OpenAI supported as alternative pipelines but not default.
 - **Open issue:** Sporadic audio quality (clears up intermittently). Suspected I2S clock drift on ESP32-S3 with esp-idf driver. **Next step:** test fixed MCLK pin on MAX98357A.
 - **Enclosure:** golf-ball-on-tee design in Fusion 360 for garage unit. Prototyping in alt-color PLA before final print. M3 heat-set inserts: 4.91mm OD, need 4.5mm holes.
 - **Hardware on hand:** 6× ESP32-S3 N16R8, 5× MAX98357A, 5× INMP441. 5 more units to build.
+- **ESPHome firmware location:** `esphome/` at repo root → maps to `/config/esphome/` on the NUC. The earlier `voice-satellites/esphome/` location was reverted because ESPHome dashboard's `rel_path()` validation is incompatible with directory-level symlinks.
 
 ### Network → HA boundary (cross-project)
 - **ADR-008** (in network-docs project) — analysis underway for moving HA NUC from IoT VLAN to LRD-Servers VLAN.
@@ -71,6 +72,7 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - Audit 573 entities exposed to Assist — too many.
 - Turn off "Expose new entities" default.
 - Phantom entity on Fibaro Dimmer 2 (`light.dimmer_2_2`) — unexposed but worth final rename for clarity.
+- **Periodic voice pipeline audit** — Settings → Voice Assistants → confirm each pipeline's conversation agent still exists. Stale agent references silently break devices. See ADR-003 operational notes.
 
 ---
 
