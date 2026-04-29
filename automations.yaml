@@ -623,3 +623,35 @@
       lux_sensor: sensor.st_00184974_illuminance
       lux_threshold: 300
       skip_if_lights_on: true
+- id: "ha_config_auto_pull"
+  alias: HA Config Auto-Pull from Git
+  description: Pulls latest config from GitHub every 15 min via shell_command.git_pull_config. Notifies on actual changes or on failure (e.g., divergent local edits blocking ff-only). See docs/decisions/005 if added, or scratch/cleanup-plan.md for context.
+  triggers:
+    - trigger: time_pattern
+      minutes: "/15"
+  conditions: []
+  actions:
+    - action: shell_command.git_pull_config
+      response_variable: pull_result
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ pull_result.returncode != 0 }}"
+          sequence:
+            - action: notify.mobile_app_iphone_sd
+              data:
+                title: HA config pull FAILED
+                message: "{{ (pull_result.stdout ~ ' / ' ~ pull_result.stderr)[:500] }}"
+                data:
+                  push:
+                    interruption-level: time-sensitive
+        - conditions:
+            - condition: template
+              value_template: "{{ 'Already up to date' not in (pull_result.stdout | string) }}"
+          sequence:
+            - action: notify.mobile_app_iphone_sd
+              data:
+                title: HA config updated from git
+                message: "{{ (pull_result.stdout | string)[:500] }}"
+  mode: single
+  max_exceeded: silent

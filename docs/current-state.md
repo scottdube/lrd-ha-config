@@ -44,6 +44,7 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 
 ## Recently completed
 
+- **HA config auto-pull from git wired.** Time-pattern automation (`HA Config Auto-Pull from Git`, every 15 min) calls `shell_command.git_pull_config` with `--ff-only`. Mobile push notifies on actual changes and on failures (e.g., divergent local edits blocking ff-only). Eliminates the manual NUC-pull step that caused state drift earlier today.
 - **Temporary ethernet run to OmniLogic controller** in place and functioning perfectly. WiFi packet loss issue (~30-40%) eliminated. Permanent run mostly done — Shepard Electric to finish exterior wall pass-through.
 - **OmniLogic Local upgraded to `1.0.4`** (stable, off beta).
 - **GitHub issue #173 (cryptk/haomnilogic-local)** resolved by dev team in newer integration releases.

@@ -25,6 +25,7 @@ shell_command:
     "{{ states('valve.omnilogic_pool_waterfall') }}"
     "{{ states('sensor.pool_forecast_high') }}"
     "{{ states('sensor.pool_swimming_day') }}"
+  git_pull_config: cd /config && git pull --ff-only origin main 2>&1
 
 recorder:
   exclude:
