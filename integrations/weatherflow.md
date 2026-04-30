@@ -33,7 +33,7 @@ Two physical Tempest stations across Scott's two residences (~6 months each).
 
 | Station ID | Name | Location | Source | Notes |
 |---|---|---|---|---|
-| `ST-00184974` (hub `HB-00183756`) | Outside | Lake Ridge Dr (FL) | Local + Cloud | Pool automation, door automations, lighting. Local works because HA lives at LRD on the IoT VLAN. |
+| `ST-00184974` (hub `HB-00183756`) | Outside | Lake Ridge Dr (FL) | Local + Cloud | Pool automation, door automations, lighting. Local works because HA OS has an `eno1.4` sub-interface on the IoT VLAN (`192.168.11.155`) for L2 broadcast adjacency to the Tempest hub. HA's primary interface moved to LRD-Servers VLAN per network-docs ADR-009; broadcast adjacency restored per ADR-011. See ADR-005 in this repo. |
 | `ST-XXXXXXXX` (TODO fill in — drill into the "Shore In" hub in WeatherflowCloud integration to see) | Shore In | Shore property (SLN) | Cloud only | No HA install at SLN yet, so no local integration possible from there. Currently monitor-only — no automations consume Shore In data (yet). |
 
 (All WeatherFlow stations follow `ST-XXXXXXXX` IDs; hubs follow `HB-XXXXXXXX`.)
@@ -97,6 +97,7 @@ The Tempest exposes ~28-32 entities per station. Below is the catalog of what's 
 - **Some values come through in metric even when the Tempest app is set to imperial.** Scott specifically remembers needing to convert some Tempest data; the pool blueprint divides precipitation values by 25.4 (mm → inches), suggesting precipitation is the affected channel. Other channels may also be affected — verify when wiring new automations. The Tempest app's US-units setting does not appear to propagate to all HA-exposed sensor values.
 - **Two integrations, overlapping entities.** The Lake Ridge Tempest appears in BOTH local and cloud integrations with similar but not identical entity sets. Don't assume an entity update in one source means the other has the latest value. Use local for real-time-critical reads, cloud for forecast and Shore In.
 - **Forecast not exposed directly.** Forecast values come through the cloud integration but typically as attributes of the weather entity; pool automation depends on a template sensor that extracts the day's high.
+- **Cloud parser warning — by design, ignore.** HA log shows `[weatherflow4py.ws] Unrecognized WS Message` periodically, message type `obs_st`, typically right after HA restart. Per `jeeftor` (library author and code owner for `weatherflow_cloud`) in [home-assistant/core#151447](https://github.com/home-assistant/core/issues/151447#issuecomment-3242396117): WeatherFlow's server sends an `obs_st` summary message on each websocket connect that doesn't match WeatherFlow's own published API spec. The `weatherflow4py` library correctly rejects it as malformed, logs the warning, and continues. The maintainer considers this correct behavior — surfacing a real server-side spec violation. Issue was auto-closed as stale (2025-11-30) and locked. **Do not open a new issue** — same response will come back. Treat as permanent log noise.
 
 ---
 
@@ -105,7 +106,7 @@ The Tempest exposes ~28-32 entities per station. Below is the catalog of what's 
 - **Lake Ridge station ID:** `ST-00184974`
 - **Lake Ridge hub:** `HB-00183756`
 - **Personal access token:** created at https://tempestwx.com/settings/tokens
-- **Local discovery:** Tempest hub must be on the same VLAN as HA (currently IoT VLAN — works).
+- **Local discovery:** Tempest hub must share an L2 broadcast domain with HA. Tempest hub `HB-00183756` is on IoT VLAN. HA OS reaches it via `eno1.4` sub-interface (`192.168.11.155/24`, no gateway, passive listener) — see ADR-005 and network-docs ADR-011. **Do not delete `eno1.4`** or this integration silently stops receiving data.
 - **Shore In:** TODO capture station ID and any setup notes for the off-network deployment.
 
 ---

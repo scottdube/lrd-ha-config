@@ -2,7 +2,7 @@
 
 Home Assistant configuration, automations, integrations, and adjacent maker work for the LRD smart home.
 
-**HA host:** NUC @ 192.168.11.155, IoT VLAN, HA OS 17.2 / Core 2026.4.1
+**HA host:** NUC @ 192.168.50.11 on LRD-Servers VLAN; `eno1.4` sub-interface (`192.168.11.155`) on IoT VLAN for broadcast/multicast adjacency only (no gateway). HA OS 17.2 / Core 2026.4.1
 **Network:** UDM SE, WireGuard for remote access, Nabu Casa as backup remote
 **Canonical config repo:** [`scottdube/lrd-ha-config`](https://github.com/scottdube/lrd-ha-config) (this repo)
 **Public blueprints:** [`scottdube/lrd-ha-blueprints`](https://github.com/scottdube/lrd-ha-blueprints)
@@ -13,7 +13,7 @@ Home Assistant configuration, automations, integrations, and adjacent maker work
 
 This project covers all Home Assistant work — configuration, automations, blueprints, dashboards, and integrations — plus adjacent hardware/maker work that's part of the HA ecosystem (ESP32-S3 voice satellites, custom enclosures).
 
-**What's NOT here:** Network infrastructure (firewalls, VLANs, ADRs about zones, cross-site routing) lives in a separate `network-docs` project. HA is a *consumer* of network policy, not a contributor to it. This project references network decisions (e.g., ADR-008 governing HA NUC placement) but doesn't own them.
+**What's NOT here:** Network infrastructure (firewalls, VLANs, ADRs about zones, cross-site routing) lives in a separate `network-docs` project. HA is a *consumer* of network policy, not a contributor to it. This project references network decisions (e.g., network-docs ADR-009 governing HA NUC placement on LRD-Servers VLAN, and network-docs ADR-011 governing the dual-VLAN broadcast/multicast adjacency for IoT-side local integrations) but doesn't own them.
 
 ---
 

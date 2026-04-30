@@ -2,7 +2,7 @@
 
 Active working notes. Update as work progresses. This is the file Cowork should reference most often when answering "where are we on X?"
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-04-30
 
 ---
 
@@ -30,11 +30,6 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **Cost:** annual subscription. See `integrations/nabu-casa.md` for full impact analysis.
 - **Recommended:** subscribe given the cross-cutting dependencies. Local Whisper + Piper is a feasible long-term alternative for STT/TTS but isn't built; Alexa bridge has no local equivalent.
 
-### Network → HA boundary (cross-project)
-- **ADR-008** (in network-docs project) — analysis underway for moving HA NUC from IoT VLAN to LRD-Servers VLAN.
-- **Status:** pcap-based traffic characterization running. Initial findings suggest only 3-4 inbound rules needed if migrated.
-- **Decision pending.** Don't move HA until ADR-008 is committed.
-
 ### Z-Wave fleet housekeeping
 - **Toilet fan (ZEN75, node 256) is dead** after a strange firmware update. Needs reinclusion or recovery. `device-inventory.md` had this as `?` — now confirmed.
 - **Kwikset 916 (node 038) battery at 30%** — replacement window opening. Other Kwikset (node 008) at 100%.
@@ -50,7 +45,9 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **GitHub issue #173 (cryptk/haomnilogic-local)** resolved by dev team in newer integration releases.
 - **Switch→valve domain migration** for OmniLogic waterfall (blueprint v1.8.0).
 - **Lanai lights blueprint v1.5** — door-activated with lux/sun fallback, skip-if-on guard. All 4 test paths verified. Live.
-- **HA → IoT VLAN migration** done. NUC at 192.168.11.155.
+- **HA NUC migrated from IoT VLAN to LRD-Servers VLAN** (network-docs ADR-009, executed 2026-04-29). New primary IP: `192.168.50.11`. Pre-flight pcap missed broadcast/multicast traffic class — discovered post-cutover when WeatherFlow Tempest local integration silently stopped receiving data.
+- **Dual-VLAN recovery via `eno1.4` sub-interface** (network-docs ADR-011, 2026-04-29). HA OS now trunked: native VLAN LRD-Servers on `eno1` (`192.168.50.11`, gateway `.50.1`), tagged VLAN IoT on `eno1.4` (`192.168.11.155`, no gateway, IPv6 disabled, passive listener only). Tempest local data flow restored within ~60 seconds. Persistence handled by HA Supervisor (`ha network vlan` command). Don't delete `eno1.4` — also load-bearing for any future broadcast/multicast-dependent local integrations.
+- **HA `http.server_host` bound to LRD-Servers IP + localhost only** (ADR-005, 2026-04-30). Prevents IoT-side exposure of `:8123` web UI now that HA is dual-homed. Editor pitfall logged: HA File Editor add-on mangles YAML list form on save — use SCS or SSH+nano for list-valued config edits. (Recovery from this incident is what prompted the GitHub repo reconciliation; configuration.yaml committed as `3ba3983`.)
 - **Hubitat retired.** All Z-Wave devices migrated to Z-Wave JS. Last device was Fibaro Dimmer 2 on lamp post.
 - **Studio Code Server clipboard issue** — workaround: open SCS in own tab (not iframe).
 - **Midea AC LAN integration** added for `38MARBQ24AA3` mini split.
@@ -115,3 +112,4 @@ See `docs/decisions/` for full ADRs. Quick reference:
 | 002 | Heater set-and-hold; heat pump owns cycling, HA owns pump speed |
 | 003 | Voice pipeline: HA Cloud (Davis/High); OpenAI only experimental |
 | 004 | Waterfall control: valve domain (post-1.0.0b5 of OmniLogic Local) |
+| 005 | http.server_host bound to LRD-Servers IP + localhost only (post dual-VLAN) |
