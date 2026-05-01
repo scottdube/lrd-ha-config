@@ -474,12 +474,12 @@ variables:
     {{ current_air_temp >= min_heatpump_air_temp }}
   heater_needed: >
     {# v1.10.0: vacation_mode forces False so HEATER+SPEED maintenance
-       turns the heater off naturally without a separate vacation branch. #}
-    {% if is_state(vacation_boolean, 'on') %}
-      false
-    {% else %}
-      {{ swimming_day and heatpump_ok }}
-    {% endif %}
+       turns the heater off naturally without a separate vacation branch.
+       Single-expression form ensures clean boolean return — multi-line
+       {% if %}{% endif %} returns a STRING with whitespace which can
+       silently fail downstream `not heater_needed` comparisons even after
+       HA's native-type conversion. Hotfix 2026-05-02. #}
+    {{ false if is_state(vacation_boolean, 'on') else (swimming_day and heatpump_ok) }}
   hours_to_heat: >
     {% if not heatpump_ok %}
       {{ 0 }}
@@ -522,15 +522,12 @@ variables:
        Fail-safe: if the binary sensor is unavailable, treat as True so
        we keep the pump running rather than starve the heat exchanger.
        v1.10.0: when in vacation_mode, force False since heater should be
-       off in vacation. #}
-    {% set s = states(heater_active_binary_sensor) %}
-    {% if is_state(vacation_boolean, 'on') %}
-      false
-    {% elif s in ['unavailable', 'unknown'] %}
-      true
-    {% else %}
-      {{ s == 'on' }}
-    {% endif %}
+       off in vacation.
+       Single-expression form ensures clean boolean return — see hotfix
+       comment on heater_needed above for why. Hotfix 2026-05-02. #}
+    {{ false if is_state(vacation_boolean, 'on')
+       else (true if states(heater_active_binary_sensor) in ['unavailable', 'unknown']
+             else is_state(heater_active_binary_sensor, 'on')) }}
   service_active: >
     {# Per ADR-011: pool service lockout. When True, equipment-control
        branches pause. Detection automations in pool_modes.yaml toggle
