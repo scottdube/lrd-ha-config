@@ -412,6 +412,8 @@ variables:
   water_temp_sensor: !input water_temp_sensor
   heater_entity: !input heater_entity
   heater_active_binary_sensor: !input heater_active_binary_sensor
+  service_lockout_boolean: !input service_lockout_boolean
+  vacation_boolean: !input vacation_boolean
   pump_switch: !input pump_switch
   pump_speed_entity: !input pump_speed_entity
   waterfall_switch: !input waterfall_switch
@@ -435,6 +437,7 @@ variables:
   light_lux_threshold: !input light_lux_threshold
   waterfall_start_time: !input waterfall_start_time
   waterfall_end_time: !input waterfall_end_time
+  vacation_filter_start_time: !input vacation_filter_start_time
   current_water_temp: >
     {{ states(water_temp_sensor) | float(75) }}
   current_air_temp: >
