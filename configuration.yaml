@@ -20,6 +20,9 @@ scene: !include scenes.yaml
 template: !include config/templates.yaml
 
 shell_command:
+  # v1 logger — runs every 10 min while pump is on. Retained during
+  # logger v2 phase 1 parallel-run period; will be retired once v2 is
+  # validated. See pool/docs/logger-v2.md migration plan.
   pool_log: >
     python3 /config/pool/scripts/temp_logger.py
     "{{ states('sensor.omnilogic_pool_watersensor') }}"
@@ -30,6 +33,12 @@ shell_command:
     "{{ states('valve.omnilogic_pool_waterfall_2') }}"
     "{{ states('sensor.pool_forecast_high') }}"
     "{{ states('sensor.pool_swimming_day') }}"
+  # v2 logger — always-on, wide CSV (~30 columns local + environmental).
+  # See pool/scripts/state_logger.py and pool/docs/logger-v2.md.
+  pool_state_log: >
+    python3 /config/pool/scripts/state_logger.py
+    --row-type {{ row_type | default('time_pattern') }}
+    --trigger-entity "{{ trigger_entity | default('') }}"
   git_pull_config: cd /config && git pull --ff-only origin main 2>&1
 
 recorder:

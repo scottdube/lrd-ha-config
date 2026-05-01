@@ -26,6 +26,8 @@ Initiated 2026-05-01 after the waterfall incident exposed multiple blind spots i
 
 **Sequencing:** Find heater_equip binary_sensor entity ID → logger v2 phase 1 (parallel, non-breaking) → blueprint v1.9.0 fix → logger v2 phase 2+ → auditor phase 1.
 
+**Logger v2 phase 1 in flight (2026-05-02):** `pool/scripts/state_logger.py` written, `shell_command.pool_state_log` and `automation.pool_state_logger_v2` added. ~30 columns, local + environmental, always-on (no pump-on gate). Awaiting (a) long-lived access token saved to `/config/.state_logger_token` on the NUC, (b) commit/push, (c) HA restart. Cloud columns + state-change triggers + trusted-temp + rsync backup are phase 1.5/2/3.
+
 ### Voice assistant satellites (ESPHome)
 - **First unit:** garage. Wired and flashed. Recovered 2026-04-28 from a stuck `voice_assistant.on_error` (pipeline pointed at a removed Ollama conversation entity — see ADR-003 for the canonical-vs-alternative pipeline policy).
 - **Pipeline (LRD Voice Assistant):** HA Cloud STT, HA Cloud TTS (Davis voice, High quality), OpenAI Conversation as agent with "Prefer handling commands locally" ON (local first, OpenAI fallback). Per ADR-003 revised 2026-04-28. Ollama is supported as an alternative agent but not default.

@@ -30,8 +30,11 @@ custom_components/
 *.db-shm
 *.db-wal
 
-# Pool runtime data (logger appends every 10 min while pump is on)
-pool_temp_log.csv
+# Pool runtime data — gitignored, lives at /config on the NUC.
+pool_temp_log.csv      # v1 logger output (deprecated, retained during v2 phase 1)
+pool_state_log.csv     # v2 logger output (logger-v2 spec)
+pool_action_log.csv    # logger v2 phase 4 action log
+.state_logger_token    # long-lived access token for state_logger.py
 
 # Lock files
 *.lock

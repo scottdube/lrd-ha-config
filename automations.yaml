@@ -505,6 +505,9 @@
   max_exceeded: silent
 - alias: Pool Temp Logger
   id: pool_temp_logger
+  description: >
+    v1 logger — runs every 10 min while pump is on. Retained during logger v2
+    phase 1 parallel-run period. Will be retired once v2 is validated.
   trigger:
     - platform: time_pattern
       minutes: /10
@@ -514,6 +517,23 @@
       state: "on"
   action:
     - action: shell_command.pool_log
+- alias: Pool State Logger v2
+  id: pool_state_logger_v2
+  description: >
+    Logger v2 phase 1 — always-on. Writes ~30 columns of local OmniLogic +
+    environmental state to /config/pool_state_log.csv every 10 min regardless
+    of pump state. Phase 1.5 will add state-change triggers; phase 2 adds
+    cloud columns and computed expected_state. See pool/docs/logger-v2.md.
+  trigger:
+    - platform: time_pattern
+      minutes: /10
+  action:
+    - action: shell_command.pool_state_log
+      data:
+        row_type: time_pattern
+        trigger_entity: ""
+  mode: single
+  max_exceeded: silent
 - id: "1775827717239"
   alias: Pool Automation v1.9.0
   description: ""
