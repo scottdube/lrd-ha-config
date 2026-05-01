@@ -79,7 +79,7 @@
       state: >
         {% set pump = states('switch.omnilogic_pool_filter_pump') %}
         {% set heater = states('water_heater.omnilogic_pool_heater') %}
-        {% set waterfall = states('valve.omnilogic_pool_waterfall_2') %}
+        {% set waterfall = states('valve.omnilogic_pool_waterfall') %}
         {% set light = states('switch.omnilogic_pool_light') %}
         Pump:{{ pump }} Heater:{{ heater }} Waterfall:{{ waterfall }} Light:{{ light }}
       icon: mdi:pool

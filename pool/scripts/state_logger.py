@@ -131,11 +131,11 @@ COLUMNS: list[dict] = [
 
     # ---------- Local: waterfall ----------
     {"name": "local_waterfall_state", "source": "state",
-     "entity": "valve.omnilogic_pool_waterfall_2"},
+     "entity": "valve.omnilogic_pool_waterfall"},
     {"name": "local_waterfall_function", "source": "attr",
-     "entity": "valve.omnilogic_pool_waterfall_2", "attr": "omni_function"},
+     "entity": "valve.omnilogic_pool_waterfall", "attr": "omni_function"},
     {"name": "local_waterfall_why_on", "source": "attr",
-     "entity": "valve.omnilogic_pool_waterfall_2", "attr": "omni_why_on"},
+     "entity": "valve.omnilogic_pool_waterfall", "attr": "omni_why_on"},
 
     # ---------- Local: chlorinator ----------
     {"name": "local_chlorinator_state", "source": "state",
@@ -231,16 +231,19 @@ def compute_water_temp_reliable(
 
 def build_row(args: argparse.Namespace, token: str) -> list[str]:
     """Walk the COLUMNS manifest and produce one CSV row."""
-    # Pre-fetch entities we'll need in compute columns
-    pump_state, _, pump_last_changed = fetch_entity(
-        "switch.omnilogic_pool_filter_pump", token
-    )
-
     # Cache of fetched entities so multiple columns reading the same entity
-    # only hit the REST API once.
+    # only hit the REST API once. Pre-populate the pump entity (with its full
+    # attribute dict, not just state) because compute_water_temp_reliable
+    # needs its last_changed below — and any later attribute reads of the
+    # same entity must see the real attrs, not an empty dict.
     cache: dict[str, tuple[str, dict, str | None]] = {
-        "switch.omnilogic_pool_filter_pump": (pump_state, {}, pump_last_changed),
+        "switch.omnilogic_pool_filter_pump": fetch_entity(
+            "switch.omnilogic_pool_filter_pump", token
+        ),
     }
+    pump_state, _, pump_last_changed = cache[
+        "switch.omnilogic_pool_filter_pump"
+    ]
 
     def get(entity_id: str) -> tuple[str, dict, str | None]:
         if entity_id not in cache:

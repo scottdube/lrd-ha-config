@@ -543,7 +543,7 @@
       min_swim_temp: 78
       heater_pump_speed: 77
       waterfall_start_time: 08:00:00
-      waterfall_switch: valve.omnilogic_pool_waterfall_2
+      waterfall_switch: valve.omnilogic_pool_waterfall
       heater_active_binary_sensor: binary_sensor.omnilogic_pool_heater_heater_equipment_status
 - id: "1775847529638"
   alias: Garage Door Activated Lights with Motion Keep-Alive

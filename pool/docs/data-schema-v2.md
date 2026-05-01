@@ -69,7 +69,7 @@ The schema version line is not a CSV row; downstream parsers must skip lines sta
 
 | Column | Source | Notes |
 |---|---|---|
-| `local_waterfall_state` | `valve.omnilogic_pool_waterfall_2` state | `open` / `closed`. **Correct entity per orphan-bug fix 2026-05-01.** |
+| `local_waterfall_state` | `valve.omnilogic_pool_waterfall` state | `open` / `closed`. Verified live entity per Developer Tools → States 2026-05-02 (`_2` suffix turned out to be the orphan, not the live one — initial fix on 2026-05-01 was wrong-direction; reverted). |
 | `local_waterfall_function` | valve attr `omni_function` | RelayFunction — should be `RLY_WATERFALL`. |
 | `local_waterfall_why_on` | valve attr `omni_why_on` | RelayWhyOn enum. |
 
