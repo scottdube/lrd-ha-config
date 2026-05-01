@@ -8,6 +8,14 @@
 #          (ADR-012). Both use input_boolean helpers (defined in
 #          packages/pool/pool_modes.yaml) checked via new blueprint inputs.
 #
+#          HOTFIX 2026-05-02 (within v1.10.0): three input variables were
+#          referenced in templates but never declared in the variables:
+#          block — service_lockout_boolean, vacation_boolean, and
+#          vacation_filter_start_time. Result was UndefinedError at template
+#          evaluation, causing silent failure of the HEATER+SPEED post-choose
+#          action (vacation toggle had no effect on heater state). Fixed by
+#          adding the !input wirings.
+#
 #          SERVICE LOCKOUT: when input_boolean.pool_service_lockout is on,
 #          all equipment-control branches (PUMP START, WATERFALL ON,
 #          WATERFALL END pump-off action, NOT-A-SWIM-DAY pump-off, HEATER+
@@ -104,14 +112,24 @@ blueprint:
   description: >
     Pool Automation v1.10.0
 
-    Intelligent pool automation using OmniLogic Local for all control
-    actions and WeatherFlow for environmental inputs. Cloud integration
-    retained for ORP/salt/pH monitoring only.
+    Intelligent pool automation using OmniLogic Local for control and
+    WeatherFlow for environmental inputs. Cloud integration retained
+    for ORP/salt/pH monitoring only.
 
-    HEATER LOGIC: Heater is set on if swim day, off if not swim day.
-    Heat pump thermostat controls all heat/cool cycling automatically.
-    HA manages pump speed only: heater_pump_speed when heater needed,
-    normal_pump_speed otherwise.
+    HEATER LOGIC (set-and-hold per ADR-002): heater enabled on swim
+    days, disabled otherwise. Heat pump thermostat controls cycling.
+    HA manages pump speed based on compressor activity (per ADR-006):
+    heater_pump_speed when compressor is actively running,
+    normal_pump_speed when idle or in vacation mode.
+
+    MODES (v1.10.0):
+    - Service mode (ADR-011) pauses equipment-control branches when
+      input_boolean.pool_service_lockout is on. Detection via external
+      panel-toggle (no HA context). Pool light continues normally.
+    - Vacation mode (ADR-012) switches from swim-day logic to
+      filter-only when input_boolean.vacation is on. Heater off,
+      waterfall closed, pump runs vacation_filter window. Pool light
+      continues for security.
   author: LRD
   domain: automation
   homeassistant:
