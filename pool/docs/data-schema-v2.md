@@ -95,6 +95,18 @@ The schema version line is not a CSV row; downstream parsers must skip lines sta
 |---|---|---|
 | `local_pool_light_state` | `switch.omnilogic_pool_light` state | on/off. |
 
+### HVAC — garage mini-split (Carrier 38MARBQ24AA3 via Midea AC LAN)
+
+First non-pool domain captured. The Midea AC LAN integration exposes real-time W draw, which the Carrier Infinity integration does not — useful for cross-checking household totals and for tuning the eventual presence-aware setback.
+
+| Column | Source | Notes |
+|---|---|---|
+| `garage_ms_power_w` | `sensor.garage_ms_power_realtime` | Instantaneous W. SensorDeviceClass.POWER. |
+| `garage_ms_kwh_total` | `sensor.garage_ms_energy_total` | Running cumulative kWh. TOTAL_INCREASING. |
+| `garage_ms_kwh_current` | `sensor.garage_ms_energy_current` | Current-period kWh. TOTAL_INCREASING. |
+
+(Future: add main Carrier Infinity unit's daily kWh sensors via `hvac_main_*` prefix when that work happens.)
+
 ---
 
 ## Cadence (phase 1)

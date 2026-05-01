@@ -174,6 +174,18 @@ COLUMNS: list[dict] = [
     # ---------- Local: pool light ----------
     {"name": "local_pool_light_state", "source": "state",
      "entity": "switch.omnilogic_pool_light"},
+
+    # ---------- HVAC: garage mini-split (Carrier 38MARBQ24AA3 via Midea AC LAN)
+    # First non-pool domain captured. Real-time power (W) is unique here —
+    # the Carrier Infinity integration only gives daily kWh aggregates;
+    # Midea AC LAN exposes instantaneous draw. Useful for cross-checking
+    # the household total and for the eventual presence-aware setback.
+    {"name": "garage_ms_power_w", "source": "state",
+     "entity": "sensor.garage_ms_power_realtime"},
+    {"name": "garage_ms_kwh_total", "source": "state",
+     "entity": "sensor.garage_ms_energy_total"},
+    {"name": "garage_ms_kwh_current", "source": "state",
+     "entity": "sensor.garage_ms_energy_current"},
 ]
 
 
