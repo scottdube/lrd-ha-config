@@ -100,6 +100,12 @@ Initiated 2026-05-01 after the waterfall incident exposed multiple blind spots i
 - 5 more units to build after garage proves out.
 - Decide locations: kitchen, master bedroom, lanai, ?, ?
 
+### Whole-home power monitoring (planned)
+- ADR-009 drafted 2026-05-02 covering Emporia Vue 2 vs IotaWatt trade-off.
+- New sub-project at `energy/` with planning docs.
+- Hardware not yet purchased; pre-purchase checklist in `energy/README.md`.
+- Logger v2 will extend with `home_*` columns once installed.
+
 ### Integrations to evaluate
 - **ChefsTemp** — feature-request email drafted but not sent (waiting on Breezo support reply first). BLE proxy possible if API not granted.
 - ~~WeatherFlow Local~~ — done. Both local and cloud integrations active; see `integrations/weatherflow.md`.
@@ -146,3 +152,4 @@ See `docs/decisions/` for full ADRs. Quick reference:
 | 004 | Waterfall control: valve domain (post-1.0.0b5 of OmniLogic Local) |
 | 005 | http.server_host bound to LRD-Servers IP + localhost only (post dual-VLAN) |
 | 006 | (proposed) actively-heating vs enabled — pump flow tied to compressor demand, not heater enabled state |
+| 009 | (proposed) whole-home power monitoring — Emporia Vue 2 vs IotaWatt; install pending |
