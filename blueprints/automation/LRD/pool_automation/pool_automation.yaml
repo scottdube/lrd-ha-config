@@ -29,6 +29,12 @@
 #          the signal covers compressor activity in either heat or cool mode.
 #          Renaming deferred to a future cosmetic-cleanup version to keep
 #          v1.9.0 focused.
+#          POST-DEPLOY FIX (same v1.9.0): heater+speed maintenance moved out
+#          of the inner choose because the WATERFALL ON branch was matching
+#          first every poll during the day window and short-circuiting it.
+#          Pump speed was therefore never adjusted between pump-start and
+#          waterfall-end. Now it runs after the inner choose unconditionally
+#          when pump is on, picking up compressor-state changes within 10 min.
 #
 #  v1.8.0  Migrated waterfall from switch to valve platform to support
 #          haomnilogic-local v1.0.0b1+. Updated entity selector domain,
@@ -614,48 +620,53 @@ action:
                     data:
                       operation_mode: "off"
 
-              # HEATER AND PUMP SPEED MANAGEMENT
-              # Runs every poll when pump is on.
-              # Heater enable: set on if swim day (heater_needed), off otherwise.
-              # Heat pump thermostat controls cycling.
-              # Pump speed (v1.9.0, per ADR-006): 77% iff compressor is actively
-              # delivering heat (heater_actively_delivering), 55% otherwise.
-              # Was: 77% whenever heater_needed was true (i.e. all day on swim
-              # days). Now: 55% during the long PAUSE windows when the heat pump
-              # is at setpoint and the compressor is idle.
-              - conditions:
+          # HEATER AND PUMP SPEED MAINTENANCE - POST-CHOOSE
+          # v1.9.0 fix (was an inner-choose branch): inner choose's WATERFALL
+          # ON branch matches every poll during 08:00-20:00 on swim days,
+          # short-circuiting all later branches including this one. Result:
+          # pump speed never adjusted during the day. Moved out of the inner
+          # choose so it runs every poll regardless of which transition
+          # branch (if any) just fired.
+          # Heater enable: set on if swim day (heater_needed), off otherwise.
+          # Heat pump thermostat controls actual cycling.
+          # Pump speed (per ADR-006): heater_pump_speed iff compressor is
+          # actively running, normal_pump_speed otherwise. Distinguishes
+          # ready-but-idle from compressor-running.
+          # Re-checks pump state via is_state() so a just-fired turn-off
+          # branch (WATERFALL END or NOT-A-SWIM-DAY) doesn't get clobbered.
+          - if:
+              - condition: template
+                value_template: "{{ is_state(pump_switch, 'on') }}"
+            then:
+              - if:
                   - condition: template
-                    value_template: "{{ pump_is_on }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ heater_needed and is_state(heater_entity, 'off') }}"
-                    then:
-                      - action: water_heater.set_operation_mode
-                        target:
-                          entity_id: !input heater_entity
-                        data:
-                          operation_mode: "on"
-                      - action: water_heater.set_temperature
-                        target:
-                          entity_id: !input heater_entity
-                        data:
-                          temperature: "{{ target_temp }}"
-                  - if:
-                      - condition: template
-                        value_template: "{{ not heater_needed and heater_is_on }}"
-                    then:
-                      - action: water_heater.set_operation_mode
-                        target:
-                          entity_id: !input heater_entity
-                        data:
-                          operation_mode: "off"
-                  - action: number.set_value
+                    value_template: "{{ heater_needed and is_state(heater_entity, 'off') }}"
+                then:
+                  - action: water_heater.set_operation_mode
                     target:
-                      entity_id: !input pump_speed_entity
+                      entity_id: !input heater_entity
                     data:
-                      value: >
-                        {{ heater_pump_speed if heater_actively_delivering else normal_pump_speed }}
+                      operation_mode: "on"
+                  - action: water_heater.set_temperature
+                    target:
+                      entity_id: !input heater_entity
+                    data:
+                      temperature: "{{ target_temp }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ not heater_needed and not is_state(heater_entity, 'off') }}"
+                then:
+                  - action: water_heater.set_operation_mode
+                    target:
+                      entity_id: !input heater_entity
+                    data:
+                      operation_mode: "off"
+              - action: number.set_value
+                target:
+                  entity_id: !input pump_speed_entity
+                data:
+                  value: >
+                    {{ heater_pump_speed if heater_actively_delivering else normal_pump_speed }}
 
       # POOL LIGHT ON - illuminance based (primary)
       - conditions:
