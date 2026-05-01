@@ -29,8 +29,11 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 - **Version churn.** Schema/domain changes have occurred between releases historically. Check release notes; audit blueprint for entity references after every upgrade. Audit unavailable entities in registry.
 - **Stale entities post-rename.** When devices are re-included or domains change, ghost entities persist with `_2` suffix. Manual cleanup required.
 
+### Open
+- **Midnight burst of `Failed to update data from OmniLogic` errors** (discovered 2026-05-01). Local coordinator throws ~18 errors clustered between 00:27 and 01:00 EDT, plus single isolated errors scattered through 01:00–07:00. Evening hours (17:00–23:59) show zero errors. Cloud integration unaffected throughout. Pattern is consistent with controller-side scheduled housekeeping (log rotation, cloud telemetry sync, etc.) rather than network instability. Needs multi-night confirmation. Full analysis: `scratch/omnilogic-local-midnight-burst-2026-05-01.md`.
+
 ### Resolved
-- **WiFi packet loss to controller (~30-40% per ping test).** Resolved by temporary ethernet run to controller (functioning perfectly). Permanent run mostly done — waiting on Shepard Electric to route through exterior wall instead of dangling from soffit.
+- **WiFi packet loss to controller (~30-40% per ping test).** Resolved by temporary ethernet run to controller (functioning perfectly). Permanent run mostly done — waiting on Shepard Electric to route through exterior wall instead of dangling from soffit. Confirmed reliable evening 2026-04-30 — zero errors over 7 hours.
 - **GitHub issue #173.** Resolved by maintainer in newer integration releases.
 
 ---

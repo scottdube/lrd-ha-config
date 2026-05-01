@@ -27,7 +27,7 @@ shell_command:
     "{{ states('water_heater.omnilogic_pool_heater') }}"
     "{{ states('switch.omnilogic_pool_filter_pump') }}"
     "{{ states('number.omnilogic_pool_filter_pump_speed') }}"
-    "{{ states('valve.omnilogic_pool_waterfall') }}"
+    "{{ states('valve.omnilogic_pool_waterfall_2') }}"
     "{{ states('sensor.pool_forecast_high') }}"
     "{{ states('sensor.pool_swimming_day') }}"
   git_pull_config: cd /config && git pull --ff-only origin main 2>&1

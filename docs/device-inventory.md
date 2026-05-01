@@ -16,9 +16,22 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 
 | Node | Device | Model | Location | Entity ID | Notes |
 |---|---|---|---|---|---|
-| ? | HS-WX300 | HomeSeer | ? | ? | Multiple of these — list each |
-| ? | HS-WX300 (kitchen cans) | HomeSeer | Kitchen | `light.kitchen_cans` | Group 2/3 association to Kitchen 4 Cans |
-| ? | HS-WX300 (kitchen 4 cans) | HomeSeer | Kitchen | `light.kitchen_4_cans` | |
+| 003 | HS-WX300 | HomeSeer | Garage | `light.garage_lights` | |
+| 005 | HS-WX300 | HomeSeer | Garage | `light.garage_cans` | |
+| 016 | HS-WX300 | HomeSeer | Lanai | `light.lanai_cans` (inferred) | |
+| 018 | HS-WX300 | HomeSeer | Master Suite | `light.master_bedroom_cans` (inferred) | |
+| 019 | HS-WX300 | HomeSeer | Outside | `light.garage_outdoor_lights` (inferred) | |
+| 020 | HS-WX300 | HomeSeer | Entry | `light.front_entryway_light` (inferred) | |
+| 022 | HS-WX300 | HomeSeer | Living Room | `light.living_room_cans` (inferred) | |
+| 023 | HS-WX300 | HomeSeer | Dining Room | `light.dining_room_light` (inferred) | |
+| 025 | HS-WX300 | HomeSeer | Kitchen | `light.under_cabinet_lights` (inferred) | |
+| 026 | HS-WX300 | HomeSeer | Kitchen | `light.kitchen_cans` | Group 2/3 association to Kitchen 4 Cans (node 034). Verify still working post-FW-rollout. |
+| 027 | HS-WX300 | HomeSeer | Nook | `light.nook_lights` (inferred) | |
+| 029 | HS-WX300 | HomeSeer | Master Suite | `light.toilet_light` (inferred) | Renamed 2026-04-30: previously "Toilet.  Light" (typo), now "Toilet Light". |
+| 030 | HS-WX300 | HomeSeer | Master Suite | `light.bathroom_light` (inferred) | |
+| 031 | HS-WX300 | HomeSeer | Master Suite | `light.vanity` (inferred) | |
+| 033 | HS-WX300 | HomeSeer | Master Suite | `light.master_suite_hall_light` (inferred) | |
+| 034 | HS-WX300 | HomeSeer | Kitchen | `light.kitchen_4_cans` | FW outlier — already on v2.2.0; group source for node 026's associations. |
 | ? | Jasco AS2005 | Jasco | Kitchen (over bar) | none | Add-on switch, associated to kitchen cans at Z-Wave level |
 | 32 | ZEN75 | Zooz | Master Suite — shower fan | `switch.heavy_duty_switch_shower` | FW v1.30.0 |
 | ? | ZEN75 | Zooz | Master Suite — toilet fan | `switch.heavy_duty_switch_toilet` | Re-included after failed FW update |
@@ -88,6 +101,15 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 | Device | Notes |
 |---|---|
 | Tempest hub | On IoT VLAN. Cloud + Local integrations both available. |
+
+---
+
+## Servers / always-on hosts
+
+| Host | Hardware | IP | VLAN | Role |
+|---|---|---|---|---|
+| HA NUC | Intel NUC | `192.168.50.11` (`eno1`) + `192.168.11.155` (`eno1.4` IoT) | LRD-Servers (native) + IoT (tagged) | Home Assistant OS + Z-Wave JS USB stick. Dual-VLAN per network-docs ADR-011. |
+| Mac mini | Apple Mac mini | `192.168.50.10` | LRD-Servers | Backup target for HA runtime data (pool state log, etc.). SSH reachable from NUC (ed25519 key already exists per 2026-04-30 SSH-key auth work — verify the same key is authorized on the mini). |
 
 ---
 

@@ -4,6 +4,32 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.9.0  Pump flow tied to compressor activity, not heater enabled state
+#          (per ADR-006). New input heater_active_binary_sensor sourced from
+#          binary_sensor.<heater_equip>_heater_equipment_status (HeaterState.ON
+#          from pyomnilogic_local — covers BOTH heating and cooling compressor
+#          activity since HeaterState has no direction component). Pump speed
+#          now selects 77% iff compressor active, 55% otherwise.
+#          WATERFALL END pump-shutoff gate uses heater_actively_delivering
+#          instead of heater_is_on, so pump shuts off after waterfall window
+#          when compressor is idle. Was gated open by enabled-but-idle heater
+#          state — pump ran 24/7 on swim-day stretches.
+#          KNOWN RISK BEING WATCHED: heat pump in AUTO with ~2°F hysteresis
+#          runs both heat and cool cycles. Overnight pump-off blocks both
+#          directions. Acceptable in Florida May–summer where overnight
+#          cooling/heating demand is minimal. Revisit in shoulder season.
+#          Added swim_day guards on PUMP START and WATERFALL ON branches —
+#          previously both fired regardless of swim_day, requiring NOT-A-SWIM-DAY
+#          branch to clean up. Closed the ordering bug.
+#          Added integration-health gate on the main poll: if pump entity is
+#          unavailable (e.g. during the OmniLogic Local midnight error burst),
+#          skip the poll rather than reasoning with stale `unavailable`-as-off
+#          state. See scratch/omnilogic-local-midnight-burst-2026-05-01.md.
+#          NOTE: variable named `heater_actively_delivering` is a misnomer —
+#          the signal covers compressor activity in either heat or cool mode.
+#          Renaming deferred to a future cosmetic-cleanup version to keep
+#          v1.9.0 focused.
+#
 #  v1.8.0  Migrated waterfall from switch to valve platform to support
 #          haomnilogic-local v1.0.0b1+. Updated entity selector domain,
 #          default entity ID, service calls (valve.open_valve/close_valve),
@@ -43,9 +69,9 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.8.0"
+  name: "Pool Automation v1.9.0"
   description: >
-    Pool Automation v1.8.0
+    Pool Automation v1.9.0
 
     Intelligent pool automation using OmniLogic Local for all control
     actions and WeatherFlow for environmental inputs. Cloud integration
@@ -78,6 +104,19 @@ blueprint:
           selector:
             entity:
               domain: water_heater
+        heater_active_binary_sensor:
+          name: Heater Compressor Active Binary Sensor
+          description: >
+            Binary sensor that reports whether the heat pump compressor is
+            actively running (HeaterState.ON from pyomnilogic_local). Distinct
+            from the heater entity's enable state, which stays on across the
+            entire swim day. Used for pump-speed selection and pump-off gating
+            so the pump only runs at heater speed and stays on while the
+            compressor is actually delivering heat. Per ADR-006.
+          default: binary_sensor.omnilogic_pool_heater_heater_equipment_status
+          selector:
+            entity:
+              domain: binary_sensor
         pump_switch:
           name: Pump Switch
           description: Pool filter pump switch (local integration)
@@ -307,6 +346,7 @@ blueprint:
 variables:
   water_temp_sensor: !input water_temp_sensor
   heater_entity: !input heater_entity
+  heater_active_binary_sensor: !input heater_active_binary_sensor
   pump_switch: !input pump_switch
   pump_speed_entity: !input pump_speed_entity
   waterfall_switch: !input waterfall_switch
@@ -385,6 +425,12 @@ variables:
     {{ is_state(pump_switch, 'on') }}
   heater_is_on: >
     {{ not is_state(heater_entity, 'off') }}
+  heater_actively_delivering: >
+    {# Per ADR-006: distinguishes compressor-running from heater-enabled.
+       Fail-safe: if the binary sensor is unavailable, treat as True so
+       we keep the pump running rather than starve the heat exchanger. #}
+    {% set s = states(heater_active_binary_sensor) %}
+    {{ true if s in ['unavailable', 'unknown'] else s == 'on' }}
   hours_pumped_today: >
     {% set start = states('input_datetime.pool_pump_actual_start') %}
     {% if start and start != 'unknown' and not start.startswith('1970') %}
@@ -434,17 +480,28 @@ action:
               datetime: "1970-01-01 00:00:00"
 
       # MAIN POLL - every 10 minutes
+      # Integration-health gate: skip the entire poll if pump entity is
+      # unavailable. Otherwise pump_is_on (= is_state(pump_switch, 'on'))
+      # returns False for an unavailable entity, which causes the PUMP START
+      # branch to fire on stale state during integration outages (e.g. the
+      # OmniLogic Local midnight error burst — see scratch/omnilogic-local-
+      # midnight-burst-2026-05-01.md).
       - conditions:
           - condition: trigger
             id: poll
+          - condition: template
+            value_template: "{{ states(pump_switch) != 'unavailable' }}"
         sequence:
           - choose:
               # PUMP START - conditions met and time reached
+              # swim_day guard added v1.9.0: previously fired regardless of
+              # swim_day, requiring the NOT-A-SWIM-DAY branch to undo it.
               - conditions:
                   - condition: template
                     value_template: >
                       {{ not pump_is_on
-                         and current_minutes >= pump_should_start_minutes }}
+                         and current_minutes >= pump_should_start_minutes
+                         and swimming_day }}
                 sequence:
                   - action: switch.turn_on
                     target:
@@ -470,14 +527,17 @@ action:
                           {{ normal_chlor_percent }}
                         {% endif %}
 
-              # WATERFALL ON - within waterfall window
-              # Pump independence: if pump is off when waterfall window opens,
-              # start pump at correct speed before enabling waterfall.
+              # WATERFALL ON - within waterfall window AND swim day
+              # swim_day guard added v1.9.0: previously fired regardless of
+              # swim_day. Pump independence: if pump is off when waterfall
+              # window opens, start pump at correct speed before enabling
+              # waterfall.
               - conditions:
                   - condition: template
                     value_template: >
                       {{ current_minutes >= waterfall_start_minutes
-                         and current_minutes < waterfall_end_minutes }}
+                         and current_minutes < waterfall_end_minutes
+                         and swimming_day }}
                 sequence:
                   - if:
                       - condition: template
@@ -506,6 +566,20 @@ action:
                           entity_id: !input waterfall_switch
 
               # WATERFALL END - time reached
+              # v1.9.0: pump-shutoff gate now uses heater_actively_delivering
+              # rather than heater_is_on. Previously the heater's enabled
+              # state (true all swim day) blocked the pump shutoff, causing
+              # 24/7 pump runs at heater speed — see ADR-006.
+              # Known risk being deployed-and-watched: heat pump runs in AUTO
+              # (heat AND cool, ~2°F hysteresis); overnight pump-off blocks
+              # both directions of compressor activity. Acceptable risk in
+              # Florida May–summer because (a) water rarely drops below
+              # setpoint overnight in Florida heat, and (b) when above
+              # setpoint, the pool radiates heat to sky overnight without
+              # needing active cooling. Revisit in shoulder season if water
+              # temp stratifies or heater faults observed. See ADR-006 for
+              # signal hierarchy and ADR-008 placeholder for trusted-temp
+              # work that may revise this gate.
               - conditions:
                   - condition: template
                     value_template: >
@@ -517,7 +591,7 @@ action:
                       entity_id: !input waterfall_switch
                   - condition: template
                     value_template: >
-                      {{ not heater_is_on and filtration_complete }}
+                      {{ not heater_actively_delivering and filtration_complete }}
                   - action: switch.turn_off
                     target:
                       entity_id: !input pump_switch
@@ -542,8 +616,13 @@ action:
 
               # HEATER AND PUMP SPEED MANAGEMENT
               # Runs every poll when pump is on.
-              # Heater on = swim day. Heat pump thermostat controls cycling.
-              # HA enforces on/off state and sets pump speed accordingly.
+              # Heater enable: set on if swim day (heater_needed), off otherwise.
+              # Heat pump thermostat controls cycling.
+              # Pump speed (v1.9.0, per ADR-006): 77% iff compressor is actively
+              # delivering heat (heater_actively_delivering), 55% otherwise.
+              # Was: 77% whenever heater_needed was true (i.e. all day on swim
+              # days). Now: 55% during the long PAUSE windows when the heat pump
+              # is at setpoint and the compressor is idle.
               - conditions:
                   - condition: template
                     value_template: "{{ pump_is_on }}"
@@ -576,7 +655,7 @@ action:
                       entity_id: !input pump_speed_entity
                     data:
                       value: >
-                        {{ heater_pump_speed if heater_needed else normal_pump_speed }}
+                        {{ heater_pump_speed if heater_actively_delivering else normal_pump_speed }}
 
       # POOL LIGHT ON - illuminance based (primary)
       - conditions:

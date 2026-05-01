@@ -2,19 +2,29 @@
 
 Active working notes. Update as work progresses. This is the file Cowork should reference most often when answering "where are we on X?"
 
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-01 (pool automation incident — uncovered blueprint design issue + observability gap; ADR-006, logger v2 spec, auditor spec drafted)
 
 ---
 
 ## In flight
 
 ### Pool automation
-- **Blueprint version:** v1.8.0 (deployed)
-- **Heater logic:** set-and-hold — heater on if swim day, off if not. Heat pump owns all cycling. HA controls pump speed only (77% when heater needed, 55% otherwise).
-- **Waterfall:** runs independently of pump_is_on (v1.6 change).
+- **Blueprint version:** v1.8.0 (deployed); **v1.9.0 patched in repo 2026-05-01, awaiting deployment to NUC** (per ADR-006).
+- **Heater logic:** set-and-hold — heater on if swim day, off if not. Heat pump owns cycling. **Open issue (ADR-006):** blueprint conflates heater-`on` (enabled/ready) with heater-actively-delivering. Result: pump runs 24/7 at 77% on swim-day stretches even when compressor is idle. Confirmed in 2026-04-28→05-01 CSV: 595 pump-on rows, 0 pump-off rows. Empirically validated 2026-05-01 via Hayward cloud activity log — heater compressor only ran 04:02–06:47 EDT (2h45m) yet pump ran 24h. **Signal source identified:** local `binary_sensor.<heater_equip>_heater_equipment_status` (compressor active boolean from `pyomnilogic_local.HeaterState`) plus cloud `water_heater` state as cross-validation. Blueprint v1.9.0 ready to implement.
+- **Waterfall:** runs independently of pump_is_on (v1.6 change). **Logger orphan-entity bug fixed 2026-05-01** — logger and `sensor.pool_automation_status` template were watching `valve.omnilogic_pool_waterfall` (orphan) while blueprint controlled `valve.omnilogic_pool_waterfall_2` (live). Whether the live valve was actually closing at 20:00 each evening is now unverifiable from historical data; will know within 24h of the fix landing on the NUC.
 - **Integration:** OmniLogic Local on `1.0.4` (stable). Cloud retained for ORP/salt/pH monitoring only.
-- **Network:** Temporary ethernet run to OmniLogic controller is in place and functioning perfectly. Permanent run mostly done — waiting on Shepard Electric to route through exterior wall (currently dangling from soffit).
+- **Network:** Temporary ethernet run to OmniLogic controller — confirmed reliable on 2026-04-30 evening (zero errors over 7 hours). Permanent run mostly done — waiting on Shepard Electric to route through exterior wall (currently dangling from soffit).
+- **Open: midnight error burst on local integration** — discovered 2026-05-01 while diagnosing waterfall incident. ~18 `Failed to update data from OmniLogic` errors clustered 00:27–01:00 EDT, plus scattered isolated errors through 01:00–07:00. Evening hours zero errors. Cloud unaffected throughout. Pattern fits controller-side scheduled housekeeping rather than network instability. Needs multi-night confirmation. Full analysis: `scratch/omnilogic-local-midnight-burst-2026-05-01.md`.
 - **Issue #173 resolved** in newer releases of `cryptk/haomnilogic-local`.
+
+### Pool observability rebuild
+Initiated 2026-05-01 after the waterfall incident exposed multiple blind spots in the existing logger (conditional on pump=on, captured wrong waterfall entity, no auditing). Three artifacts drafted, all awaiting review before implementation:
+
+- **ADR-006** (`docs/decisions/006-actively-heating-vs-enabled.md`) — pump flow tied to compressor demand, not heater enabled state. Signal sources confirmed (local binary_sensor + cloud heater state). Includes additional v1.9.0 changes: swim_day guards on PUMP START + WATERFALL ON branches, poll-cadence shift (`:00→:05`) to dodge midnight burst. Amends ADR-002.
+- **Logger v2 spec** (`pool/docs/logger-v2.md`) — always-on logging, captures local + cloud side-by-side for cross-validation, expected-state columns, transition events, action log, fixed entity references. ~60 columns, single CSV with `local_*`/`cloud_*` prefixes.
+- **Auditor spec** (`pool/docs/auditor.md`) — nightly script that asserts daily-shape, pump, waterfall, heater, integration-health expectations against logger output. Failures push to mobile. Phase 1 catches the valve-stuck-open class of bug. Add new H4 (local-vs-cloud heater agreement) and H5/H6 (ADR-006 verification) once v1.9.0 ships.
+
+**Sequencing:** Find heater_equip binary_sensor entity ID → logger v2 phase 1 (parallel, non-breaking) → blueprint v1.9.0 fix → logger v2 phase 2+ → auditor phase 1.
 
 ### Voice assistant satellites (ESPHome)
 - **First unit:** garage. Wired and flashed. Recovered 2026-04-28 from a stuck `voice_assistant.on_error` (pipeline pointed at a removed Ollama conversation entity — see ADR-003 for the canonical-vs-alternative pipeline policy).
@@ -33,7 +43,6 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 ### Z-Wave fleet housekeeping
 - **Toilet fan (ZEN75, node 256) is dead** after a strange firmware update. Needs reinclusion or recovery. `device-inventory.md` had this as `?` — now confirmed.
 - **Kwikset 916 (node 038) battery at 30%** — replacement window opening. Other Kwikset (node 008) at 100%.
-- **HS-WX300 fleet FW divergence** — node 034 is on v2.2.0 while the other 15 HS-WX300s are on v2.1.13. **Decision: roll the remaining 15 forward to v2.2.0.** Changelog (verified 2026-04-28 via HomeSeer docs) is SDK v7.18.1 → v7.18.8 plus a fix for a Silicon Labs SDK bug where R2 (800 Series) WX300s "can stop responding to Z-Wave commands if not manually controlled for some time." Low-risk update, behaviorally identical, fixes a real intermittent failure mode. Firmware file: `https://homeseer.com/updates4/WX300-R2_2_2_0.zip`. Update via Z-Wave JS UI → Node → Firmware Update. 15 devices × ~5 min each.
 
 ---
 
@@ -48,6 +57,9 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **HA NUC migrated from IoT VLAN to LRD-Servers VLAN** (network-docs ADR-009, executed 2026-04-29). New primary IP: `192.168.50.11`. Pre-flight pcap missed broadcast/multicast traffic class — discovered post-cutover when WeatherFlow Tempest local integration silently stopped receiving data.
 - **Dual-VLAN recovery via `eno1.4` sub-interface** (network-docs ADR-011, 2026-04-29). HA OS now trunked: native VLAN LRD-Servers on `eno1` (`192.168.50.11`, gateway `.50.1`), tagged VLAN IoT on `eno1.4` (`192.168.11.155`, no gateway, IPv6 disabled, passive listener only). Tempest local data flow restored within ~60 seconds. Persistence handled by HA Supervisor (`ha network vlan` command). Don't delete `eno1.4` — also load-bearing for any future broadcast/multicast-dependent local integrations.
 - **HA `http.server_host` bound to LRD-Servers IP + localhost only** (ADR-005, 2026-04-30). Prevents IoT-side exposure of `:8123` web UI now that HA is dual-homed. Editor pitfall logged: HA File Editor add-on mangles YAML list form on save — use SCS or SSH+nano for list-valued config edits. (Recovery from this incident is what prompted the GitHub repo reconciliation; configuration.yaml committed as `3ba3983`.)
+- **HS-WX300 fleet FW rollout: 15 devices upgraded v2.1.13 → v2.2.0** (2026-04-30). All 16 HS-WX300s now on FW v2.2.0 / SDK v7.18.8 (closes the divergence with node 034). Fixes Silabs SDK 7.18.1 bug where R2 800-Series WX300s "can stop responding to Z-Wave commands if not manually controlled for some time." Process logged in `scratch/wx300-fw-rollout.md`. Side outcomes: all 16 nodes now have friendly names set in Z-Wave JS UI (previously "NodeID_X" placeholders); node 029 renamed from "Toilet.  Light" to "Toilet Light" (typo fix); node 025 (Under Cabinet Lights) had Params 11+12 ramp rates set to 0 to fix perceived-dimming on non-dimmable load (pattern documented in `integrations/zwave-js.md`); `docs/device-inventory.md` back-filled with all 16 WX300 node IDs / locations / entity IDs.
+- **Auto-pull persistent_notification.create added** (2026-04-30). Auto-pull automation now fires bell-icon persistent notifications alongside mobile push, so success/failure events are durable in HA UI even after iOS notification dismiss.
+- **Durable SSH-key auth on NUC SSH shell** (2026-04-30). Generated ed25519 key, registered with GitHub, configured `pushInsteadOf` rewrite. Push uses SSH (no prompts), fetch/pull stays HTTPS so the auto-pull container's anonymous read path is unaffected.
 - **Hubitat retired.** All Z-Wave devices migrated to Z-Wave JS. Last device was Fibaro Dimmer 2 on lamp post.
 - **Studio Code Server clipboard issue** — workaround: open SCS in own tab (not iframe).
 - **Midea AC LAN integration** added for `38MARBQ24AA3` mini split.
@@ -61,8 +73,24 @@ Active working notes. Update as work progresses. This is the file Cowork should 
 - **Away mode** — single trigger: lights off, thermostat setback, security armed. Pieces exist; needs assembly.
 - **Welcome home** — lights on, thermostat resume, recirc pump on (partial).
 - **Vacation mode** — explicitly mentioned as wanted.
+- **Kitchen + Great Room lux-based lighting** — site orientation darkens these rooms before sundown, so lux is the right trigger.
+  - **Trigger / signal hierarchy** (designed so future indoor sensors slot in without a rewrite): future indoor lux sensors (when added) → Tempest local API illuminance (current primary) → sun elevation (fallback if Tempest stale/unavailable). Priority chain, not a vote.
+  - **Presence gate:** `binary_sensor.household_occupied` — template sensor that ORs `person.*` entities, where each person is fed by HA Companion GPS *and* UniFi network device_tracker as a backup (handles GPS dropout / iOS background-location flake). Hysteresis on the OFF transition only (5–10 min) to prevent transient GPS loss from killing lights while we're home. Build this sensor as a reusable primitive — vacation automations and welcome-home will reuse it.
+  - **Vacation guard:** honors cross-cutting `input_boolean.vacation` (see below).
+  - **Resolved design decisions:**
+    - **ON-only automation.** Other automations / wall switches / bedtime routines own OFF. Mirror lanai v1.5 skip-if-already-on guard so it never overrides a manual ON.
+    - **Lights are a blueprint input** (selector for one or more `light` entities), not hardcoded — same blueprint can serve other rooms later.
+  - **Pre-build verification:**
+    - iOS Private Wi-Fi Address must be **Fixed** or **Off** on home SSID for both phones (NOT Rotating). Fixed = stable randomized MAC per-SSID, fine for tracking. Rotating = changes every 2 weeks, breaks tracking. WPA2+ networks default to Fixed, so usually no change needed.
+    - In UniFi: rename the iPhone clients (`iPhone-Scott`, `iPhone-Wife`) so the picker isn't a guessing game; clean up stale "iPhone" entries from earlier Rotating-mode history.
+    - Confirm UniFi Network integration is installed in HA and `device_tracker.iphone_*` entities report `home`/`not_home` correctly.
+  - **Pattern reference:** lanai lights blueprint v1.5 (lux/sun fallback already proven), but trigger model differs — lanai is door-activated, this is lux-state-driven.
 - **Carrier Infinity presence-aware setback** — Florida AC cost optimization.
 - **Camera motion alerts when away** — UniFi cameras already integrated.
+- **Lanai fan presence + temp control** — fans on when occupied AND lanai temp above threshold X. Maybe staged speeds: e.g. low at 78–82°F, medium at 82–86°F, high at 86°F+. Uses the same `binary_sensor.household_occupied` primitive being designed for kitchen/great-room lux. Need: lanai temp sensor (Tempest OAT may be a reasonable proxy until a local one is added), fan speed control entities, presence gate. Decide whether to gate by HVAC state too (don't run lanai fans if AC is on doors-open).
+
+### Cross-cutting automation patterns to add
+- **`input_boolean.vacation` guard** — add a vacation helper and retrofit it as a condition on presence/lux/welcome-home style automations so they no-op while we're out of town. New automations (kitchen/great-room lux, welcome home, etc.) should include this guard from day one. Decide whether vacation mode itself should auto-set this, or keep it manual via dashboard toggle.
 
 ### Voice satellites
 - 5 more units to build after garage proves out.
@@ -113,3 +141,4 @@ See `docs/decisions/` for full ADRs. Quick reference:
 | 003 | Voice pipeline: HA Cloud (Davis/High); OpenAI only experimental |
 | 004 | Waterfall control: valve domain (post-1.0.0b5 of OmniLogic Local) |
 | 005 | http.server_host bound to LRD-Servers IP + localhost only (post dual-VLAN) |
+| 006 | (proposed) actively-heating vs enabled — pump flow tied to compressor demand, not heater enabled state |

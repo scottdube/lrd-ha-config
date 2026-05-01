@@ -38,6 +38,7 @@ Network is fully migrated from Hubitat (retired). All Z-Wave devices currently l
 - **No Security inclusion** required for some older GE/Jasco devices. S2 inclusion fails silently; fall back to "No Security" path in Z-Wave JS UI.
 - **Mesh weakness around the lock.** Kwikset 916 has shown `neighbors:[]` / weak LWR — root cause of historic battery drain (retry storm). ZEN77 is acting as repeater for the lock; verify it's still reachable.
 - **Provisioned-but-not-included** placeholder ghost nodes (HS-WX300 case). Resolution: remove via Z-Wave JS UI provisioning list.
+- **HS-WX300 with non-dimmable loads** — set Parameter 11 (Ramp Rate Z-Wave) and Parameter 12 (Ramp Rate Manual) both to **0**. Instant on/off makes the paddle behave switch-like from the user's perspective; the slow default 3-sec ramp was causing users to hold the paddle waiting for fade-in, which produced the perceived "dimming." No need for hardware Switch Mode change (which requires exclusion + re-inclusion per HomeSeer R2 user guide) or HA template-switch wrapper. Verified on node 25 (Under Cabinet Lights) 2026-04-30. Apply to any WX300 driving a non-dimmable load (LED tape with non-dimmable driver, certain CFL/LED, etc.).
 
 ---
 

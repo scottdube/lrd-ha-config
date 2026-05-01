@@ -12,7 +12,7 @@ Schema for `/config/pool_temp_log.csv`, written by `pool/scripts/temp_logger.py`
 | `heater_state` | string | `water_heater.omnilogic_pool_heater` | Values seen: `on`, `off`. (`heating`/`idle` modes possible — not yet observed.) |
 | `pump_state` | string | `switch.omnilogic_pool_filter_pump` | `on` / `off`. Logger only fires when this is `on` (per automation condition). |
 | `pump_speed` | int (%) | `number.omnilogic_pool_filter_pump_speed` | Observed values: 0, 55, 65, 77, 90. Can be `unavailable`. |
-| `waterfall_state` | string | `valve.omnilogic_pool_waterfall` | `open` / `closed`. (Earlier dataset has `on`/`off` from pre-v1.8 switch domain — see "Known-bad ranges" below.) |
+| `waterfall_state` | string | `valve.omnilogic_pool_waterfall_2` | `open` / `closed`. (Earlier dataset has `on`/`off` from pre-v1.8 switch domain, plus `open`/`closed` rows that were observing the orphan `valve.omnilogic_pool_waterfall` before the 2026-05-01 entity-reference fix — see "Known-bad ranges" below.) |
 | `forecast_high` | float (°F) | `sensor.pool_forecast_high` | Template sensor in `config/templates.yaml`. |
 | `swimming_day` | string | `sensor.pool_swimming_day` | Free-text, e.g. `Yes` or `No - Forecast 75.0°F`. Not machine-friendly; consider parsing or restructuring. |
 
@@ -46,3 +46,4 @@ A `.bak` of the pre-cleanup file was retained on the NUC at the time. If raw row
 ## Schema migrations / domain churn
 
 - **2026-04-?? (v1.8.0):** `waterfall_state` switched from `on`/`off` (switch domain) to `open`/`closed` (valve domain) when the OmniLogic Local integration migrated to the valve platform. Earlier rows have the old values. Filter logic should accept both.
+- **2026-05-01: orphan-entity bug fix.** Between the v1.8.0 migration and 2026-05-01, the logger and `sensor.pool_automation_status` template were both pointing at the un-suffixed orphan `valve.omnilogic_pool_waterfall` (left over from the domain migration), while the blueprint actually controls `valve.omnilogic_pool_waterfall_2`. Any `open`/`closed` value in rows between those dates reflects the orphan's stale state, not the live valve. Discovered while diagnosing a 2026-05-01 early-morning waterfall run; logger was reporting "open" continuously for 4+ days while we had no signal whether the live valve was actually being closed at 20:00. Fix: `valve.omnilogic_pool_waterfall_2` is now the source.

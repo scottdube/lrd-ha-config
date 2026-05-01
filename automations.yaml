@@ -515,7 +515,7 @@
   action:
     - action: shell_command.pool_log
 - id: "1775827717239"
-  alias: Pool Automation v1.7.0
+  alias: Pool Automation v1.9.0
   description: ""
   use_blueprint:
     path: LRD/pool_automation/pool_automation.yaml
@@ -524,6 +524,7 @@
       heater_pump_speed: 77
       waterfall_start_time: 08:00:00
       waterfall_switch: valve.omnilogic_pool_waterfall_2
+      heater_active_binary_sensor: binary_sensor.omnilogic_pool_heater_heater_equipment_status
 - id: "1775847529638"
   alias: Garage Door Activated Lights with Motion Keep-Alive
   description: ""
