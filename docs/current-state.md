@@ -92,6 +92,7 @@ Initiated 2026-05-01 after the waterfall incident exposed multiple blind spots i
 - **Carrier Infinity presence-aware setback** — Florida AC cost optimization. Reprioritized 2026-05-02: lower urgency than initially thought given HVAC was only ~18% of April daily load (vs. pool ~30%+). Best ROI is during winter heating months (main unit ran 878 kWh in March). Build after pool work stabilizes.
 - **Camera motion alerts when away** — UniFi cameras already integrated.
 - **Lanai fan presence + temp control** — fans on when occupied AND lanai temp above threshold X. Maybe staged speeds: e.g. low at 78–82°F, medium at 82–86°F, high at 86°F+. Uses the same `binary_sensor.household_occupied` primitive being designed for kitchen/great-room lux. Need: lanai temp sensor (Tempest OAT may be a reasonable proxy until a local one is added), fan speed control entities, presence gate. Decide whether to gate by HVAC state too (don't run lanai fans if AC is on doors-open).
+- **Battery health tracking** (raised 2026-05-02 after Kwikset 916 long-beep at 20%). Two-layer approach per ADR-014: HACS Battery Notes for ops view (last-replaced, replacement reminders) + logger v2 extension for analytics (decay rate baselines, anomaly detection in auditor). Phase 1 (Battery Notes install) is immediate; Phase 2-4 build over time as data accumulates.
 - **Pool maintenance day handling** (raised 2026-05-02, scoped 2026-05-02).
   - **Pattern**: weekly but unpredictable day (service tech schedules vary).
   - **Critical concern**: tech may shut equipment down to clean filter/chlorinator. **HA must not auto-restart while equipment is partially disassembled.**
@@ -171,6 +172,7 @@ See `docs/decisions/` for full ADRs. Quick reference:
 | 004 | Waterfall control: valve domain (post-1.0.0b5 of OmniLogic Local) |
 | 005 | http.server_host bound to LRD-Servers IP + localhost only (post dual-VLAN) |
 | 006 | (proposed) actively-heating vs enabled — pump flow tied to compressor demand, not heater enabled state |
-| 009 | (proposed) whole-home power monitoring — Emporia Vue 2 vs IotaWatt; install pending |
+| 009 | (proposed) whole-home power monitoring — Emporia Vue 2 + ESPHome firmware flash recommended (2026-05-02 revision); install pending |
 | 011 | (accepted) pool service mode — input_boolean.pool_service_lockout via panel-toggle detection |
 | 012 | (accepted) vacation mode — cross-cutting input_boolean.vacation, pool implementation first |
+| 014 | (proposed) battery health tracking — Battery Notes + logger v2 extension + auditor assertions |

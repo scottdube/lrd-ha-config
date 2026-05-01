@@ -41,19 +41,22 @@ energy/
 
 ---
 
-## Hardware (decision pending — see ADR-009)
+## Hardware (recommended path — see ADR-009)
 
-Two paths under consideration:
+**2× Emporia Vue 2 with ESPHome firmware flash** (one device per panel).
 
-| | Emporia Vue 2 | IotaWatt |
-|---|---|---|
-| Cost (full kit) | ~$170–200 | ~$400–500 |
-| Cloud-required? | Yes | No |
-| HA integration | `emporia_vue` (HACS) | `iotawatt` (core HA) |
-| Open source | No | Yes |
-| Maker fit | Moderate | Strong |
+| | Emporia (cloud) | IotaWatt | **Emporia + ESPHome** |
+|---|---|---|---|
+| Cost (2 panels) | $340–400 | $800–1000 | **$340–400** |
+| Local-first | No | Yes | **Yes** |
+| In-panel NEC cert | Yes | No | **Yes** |
+| Native HA integration | HACS via cloud | REST | **ESPHome native API** |
+| Maker fit | Moderate | Strong | **Strong** |
+| Setup complexity | Lowest | Moderate | Moderate (one-time flash) |
 
-Recommendation in ADR-009 leans IotaWatt for local-first principle. Final call deferred.
+Vue 2's internal ESP32 accepts ESPHome firmware via UART. After flashing, runs fully local. Reference video being watched: https://www.youtube.com/watch?v=Z52y1Gm4VAg
+
+IotaWatt remains a viable fallback if Vue 2 flashing proves problematic on the current hardware revision.
 
 ---
 

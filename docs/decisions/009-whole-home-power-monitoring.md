@@ -69,6 +69,44 @@ Two viable hardware paths considered. **Choice deferred** until install logistic
 - Steeper learning curve — IotaWatt's web UI is functional but less polished than Emporia's app.
 - CTs are an additional purchase decision (size by amperage).
 
+### Option B-prime: Emporia Vue 2 with ESPHome firmware flash (~$170-200, raised 2026-05-02)
+
+The ESP32 inside the Vue 2 accepts custom firmware via UART. The ESPHome community maintains an `emporia_vue` component that supports all 16 branch CTs + 2 mains. After flashing, the device runs ESPHome firmware and integrates with HA via ESPHome's native API — fully local, no Emporia account, no cloud dependency.
+
+**Process** (one-time per device):
+- Open the Vue 2 case (snap-fit, no tools needed for older revisions; check current revision)
+- Connect a USB-to-UART adapter to the ESP32's serial pins
+- Flash ESPHome firmware via `esphome run` or the web flasher
+- Reassemble, mount in panel
+- Configure ESPHome YAML for the CTs + calibration
+
+Reference video Scott is watching: https://www.youtube.com/watch?v=Z52y1Gm4VAg
+
+**Pros (compared to Option A, vanilla cloud Emporia):**
+- **Fully local** — no cloud dependency, no Emporia account.
+- **Native ESPHome integration** — same architecture as Scott's voice-garage device.
+- All other Option A pros preserved (cost, install simplicity, in-panel cert, all CTs included).
+
+**Cons:**
+- **Voids vendor warranty.** At ~$170/device, low-stakes; treat as throwaway hardware.
+- **Loses Emporia's mobile app** — but HA dashboards replace it.
+- **One-time firmware flash required** — moderate complexity, fits Scott's maker profile (he already runs ESPHome on voice-garage).
+- **Future Emporia firmware updates are no longer relevant** — you're on ESPHome's release cadence instead. Acceptable since CT measurement is mature, not evolving.
+
+**Critical analysis vs IotaWatt (Option B):**
+
+| | IotaWatt | Vue 2 + ESPHome (B-prime) |
+|---|---|---|
+| Cost (2 devices for 2 panels) | $800–1000 | $340–400 |
+| Local-first | Yes | Yes |
+| In-panel cert (NEC 312.8(B)) | No (external box + conduit) | Yes |
+| Maker-friendly | Yes | Yes (firmware project) |
+| Native HA integration | Via REST | Via ESPHome native API |
+| Setup complexity | Lower (no flashing) | Higher (one-time flash per device) |
+| Warranty | Intact | Voided |
+
+B-prime wins on cost (~half), in-panel certification, and integration cleanliness. IotaWatt wins on setup simplicity (no flashing) and warranty. For Scott's profile (maker, local-first preference, two panels), B-prime is the strongest fit.
+
 ### Option C (rejected): Per-circuit Shelly Pro modules
 
 - Reliable, fully local, but $50–80/circuit. For 14 circuits: $700–1100. Doesn't scale economically vs. Option A or B.
@@ -83,7 +121,13 @@ Two viable hardware paths considered. **Choice deferred** until install logistic
 
 ### Recommendation
 
-Lean **Option B (IotaWatt)** for fit with maker profile and local-first principle, despite higher upfront cost. **Option A (Emporia Vue 2)** is acceptable as a fast-start if Scott values immediate deployment over local-first. Final choice deferred until panel install logistics are evaluated.
+**Option B-prime: 2× Emporia Vue 2 + ESPHome firmware flash** (revised 2026-05-02 after Scott researched the ESPHome flashing path).
+
+Combines the cheapest hardware path (Emporia at ~$170/device, all CTs included) with the local-first principle (post-flash, no cloud), in-panel NEC 312.8(B) compliance, and native ESPHome HA integration. Roughly half the cost of dual IotaWatt for the same functional outcome on what matters.
+
+Trade-off accepted: one-time firmware flash per device (~30 min first time, ~10 min second). Fits Scott's existing ESPHome stack and maker workflow.
+
+Original Option B (IotaWatt) remains a viable fallback if the flashing process turns out problematic on the current Vue 2 hardware revision (PCB/UART access changes have been reported across revisions).
 
 ## Consequences
 
