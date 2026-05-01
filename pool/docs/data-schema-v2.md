@@ -87,6 +87,7 @@ The schema version line is not a CSV row; downstream parsers must skip lines sta
 |---|---|---|
 | `local_water_temp` | `sensor.omnilogic_pool_watersensor` | Raw — may be stale during pump-off intervals because the sensor is in the pump return path. |
 | `local_water_temp_reliable` | `'true'` if pump on for ≥ 10 min, else `'false'` | Computed in script. 10-min settling threshold tunable via `WATER_TEMP_SETTLING_SECONDS` constant in `state_logger.py`. **All consumers of `local_water_temp` must gate on this.** |
+| `local_heater_estimated_power_w` | int W when compressor active, else 0 | Derived from `binary_sensor.omnilogic_pool_heater_heater_equipment_status`. `HEATER_RATED_POWER_W` constant (7800) per HP31005T nameplate (33.9A × 230V). Upper-bound estimate; real measurement requires external instrumentation (future ADR-009). Returns `unavailable` if upstream binary sensor is itself unavailable. |
 
 ### Local — pool light
 

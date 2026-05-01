@@ -67,13 +67,22 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 | Device | Make/Model | Integration | Entity (key) |
 |---|---|---|---|
 | Controller | Hayward OmniLogic / OmniPL | OmniLogic Local (control) + OmniLogic Cloud (monitor only) | various |
-| Heat pump | Hayward HeatPro | via OmniLogic | `water_heater.omnilogic_pool_heater` |
+| Heat pump | Hayward HP31005T (heat AND cool) | via OmniLogic | `water_heater.omnilogic_pool_heater` |
 | Filter pump | (variable speed) | via OmniLogic | `switch.omnilogic_pool_filter_pump` |
 | Waterfall | (valve) | via OmniLogic | `valve.omnilogic_pool_waterfall` |
 | Chlorinator | salt | via OmniLogic | `switch.omnilogic_pool_chlorinator` |
 | Pool light | — | via OmniLogic | `light.?` |
 
 **Network:** OmniLogic controller on WiFi, IoT VLAN. **Packet loss issue — ethernet run pending.**
+
+**Heat pump nameplate (HP31005T, manufactured 11/07/2024):**
+- Total Load: 33.9A @ 208/230V → ~7.0–7.8 kW input at full load
+- Compressor: 32.3A; Fan: 1.6A; Locked Rotor: 139A
+- Min Circuit Ampacity: 42A; Max Fuse: 70A
+- Heating water-temp range: 48.2–104°F
+- Cooling water-temp range: 48.2–86°F (heat pump can't cool above 86°F)
+- Recommended water flow: **42.7 gpm** (binding constraint for `heater_pump_speed` blueprint input)
+- Refrigerant: R410A, 3500g (7.72 lb)
 
 ---
 

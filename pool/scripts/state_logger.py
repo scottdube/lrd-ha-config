@@ -70,6 +70,15 @@ SCHEMA_VERSION = "2.0-phase1"
 # Tunable; see pool/docs/logger-v2.md and ADR-008.
 WATER_TEMP_SETTLING_SECONDS = 600  # 10 min
 
+# Hayward HP31005T heat pump rated input power. Computed as V × A at the
+# nominal 230V rating: 230 × 33.9A = 7797W. This is the estimated draw when
+# the compressor is actively running. Real draw varies (lower in cooling
+# mode, lower at partial heat-output, higher during defrost). Estimate is
+# upper bound. Future ADR-009 (whole-home power monitoring) will replace
+# this with measured data.
+HEATER_RATED_POWER_W = 7800
+HEATER_MODEL = "HP31005T"
+
 # Column manifest. Each entry:
 #   name        : CSV column name
 #   source      : 'compute', 'state', or 'attr'
@@ -157,6 +166,11 @@ COLUMNS: list[dict] = [
     # Trusted water temp (forward-fill of last reliable read) — Phase 2.
     # local_water_temp_trusted column placeholder added in v2 of this script.
 
+    # Heater estimated power: HEATER_RATED_POWER_W when compressor binary
+    # sensor reports 'on', else 0. Per HP31005T nameplate (33.9A @ 230V).
+    # Estimate only — see HEATER_RATED_POWER_W comment.
+    {"name": "local_heater_estimated_power_w", "source": "compute"},
+
     # ---------- Local: pool light ----------
     {"name": "local_pool_light_state", "source": "state",
      "entity": "switch.omnilogic_pool_light"},
@@ -212,6 +226,21 @@ def parse_iso_utc(iso_str: str | None) -> datetime | None:
         return datetime.fromisoformat(iso_str)
     except ValueError:
         return None
+
+
+def compute_heater_estimated_power_w(heater_equip_status: str) -> str:
+    """
+    Estimated heat pump input power (W) based on compressor binary sensor.
+
+    Returns HEATER_RATED_POWER_W when compressor is active ('on'), else '0'.
+    Returns 'unavailable' if the upstream binary sensor itself is unavailable
+    (rather than guessing).
+    """
+    if heater_equip_status == "on":
+        return str(HEATER_RATED_POWER_W)
+    if heater_equip_status == "off":
+        return "0"
+    return "unavailable"
 
 
 def compute_water_temp_reliable(
@@ -273,6 +302,11 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
                 row.append(
                     compute_water_temp_reliable(pump_state, pump_last_changed)
                 )
+            elif name == "local_heater_estimated_power_w":
+                heater_equip_state, _, _ = get(
+                    "binary_sensor.omnilogic_pool_heater_heater_equipment_status"
+                )
+                row.append(compute_heater_estimated_power_w(heater_equip_state))
             else:
                 # Unknown computed column — record as empty
                 row.append("")

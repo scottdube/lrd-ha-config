@@ -15,12 +15,15 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 
 ### What it controls
 - Pump (variable speed via `number.set_value` on speed entity)
-- Heater (`water_heater.omnilogic_pool_heater`)
+- Heater (`water_heater.omnilogic_pool_heater`) — Hayward HP31005T (heat AND cool, 7.0–7.8 kW @ 208/230V, recommended flow 42.7 gpm)
 - Waterfall (`valve.omnilogic_pool_waterfall` — see ADR-004)
 - Chlorinator (`number.set_value` on timed percent entity)
 - Pool light
 - Water temperature
 - Air temperature
+
+### What it does NOT expose
+- **Heater power consumption.** The integration parses filter pump power telemetry but no heater power. Estimated via runtime × HEATER_RATED_POWER_W in `pool/scripts/state_logger.py`. Real measurement requires external instrumentation (CT clamp on the heat pump's circuit, or whole-panel monitor like Emporia Vue 2).
 
 ### Entity naming convention
 `*.omnilogic_pool_*` (vs cloud's `*.pool_pool_*`). Easy to confuse. Always grep for `omnilogic_pool_` when wiring blueprints.
