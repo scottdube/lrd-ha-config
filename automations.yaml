@@ -535,7 +535,7 @@
   mode: single
   max_exceeded: silent
 - id: "1775827717239"
-  alias: Pool Automation v1.9.0
+  alias: Pool Automation v1.10.0
   description: ""
   use_blueprint:
     path: LRD/pool_automation/pool_automation.yaml
@@ -552,6 +552,9 @@
       waterfall_start_time: 08:00:00
       waterfall_switch: valve.omnilogic_pool_waterfall
       heater_active_binary_sensor: binary_sensor.omnilogic_pool_heater_heater_equipment_status
+      # v1.10.0: mode helpers from packages/pool/pool_modes.yaml
+      service_lockout_boolean: input_boolean.pool_service_lockout
+      vacation_boolean: input_boolean.vacation
 - id: "1775847529638"
   alias: Garage Door Activated Lights with Motion Keep-Alive
   description: ""

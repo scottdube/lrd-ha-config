@@ -175,6 +175,16 @@ COLUMNS: list[dict] = [
     {"name": "local_pool_light_state", "source": "state",
      "entity": "switch.omnilogic_pool_light"},
 
+    # ---------- Pool modes (ADR-011, ADR-012) ----------
+    # Helper booleans driving the v1.10.0 service_active and vacation_mode
+    # gates in the blueprint. Captured here so the auditor can verify
+    # that pump/heater/waterfall behavior actually changed when these
+    # modes were active.
+    {"name": "pool_service_lockout", "source": "state",
+     "entity": "input_boolean.pool_service_lockout"},
+    {"name": "vacation_mode", "source": "state",
+     "entity": "input_boolean.vacation"},
+
     # ---------- HVAC: garage mini-split (Carrier 38MARBQ24AA3 via Midea AC LAN)
     # First non-pool domain captured. Real-time power (W) is unique here —
     # the Carrier Infinity integration only gives daily kWh aggregates;

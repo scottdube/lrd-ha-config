@@ -4,6 +4,31 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.10.0 Two new mode gates — service lockout (ADR-011) and vacation mode
+#          (ADR-012). Both use input_boolean helpers (defined in
+#          packages/pool/pool_modes.yaml) checked via new blueprint inputs.
+#
+#          SERVICE LOCKOUT: when input_boolean.pool_service_lockout is on,
+#          all equipment-control branches (PUMP START, WATERFALL ON,
+#          WATERFALL END pump-off action, NOT-A-SWIM-DAY pump-off, HEATER+
+#          SPEED maintenance) skip. Pool light branches and midnight reset
+#          continue normally — service is about pump/heater/waterfall, not
+#          unrelated functions. Detection: external pump on/off transitions
+#          (from Hayward panel) toggle the lockout via separate automations
+#          in packages/pool/pool_modes.yaml. Mobile notify on engage with
+#          "Resume" action. Auto-clear at midnight as safety backstop.
+#          Replaces tech's breaker-cycling workflow which was wearing the
+#          60A pool breaker faster than its load class warrants.
+#
+#          VACATION MODE: when input_boolean.vacation is on, the blueprint
+#          switches from "swim day" logic to filter-only logic. Heater off,
+#          waterfall closed, pool light still works (security), pump runs a
+#          configurable filter window (default 10:00–18:00, 8 hours). Avoids
+#          algae bloom over multi-day absences. NOT-A-SWIM-DAY logic is
+#          bypassed during vacation (we want filtration regardless of
+#          forecast). Service lockout still applies on top — vacation +
+#          service = both pause equipment.
+#
 #  v1.9.0  Pump flow tied to compressor activity, not heater enabled state
 #          (per ADR-006). New input heater_active_binary_sensor sourced from
 #          binary_sensor.<heater_equip>_heater_equipment_status (HeaterState.ON
@@ -75,9 +100,9 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.9.0"
+  name: "Pool Automation v1.10.0"
   description: >
-    Pool Automation v1.9.0
+    Pool Automation v1.10.0
 
     Intelligent pool automation using OmniLogic Local for all control
     actions and WeatherFlow for environmental inputs. Cloud integration
@@ -123,6 +148,30 @@ blueprint:
           selector:
             entity:
               domain: binary_sensor
+        service_lockout_boolean:
+          name: Pool Service Lockout Boolean
+          description: >
+            input_boolean that pauses all equipment-control branches when ON.
+            Detection automations toggle it based on external pump on/off
+            transitions (from the Hayward panel). Per ADR-011. Defaults to
+            input_boolean.pool_service_lockout (defined in
+            packages/pool/pool_modes.yaml).
+          default: input_boolean.pool_service_lockout
+          selector:
+            entity:
+              domain: input_boolean
+        vacation_boolean:
+          name: Vacation Mode Boolean
+          description: >
+            input_boolean that switches the pool from swim-day logic to
+            filter-only logic when ON. Heater off, waterfall closed, pump
+            runs vacation_filter window. Per ADR-012. Defaults to
+            input_boolean.vacation (defined in
+            packages/pool/pool_modes.yaml).
+          default: input_boolean.vacation
+          selector:
+            entity:
+              domain: input_boolean
         pump_switch:
           name: Pump Switch
           description: Pool filter pump switch (local integration)
@@ -259,6 +308,16 @@ blueprint:
           default: "20:00:00"
           selector:
             time:
+        vacation_filter_start_time:
+          name: Vacation Filter Start Time
+          description: >
+            When in vacation mode, start the filtration pump at this time.
+            Pump runs for min_filter_hours and then turns off. Default
+            10:00 (mid-morning, off-peak energy in many TOU plans, after
+            sunrise pool warm-up).
+          default: "10:00:00"
+          selector:
+            time:
 
     chlorinator_config:
       name: Chlorinator Settings
@@ -393,7 +452,13 @@ variables:
   heatpump_ok: >
     {{ current_air_temp >= min_heatpump_air_temp }}
   heater_needed: >
-    {{ swimming_day and heatpump_ok }}
+    {# v1.10.0: vacation_mode forces False so HEATER+SPEED maintenance
+       turns the heater off naturally without a separate vacation branch. #}
+    {% if is_state(vacation_boolean, 'on') %}
+      false
+    {% else %}
+      {{ swimming_day and heatpump_ok }}
+    {% endif %}
   hours_to_heat: >
     {% if not heatpump_ok %}
       {{ 0 }}
@@ -434,9 +499,41 @@ variables:
   heater_actively_delivering: >
     {# Per ADR-006: distinguishes compressor-running from heater-enabled.
        Fail-safe: if the binary sensor is unavailable, treat as True so
-       we keep the pump running rather than starve the heat exchanger. #}
+       we keep the pump running rather than starve the heat exchanger.
+       v1.10.0: when in vacation_mode, force False since heater should be
+       off in vacation. #}
     {% set s = states(heater_active_binary_sensor) %}
-    {{ true if s in ['unavailable', 'unknown'] else s == 'on' }}
+    {% if is_state(vacation_boolean, 'on') %}
+      false
+    {% elif s in ['unavailable', 'unknown'] %}
+      true
+    {% else %}
+      {{ s == 'on' }}
+    {% endif %}
+  service_active: >
+    {# Per ADR-011: pool service lockout. When True, equipment-control
+       branches pause. Detection automations in pool_modes.yaml toggle
+       the boolean based on external panel-toggle events.
+       Fail-safe: if the helper doesn't exist, treat as False (no lockout)
+       so a missing helper doesn't disable the pool. #}
+    {{ is_state(service_lockout_boolean, 'on') }}
+  vacation_mode: >
+    {# Per ADR-012: cross-cutting vacation toggle. When True, pool runs
+       filter-only logic (no heating, no waterfall, pool light still works).
+       Fail-safe: if helper doesn't exist, treat as False (normal operation). #}
+    {{ is_state(vacation_boolean, 'on') }}
+  vacation_filter_start_minutes: >
+    {% set t = vacation_filter_start_time %}
+    {% set h = t[0:2] | int %}
+    {% set m = t[3:5] | int %}
+    {{ h * 60 + m }}
+  vacation_filter_end_minutes: >
+    {{ vacation_filter_start_minutes + (min_filter_hours * 60) }}
+  should_filter: >
+    {# Cross-mode filtration gate. In normal mode: tied to swim_day. In
+       vacation mode: always filter (pool needs sanitization regardless
+       of swim use). #}
+    {{ swimming_day or vacation_mode }}
   hours_pumped_today: >
     {% set start = states('input_datetime.pool_pump_actual_start') %}
     {% if start and start != 'unknown' and not start.startswith('1970') %}
@@ -502,12 +599,23 @@ action:
               # PUMP START - conditions met and time reached
               # swim_day guard added v1.9.0: previously fired regardless of
               # swim_day, requiring the NOT-A-SWIM-DAY branch to undo it.
+              # v1.10.0: gated on `not service_active` (ADR-011). When in
+              # vacation_mode, uses vacation_filter window instead of
+              # heat-time-based pump_should_start_minutes (ADR-012).
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ not pump_is_on
-                         and current_minutes >= pump_should_start_minutes
-                         and swimming_day }}
+                      {% if service_active %}
+                        false
+                      {% elif vacation_mode %}
+                        {{ not pump_is_on
+                           and current_minutes >= vacation_filter_start_minutes
+                           and current_minutes < vacation_filter_end_minutes }}
+                      {% else %}
+                        {{ not pump_is_on
+                           and current_minutes >= pump_should_start_minutes
+                           and swimming_day }}
+                      {% endif %}
                 sequence:
                   - action: switch.turn_on
                     target:
@@ -538,12 +646,16 @@ action:
               # swim_day. Pump independence: if pump is off when waterfall
               # window opens, start pump at correct speed before enabling
               # waterfall.
+              # v1.10.0: skipped during vacation_mode (no waterfall on
+              # vacation per ADR-012) and during service_active (ADR-011).
               - conditions:
                   - condition: template
                     value_template: >
                       {{ current_minutes >= waterfall_start_minutes
                          and current_minutes < waterfall_end_minutes
-                         and swimming_day }}
+                         and swimming_day
+                         and not vacation_mode
+                         and not service_active }}
                 sequence:
                   - if:
                       - condition: template
@@ -582,10 +694,10 @@ action:
               # Florida May–summer because (a) water rarely drops below
               # setpoint overnight in Florida heat, and (b) when above
               # setpoint, the pool radiates heat to sky overnight without
-              # needing active cooling. Revisit in shoulder season if water
-              # temp stratifies or heater faults observed. See ADR-006 for
-              # signal hierarchy and ADR-008 placeholder for trusted-temp
-              # work that may revise this gate.
+              # needing active cooling.
+              # v1.10.0: pump-off action gated on `not service_active` so
+              # we don't yank the pump out from under a tech still working.
+              # Valve-close still fires regardless (cleanup is safe).
               - conditions:
                   - condition: template
                     value_template: >
@@ -597,16 +709,30 @@ action:
                       entity_id: !input waterfall_switch
                   - condition: template
                     value_template: >
-                      {{ not heater_actively_delivering and filtration_complete }}
+                      {{ not heater_actively_delivering
+                         and filtration_complete
+                         and not service_active }}
                   - action: switch.turn_off
                     target:
                       entity_id: !input pump_switch
 
-              # NOT A SWIMMING DAY - shut everything down
+              # NOT A SWIMMING DAY (or end of vacation filter window) -
+              # shut everything down.
+              # v1.10.0: triggered when `should_filter` is False
+              # (swim_day=False AND not vacation_mode), OR in vacation_mode
+              # past the vacation filter end window. Gated on `not
+              # service_active` so we don't shut down on a tech mid-work.
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ not swimming_day and pump_is_on }}
+                      {% if service_active %}
+                        false
+                      {% elif vacation_mode %}
+                        {{ pump_is_on
+                           and current_minutes >= vacation_filter_end_minutes }}
+                      {% else %}
+                        {{ not swimming_day and pump_is_on }}
+                      {% endif %}
                 sequence:
                   - action: switch.turn_off
                     target:
@@ -634,9 +760,14 @@ action:
           # ready-but-idle from compressor-running.
           # Re-checks pump state via is_state() so a just-fired turn-off
           # branch (WATERFALL END or NOT-A-SWIM-DAY) doesn't get clobbered.
+          # v1.10.0: skip entirely if service_active (ADR-011). In
+          # vacation_mode (ADR-012), heater_needed is forced False (via
+          # the variable definition above) so the heater-off branch fires
+          # naturally and pump_speed selects normal_pump_speed.
           - if:
               - condition: template
-                value_template: "{{ is_state(pump_switch, 'on') }}"
+                value_template: >
+                  {{ is_state(pump_switch, 'on') and not service_active }}
             then:
               - if:
                   - condition: template

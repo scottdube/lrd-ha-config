@@ -1,0 +1,144 @@
+# Pool modes — service lockout + vacation mode
+#
+# Helpers, detection automations, and notifications for the pool blueprint's
+# pause/modify gates. Lives in a package (not automations.yaml) so HA UI's
+# YAML re-normalization on save doesn't fight git.
+#
+# Related ADRs:
+#  - docs/decisions/011-pool-service-mode.md
+#  - docs/decisions/012-vacation-mode.md
+
+# ---------- Helpers ----------
+
+input_boolean:
+  pool_service_lockout:
+    name: Pool Service Lockout
+    icon: mdi:tools
+    # Engaged automatically when the tech toggles pump off via the Hayward
+    # panel (no HA context). Cleared when she toggles pump back on, OR
+    # manually via mobile notify, OR auto-clear at midnight.
+    # See blueprints/automation/LRD/pool_automation/pool_automation.yaml
+    # service_active variable.
+  vacation:
+    name: Vacation Mode
+    icon: mdi:airplane
+    # Cross-cutting: any automation can check this. Pool blueprint uses it
+    # to switch from swim-day logic to filter-only logic.
+
+# ---------- Service lockout: detection automations ----------
+
+automation:
+  - alias: "Pool: Detect External Pump-Off (engage service lockout)"
+    id: pool_detect_external_pump_off
+    description: >
+      Pool tech (or anyone) toggles pump off via Hayward panel — change
+      arrives via the integration coordinator with no HA context. Set
+      lockout, notify Scott. Per ADR-011.
+    trigger:
+      - platform: state
+        entity_id: switch.omnilogic_pool_filter_pump
+        from: "on"
+        to: "off"
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.to_state.context.user_id is none
+             and trigger.to_state.context.parent_id is none }}
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.pool_service_lockout
+      - action: notify.mobile_app_iphone_sd
+        data:
+          title: Pool Service Lockout Engaged
+          message: >
+            Pump turned off externally (likely tech at panel). Pool blueprint
+            paused for service. Will auto-resume when pump turns back on, OR
+            tap action to resume manually, OR auto-clears at midnight.
+          data:
+            push:
+              interruption-level: time-sensitive
+            actions:
+              - action: pool_resume_now
+                title: Resume Pool Automation Now
+    mode: single
+
+  - alias: "Pool: Detect External Pump-On (clear service lockout)"
+    id: pool_detect_external_pump_on
+    description: >
+      Pool tech finishes work, toggles pump back on via Hayward panel.
+      Symmetric to the off detection — clear the lockout, notify. Per ADR-011.
+    trigger:
+      - platform: state
+        entity_id: switch.omnilogic_pool_filter_pump
+        from: "off"
+        to: "on"
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.to_state.context.user_id is none
+             and trigger.to_state.context.parent_id is none }}
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "on"
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pool_service_lockout
+      - action: notify.mobile_app_iphone_sd
+        data:
+          title: Pool Service Lockout Cleared
+          message: >
+            Pump turned back on externally — service appears complete. Pool
+            blueprint resumed.
+    mode: single
+
+  - alias: "Pool: Mobile Notification Action - Resume"
+    id: pool_mobile_resume_action
+    description: >
+      Listens for the "Resume Pool Automation Now" button tap on the lockout
+      notification. Manual override path.
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: pool_resume_now
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pool_service_lockout
+      - action: notify.mobile_app_iphone_sd
+        data:
+          title: Pool Lockout Cleared (Manual)
+          message: Pool blueprint resumed via mobile notification action.
+    mode: single
+
+  - alias: "Pool: Auto-Clear Service Lockout at Midnight"
+    id: pool_lockout_midnight_autoclear
+    description: >
+      Safety backstop. If the lockout was set during the day and never
+      explicitly cleared (tech forgot to toggle pump back on, mobile push
+      was dismissed without tap), clear at midnight so pool isn't disabled
+      indefinitely. Per ADR-011.
+    trigger:
+      - platform: time
+        at: "00:01:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "on"
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pool_service_lockout
+      - action: notify.mobile_app_iphone_sd
+        data:
+          title: Pool Service Lockout Auto-Cleared
+          message: >
+            Lockout was still set at midnight — auto-cleared as safety
+            backstop. Pool blueprint resumed. If service work was actually
+            ongoing, re-engage manually.
+    mode: single

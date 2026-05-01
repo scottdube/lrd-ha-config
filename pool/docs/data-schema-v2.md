@@ -95,6 +95,13 @@ The schema version line is not a CSV row; downstream parsers must skip lines sta
 |---|---|---|
 | `local_pool_light_state` | `switch.omnilogic_pool_light` state | on/off. |
 
+### Pool modes (ADR-011, ADR-012)
+
+| Column | Source | Notes |
+|---|---|---|
+| `pool_service_lockout` | `input_boolean.pool_service_lockout` state | on/off. ON = service mode active, equipment branches paused. Set by external pump-off detection in `packages/pool/pool_modes.yaml`. |
+| `vacation_mode` | `input_boolean.vacation` state | on/off. ON = filter-only mode (heater off, waterfall closed, pump runs vacation_filter window). |
+
 ### HVAC — garage mini-split (Carrier 38MARBQ24AA3 via Midea AC LAN)
 
 First non-pool domain captured. The Midea AC LAN integration exposes real-time W draw, which the Carrier Infinity integration does not — useful for cross-checking household totals and for tuning the eventual presence-aware setback.
