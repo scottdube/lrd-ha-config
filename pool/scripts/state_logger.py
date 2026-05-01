@@ -128,6 +128,13 @@ COLUMNS: list[dict] = [
      "entity": "switch.omnilogic_pool_filter_pump", "attr": "omni_why_on"},
     {"name": "local_filter_speed", "source": "state",
      "entity": "number.omnilogic_pool_filter_pump_speed"},
+    # Filter power (W) — exposed by integration as a sensor on filter.
+    # Entity ID guess based on naming pattern; verify after first poll.
+    # Critical for: (a) energy/cost analysis vs. cube-law estimates,
+    # (b) predictive maintenance — anomalous power-vs-speed ratio
+    # signals impeller wear, blockage, or bearing degradation.
+    {"name": "local_filter_power", "source": "state",
+     "entity": "sensor.omnilogic_pool_filter_pump_power"},
 
     # ---------- Local: waterfall ----------
     {"name": "local_waterfall_state", "source": "state",

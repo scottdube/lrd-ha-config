@@ -64,6 +64,7 @@ The schema version line is not a CSV row; downstream parsers must skip lines sta
 | `local_filter_state_enum` | switch attr `omni_filter_state` | `FilterState` enum: `OFF`, `ON`, `PRIMING`, `WAITING_TURN_OFF`, `HEATER_EXTEND`, `COOLDOWN`, `SUSPEND`, `CSAD_EXTEND`, `FILTER_SUPERCHLORINATE`, `FILTER_FORCE_PRIMING`, `FILTER_WAITING_TURN_OFF`. **`HEATER_EXTEND` is a parallel signal that filter is running because heater needs flow** — useful cross-check. |
 | `local_filter_why_on` | switch attr `omni_why_on` | `FilterWhyOn` enum, includes `HEATER_EXTEND=4`, `MANUAL_ON=11`, `FREEZE_PROTECT=15`, etc. |
 | `local_filter_speed` | `number.omnilogic_pool_filter_pump_speed` | Speed % (0-100). |
+| `local_filter_power` | `sensor.omnilogic_pool_filter_pump_power` | Actual W consumption. Replaces cube-law estimates with measured data. **Predictive maintenance signal:** if W-per-RPM ratio drifts up over time, that's impeller wear or filter pressure rising; sudden spikes = blockage; drop = mechanical issue. |
 
 ### Local — waterfall
 

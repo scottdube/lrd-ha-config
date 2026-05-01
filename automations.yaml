@@ -541,7 +541,14 @@
     path: LRD/pool_automation/pool_automation.yaml
     input:
       min_swim_temp: 78
-      heater_pump_speed: 77
+      # Pump speeds: validated empirically as Scott's preferred values
+      # (returns flow above HeatPro 30 GPM minimum at his plumbing).
+      # Energy: 65→55% normal idle is ~39% pump-power reduction (cube law);
+      # 77→65% during heating is also ~40%. See conversation 2026-05-02 +
+      # bill analysis. heater_pump_speed validated against HeatPro spec —
+      # if low-flow faults appear during heating, raise it.
+      normal_pump_speed: 55
+      heater_pump_speed: 65
       waterfall_start_time: 08:00:00
       waterfall_switch: valve.omnilogic_pool_waterfall
       heater_active_binary_sensor: binary_sensor.omnilogic_pool_heater_heater_equipment_status
