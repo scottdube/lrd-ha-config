@@ -520,19 +520,34 @@
 - alias: Pool State Logger v2
   id: pool_state_logger_v2
   description: >
-    Logger v2 phase 1 — always-on. Writes ~30 columns of local OmniLogic +
-    environmental state to /config/pool_state_log.csv every 10 min regardless
-    of pump state. Phase 1.5 will add state-change triggers; phase 2 adds
-    cloud columns and computed expected_state. See pool/docs/logger-v2.md.
+    Logger v2 phase 1.5 — always-on. Writes 44 columns of local OmniLogic
+    + environmental + per-entity context state to /config/pool_state_log.csv
+    on two trigger classes:
+      - time_pattern /10: regular polling cadence (row_type=time_pattern)
+      - state on pump/waterfall/heater: immediate capture of state changes
+        with attribution context (row_type=state_change, trigger_entity set)
+    Phase 2 will add cloud columns and computed expected_state. See
+    pool/docs/logger-v2.md.
   trigger:
     - platform: time_pattern
       minutes: /10
+      id: time
+    - platform: state
+      entity_id: switch.omnilogic_pool_filter_pump
+      id: pump_change
+    - platform: state
+      entity_id: valve.omnilogic_pool_waterfall
+      id: waterfall_change
+    - platform: state
+      entity_id: water_heater.omnilogic_pool_heater
+      id: heater_change
   action:
     - action: shell_command.pool_state_log
       data:
-        row_type: time_pattern
-        trigger_entity: ""
-  mode: single
+        row_type: "{{ 'time_pattern' if trigger.id == 'time' else 'state_change' }}"
+        trigger_entity: "{{ trigger.to_state.entity_id if trigger.platform == 'state' else '' }}"
+  mode: queued
+  max: 10
   max_exceeded: silent
 - id: "1775827717239"
   alias: Pool Automation v1.10.1

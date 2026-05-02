@@ -305,6 +305,27 @@ CSV lives at `/config/pool_state_log.csv` on the HA NUC. Three-tier backup:
 
 ---
 
+## Phase 1.5 — state-change triggers + context capture (shipped 2026-05-02)
+
+**What was added:**
+
+1. **State-change triggers on `automation.pool_state_logger_v2`.** Three new triggers fire the logger immediately on any state transition of `switch.omnilogic_pool_filter_pump`, `valve.omnilogic_pool_waterfall`, or `water_heater.omnilogic_pool_heater`. Existing `time_pattern: /10` trigger retained for the cadence baseline. Automation `mode: queued` (with `max: 10`) ensures bursts don't drop rows. Row tagging via `row_type` (`time_pattern` vs `state_change`) and `trigger_entity` columns lets the auditor distinguish snapshot rows from transition rows and grep "rows triggered by waterfall transitions" trivially.
+
+2. **Per-entity context columns (9 new columns).** For each of pump, waterfall, heater:
+   - `<entity>_state_context_user_id` — non-null when a HA user initiated the change
+   - `<entity>_state_context_parent_id` — non-null when an automation/script initiated
+   - `<entity>_state_last_changed` — ISO timestamp of the last state transition
+
+   `user_id=None AND parent_id=None` indicates the change came through the integration's coordinator update (external / autonomous controller behavior). This is the same signal the service-lockout detection automations use to distinguish HA-initiated state changes from external panel toggles. Capturing it here lets the auditor flag the same class of events without needing to scrape the Activity log.
+
+**Schema rotation:** `state_logger.py` now checks the existing CSV's `# schema_version=` header on every write. If it doesn't match `SCHEMA_VERSION` constant, the existing file is renamed to `pool_state_log.<old_version>.csv` and a fresh file is created with the new header. This preserves phase 1 data side-by-side with phase 1.5 data without breaking parsers on ragged rows.
+
+**Operational value demonstrated 2026-05-02:** the v1.10.1/v1.10.2 incident debug session required ~5 round trips to HA Activity to attribute pump/waterfall/heater transitions to their causes (blueprint, integration coordinator, manual). With phase 1.5 in place, the same data lives in the CSV directly and the auditor can flag false-positive lockout candidates ("transition with both context_*_id null AND `pool_integration_recovering=off` AND last_triggered_window > 30s on blueprint") automatically.
+
+**Phase 2 still pending:** cloud columns + expected_state computed columns + trusted-temp helper.
+
+---
+
 ## File layout (proposed)
 
 ```

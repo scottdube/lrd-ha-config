@@ -39,12 +39,14 @@ fails loud only on missing token or unrecoverable filesystem errors.
 
 Phase scope
 -----------
-Phase 1 (this version): local OmniLogic + environmental + computed
-                        water_temp_reliable. ~30 columns.
-Phase 1.5: add state-change triggers, more local attributes (filter
-           power, why_on enums).
-Phase 2: cloud OmniLogic columns, expected_state computed columns, trusted
-         water temp via input_number helper.
+Phase 1: local OmniLogic + environmental + computed water_temp_reliable.
+         ~35 columns. (shipped 2026-05-02)
+Phase 1.5 (this version): state-change triggers + per-entity context
+         capture (user_id, parent_id, last_changed) for pump, waterfall,
+         heater. Adds 9 columns (44 total). Schema version 2.0-phase1.5.
+         Schema rotation logic preserves phase 1 data side-by-side.
+Phase 2: cloud OmniLogic columns, expected_state computed columns,
+         trusted water temp via input_number helper.
 Phase 3: rsync backup to Mac mini.
 """
 
@@ -63,7 +65,7 @@ from pathlib import Path
 LOG_FILE = "/config/pool_state_log.csv"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
-SCHEMA_VERSION = "2.0-phase1"
+SCHEMA_VERSION = "2.0-phase1.5"
 
 # Water-temp reliability threshold: pump must have been on for at least this
 # many seconds before the OmniLogic water temp sensor is considered settled.
@@ -196,6 +198,38 @@ COLUMNS: list[dict] = [
      "entity": "sensor.garage_ms_energy_total"},
     {"name": "garage_ms_kwh_current", "source": "state",
      "entity": "sensor.garage_ms_energy_current"},
+
+    # ---------- Phase 1.5: context capture for state-change attribution ----
+    # Per logger v2 phase 1.5 spec. For each of the three primary control
+    # entities (pump, waterfall, heater), capture:
+    #   - context.user_id   : non-null when a HA user initiated the change
+    #   - context.parent_id : non-null when an automation/script initiated
+    #   - last_changed      : timestamp of last state transition
+    # Both null means the change came through the integration's coordinator
+    # update (external / autonomous controller behavior). Same signal the
+    # service-lockout detection automations use; capturing it here lets the
+    # auditor flag the same class of events from CSV alone.
+
+    {"name": "pump_state_context_user_id", "source": "context",
+     "entity": "switch.omnilogic_pool_filter_pump", "ctx_field": "user_id"},
+    {"name": "pump_state_context_parent_id", "source": "context",
+     "entity": "switch.omnilogic_pool_filter_pump", "ctx_field": "parent_id"},
+    {"name": "pump_state_last_changed", "source": "last_changed",
+     "entity": "switch.omnilogic_pool_filter_pump"},
+
+    {"name": "waterfall_state_context_user_id", "source": "context",
+     "entity": "valve.omnilogic_pool_waterfall", "ctx_field": "user_id"},
+    {"name": "waterfall_state_context_parent_id", "source": "context",
+     "entity": "valve.omnilogic_pool_waterfall", "ctx_field": "parent_id"},
+    {"name": "waterfall_state_last_changed", "source": "last_changed",
+     "entity": "valve.omnilogic_pool_waterfall"},
+
+    {"name": "heater_state_context_user_id", "source": "context",
+     "entity": "water_heater.omnilogic_pool_heater", "ctx_field": "user_id"},
+    {"name": "heater_state_context_parent_id", "source": "context",
+     "entity": "water_heater.omnilogic_pool_heater", "ctx_field": "parent_id"},
+    {"name": "heater_state_last_changed", "source": "last_changed",
+     "entity": "water_heater.omnilogic_pool_heater"},
 ]
 
 
@@ -213,12 +247,21 @@ def get_token() -> str:
     return token
 
 
-def fetch_entity(entity_id: str, token: str) -> tuple[str, dict, str | None]:
+def fetch_entity(
+    entity_id: str, token: str
+) -> tuple[str, dict, str | None, dict]:
     """
-    Fetch one entity's state and attributes from HA REST API.
+    Fetch one entity's state, attributes, last_changed, and context from HA.
 
-    Returns (state, attributes, last_changed_iso) or
-    ('unavailable', {}, None) on any failure.
+    Returns (state, attributes, last_changed_iso, context) or
+    ('unavailable', {}, None, {}) on any failure.
+
+    The context dict contains 'id', 'user_id', 'parent_id'. user_id and
+    parent_id are None for coordinator-originated state updates. This is
+    the same signal used by the service-lockout detection automations
+    to distinguish HA-initiated changes from external/coordinator updates.
+    Phase 1.5 captures it directly so the auditor can flag the same class
+    of events without depending on Activity log scraping.
     """
     req = urllib.request.Request(
         f"{HA_BASE}/api/states/{entity_id}",
@@ -234,9 +277,10 @@ def fetch_entity(entity_id: str, token: str) -> tuple[str, dict, str | None]:
                 data.get("state", "unavailable"),
                 data.get("attributes", {}) or {},
                 data.get("last_changed"),
+                data.get("context", {}) or {},
             )
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-        return "unavailable", {}, None
+        return "unavailable", {}, None, {}
 
 
 def parse_iso_utc(iso_str: str | None) -> datetime | None:
@@ -290,20 +334,20 @@ def compute_water_temp_reliable(
 def build_row(args: argparse.Namespace, token: str) -> list[str]:
     """Walk the COLUMNS manifest and produce one CSV row."""
     # Cache of fetched entities so multiple columns reading the same entity
-    # only hit the REST API once. Pre-populate the pump entity (with its full
-    # attribute dict, not just state) because compute_water_temp_reliable
-    # needs its last_changed below — and any later attribute reads of the
-    # same entity must see the real attrs, not an empty dict.
-    cache: dict[str, tuple[str, dict, str | None]] = {
+    # only hit the REST API once. Pre-populate the pump entity because
+    # compute_water_temp_reliable needs its last_changed below — and any
+    # later attribute reads of the same entity must see the real attrs,
+    # not an empty dict.
+    cache: dict[str, tuple[str, dict, str | None, dict]] = {
         "switch.omnilogic_pool_filter_pump": fetch_entity(
             "switch.omnilogic_pool_filter_pump", token
         ),
     }
-    pump_state, _, pump_last_changed = cache[
+    pump_state, _, pump_last_changed, _ = cache[
         "switch.omnilogic_pool_filter_pump"
     ]
 
-    def get(entity_id: str) -> tuple[str, dict, str | None]:
+    def get(entity_id: str) -> tuple[str, dict, str | None, dict]:
         if entity_id not in cache:
             cache[entity_id] = fetch_entity(entity_id, token)
         return cache[entity_id]
@@ -325,7 +369,7 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
                     compute_water_temp_reliable(pump_state, pump_last_changed)
                 )
             elif name == "local_heater_estimated_power_w":
-                heater_equip_state, _, _ = get(
+                heater_equip_state, _, _, _ = get(
                     "binary_sensor.omnilogic_pool_heater_heater_equipment_status"
                 )
                 row.append(compute_heater_estimated_power_w(heater_equip_state))
@@ -334,15 +378,32 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
                 row.append("")
 
         elif src == "state":
-            state, _, _ = get(col["entity"])
+            state, _, _, _ = get(col["entity"])
             row.append(state)
 
         elif src == "attr":
-            _, attrs, _ = get(col["entity"])
+            _, attrs, _, _ = get(col["entity"])
             value = attrs.get(col["attr"], "unavailable")
             # Render dicts/lists as JSON for CSV-safety
             if isinstance(value, (dict, list)):
                 value = json.dumps(value)
+            row.append(str(value) if value is not None else "")
+
+        elif src == "last_changed":
+            # Phase 1.5: capture the entity's last_changed timestamp.
+            # Useful for correlating row events with state-transition events.
+            _, _, last_changed, _ = get(col["entity"])
+            row.append(last_changed or "")
+
+        elif src == "context":
+            # Phase 1.5: capture the HA context for the entity's current state.
+            # ctx_field is one of 'user_id', 'parent_id', 'id'.
+            # user_id=None and parent_id=None means coordinator-originated
+            # update (i.e., external/integration-side change, not HA action).
+            # Auditor uses these to distinguish blueprint-initiated from
+            # autonomous-controller events without scraping the Activity log.
+            _, _, _, context = get(col["entity"])
+            value = context.get(col["ctx_field"])
             row.append(str(value) if value is not None else "")
 
         else:
@@ -351,9 +412,43 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
     return row
 
 
+def maybe_rotate_csv(log_path: Path) -> None:
+    """
+    Rotate the CSV if its first-line schema_version comment doesn't match
+    the current SCHEMA_VERSION. Renames the existing file to include the
+    old schema version in the filename so historical data is preserved
+    side-by-side. The next write_row call will then create a fresh file
+    with the current schema header.
+
+    Why this exists: when phase 1.5 added context columns, the new schema
+    has 44 columns vs phase 1's 35. Appending new rows to the old file
+    would produce ragged CSV that breaks pandas / csv parsers. Rotating
+    is the simplest safe migration — historical rows stay readable in
+    their original format, new rows go in a fresh file.
+
+    No-op if the file doesn't exist or the version already matches.
+    """
+    if not log_path.exists():
+        return
+    with log_path.open() as f:
+        first_line = f.readline().strip()
+    expected = f"# schema_version={SCHEMA_VERSION}"
+    if first_line == expected:
+        return
+    if first_line.startswith("# schema_version="):
+        old_version = first_line.split("=", 1)[1]
+    else:
+        old_version = "unknown"
+    rotated = log_path.with_name(
+        f"{log_path.stem}.{old_version}{log_path.suffix}"
+    )
+    log_path.rename(rotated)
+
+
 def write_row(row: list[str]) -> None:
     """Append row to CSV. Create file with header if missing."""
     log_path = Path(LOG_FILE)
+    maybe_rotate_csv(log_path)
     file_exists = log_path.exists()
 
     with log_path.open("a", newline="") as f:
