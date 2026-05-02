@@ -121,13 +121,42 @@ B-prime wins on cost (~half), in-panel certification, and integration cleanlines
 
 ### Recommendation
 
-**Option B-prime: 2× Emporia Vue 2 + ESPHome firmware flash** (revised 2026-05-02 after Scott researched the ESPHome flashing path).
+**Vue 3 + cloud now, flash to ESPHome later** (revised 2026-05-02 evening after Discord confirmation).
 
-Combines the cheapest hardware path (Emporia at ~$170/device, all CTs included) with the local-first principle (post-flash, no cloud), in-panel NEC 312.8(B) compliance, and native ESPHome HA integration. Roughly half the cost of dual IotaWatt for the same functional outcome on what matters.
+#### Hardware path
 
-Trade-off accepted: one-time firmware flash per device (~30 min first time, ~10 min second). Fits Scott's existing ESPHome stack and maker workflow.
+2× Vue 3 (Gen 3, model EMV3A or similar). Vue 2 is retail end-of-life — no longer reliably available except used. Vue 3 has functional advantages over Vue 2 for in-panel install:
+- **Built-in RJ45 ethernet** — no WiFi-in-metal-panel risk if cable runs through top knockout to attic
+- **Factory SMA antenna jack** + included antenna — clean WiFi option as alternative
+- **In-panel NEC 312.8(B) certified**
 
-Original Option B (IotaWatt) remains a viable fallback if the flashing process turns out problematic on the current Vue 2 hardware revision (PCB/UART access changes have been reported across revisions).
+Cost: ~$340–400 for 2 devices, all CTs included.
+
+#### Initial deployment: cloud
+
+Run on Emporia cloud initially via the existing `emporia_vue` HACS integration. Reasons:
+- Working data day 1 — bill decomposition can start immediately
+- No firmware-flashing-vs-stable-version timing pressure
+- Lets Scott observe the Vue 3 + cloud behavior, get CT calibration dialed in, etc., before committing to a flash
+
+#### ESPHome flash: ready when convenient
+
+Per Discord (`emporia-vue-local` server, 2026-05-02): the previously-blocking ESPHome 2026.4.0 incompatibility was **fixed in the external component's `@dev` branch**, NOT via an ESPHome version release. So flashing to ESPHome on current ESPHome is viable today with two configuration items:
+
+1. External component source: `github://emporia-vue-local/esphome@dev`
+2. Set the sensor variant in YAML (Vue 2 vs Vue 3)
+
+This eliminates the "wait for ESPHome to publish a fix" delay that had me considering version pinning. Flash whenever Scott is ready (post-Sunday-install + a few days of cloud data + tools acquired).
+
+#### Why not IotaWatt
+
+IotaWatt is functionally fine and was the original Option B — but at this point, Vue 3 + cloud-now-flash-later wins on:
+- **In-panel NEC 312.8(B) certification** (IotaWatt is not certified for in-panel mount)
+- **Cost** (~$340–400 vs $800–1000 for two-panel coverage)
+- **Native ESPHome integration** (no REST polling intermediary)
+- **Maker fit** (ESPHome already in Scott's stack via voice satellites)
+
+IotaWatt remains a fallback only if Vue 3 hardware quality issues emerge or the ESPHome flash process turns out problematic on the specific units delivered.
 
 ## Consequences
 

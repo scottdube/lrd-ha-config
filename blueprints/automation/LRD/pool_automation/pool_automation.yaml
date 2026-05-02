@@ -4,6 +4,19 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.10.1 current_water_temp fallback fix (ADR-013). When the OmniLogic
+#          water sensor reads 'unknown' (pump off → no flow for sensor to
+#          settle), the prior float(75) fallback drove hours_to_heat to 14
+#          (= 89 - 75), which made heat_start_minutes negative, which made
+#          pump_should_start_minutes always satisfy the PUMP START gate.
+#          Result: every poll after a lockout cleared (or any other off
+#          state) immediately fired PUMP START. Confirmed against logbook
+#          on 2026-05-02: pump turned on at 00:10:01 EDT — first poll after
+#          midnight lockout auto-clear — even though no scheduled run window
+#          had been reached. Fallback now returns target_temp, making
+#          hours_to_heat = 0 when sensor is unknown, so PUMP START is gated
+#          by filter_start_minutes (morning waterfall window) only.
+#
 #  v1.10.0 Two new mode gates — service lockout (ADR-011) and vacation mode
 #          (ADR-012). Both use input_boolean helpers (defined in
 #          packages/pool/pool_modes.yaml) checked via new blueprint inputs.
@@ -108,9 +121,9 @@
 # =============================================================================
 
 blueprint:
-  name: "Pool Automation v1.10.0"
+  name: "Pool Automation v1.10.1"
   description: >
-    Pool Automation v1.10.0
+    Pool Automation v1.10.1
 
     Intelligent pool automation using OmniLogic Local for control and
     WeatherFlow for environmental inputs. Cloud integration retained
@@ -457,7 +470,28 @@ variables:
   waterfall_end_time: !input waterfall_end_time
   vacation_filter_start_time: !input vacation_filter_start_time
   current_water_temp: >
-    {{ states(water_temp_sensor) | float(75) }}
+    {# v1.10.1 (ADR-013): fallback changed from float(75) to float(target_temp).
+       The OmniLogic water sensor reads 'unknown' when the pump is off (no flow
+       for the in-line probe to settle against). The old float(75) fallback
+       made hours_to_heat = max(target_temp - 75, 0) — at target_temp=89 that's
+       14 hours, driving heat_start_minutes negative and pump_should_start_minutes
+       to a value < current_minutes the moment any other gate (e.g. service
+       lockout) cleared. Result: pump auto-started immediately after lockout
+       cleared at midnight even though no real heat demand existed.
+
+       New fallback returns target_temp when the sensor is unknown, making
+       hours_to_heat = 0 and letting filter_start_minutes (08:00 morning
+       window) drive PUMP START. Pump comes on naturally at the morning
+       filter window, reads true water temp once flow settles, and the
+       blueprint reacts on the next /10 poll.
+
+       Limitation: this assumes "unknown" means "we don't know, so don't
+       force an early start" rather than "water might actually be very cold."
+       For shoulder-season cold mornings this could leave warmup tight. The
+       proper fix is a trusted-temp helper (logger v2 phase 2) or an
+       independent water sensor that reports while pump is off (ADR-015
+       candidate). #}
+    {{ states(water_temp_sensor) | float(target_temp) }}
   current_air_temp: >
     {{ state_attr(weather_entity, 'temperature') | float(70) }}
   forecast_high: >

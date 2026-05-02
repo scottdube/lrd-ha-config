@@ -2,14 +2,14 @@
 
 Active working notes. Update as work progresses. This is the file Cowork should reference most often when answering "where are we on X?"
 
-**Last updated:** 2026-05-01 (pool automation incident — uncovered blueprint design issue + observability gap; ADR-006, logger v2 spec, auditor spec drafted)
+**Last updated:** 2026-05-02 (v1.10.1 patched — current_water_temp fallback fix per ADR-013; tech workflow test pending; logger v2 phase 1.5 + Mac mini rsync queued)
 
 ---
 
 ## In flight
 
 ### Pool automation
-- **Blueprint version:** v1.9.0 (deployed); **v1.10.0 patched in repo 2026-05-02, awaiting push + deploy** — adds service mode (ADR-011) + vacation mode (ADR-012). New input_boolean helpers + detection automations land in `packages/pool/pool_modes.yaml`. v1.9.0 short-circuit fix is included.
+- **Blueprint version:** v1.10.0 (deployed); **v1.10.1 patched in repo 2026-05-02, awaiting push + deploy** — single-line `current_water_temp` fallback fix per ADR-013. Closes the bug where the PUMP START gate fired at every poll after a pump-off event because `float(75)` made `hours_to_heat=14` whenever the OmniLogic water sensor read `unknown`. Validated cause via HA logbook + pool_state_log_2026-05-02.csv (00:10:01 EDT pump-on triggered by blueprint). Marginal cost of the bug: ~$150–250/year of overnight pump waste.
 - **Pump speed inputs tuned 2026-05-02:** `normal_pump_speed: 55`, `heater_pump_speed: 65` (down from defaults 65/77). Empirically validated values from Scott's prior tuning. ~17% additional reduction in pump consumption on top of v1.9.0 via cube-law. Bill analysis estimates ~$390/year savings vs. pre-v1.9.0 baseline at his SECO Energy rate ($0.136/kWh effective). Watch for HeatPro low-flow faults — if any appear during heating cycles, raise `heater_pump_speed` back toward 70-75.
 - **April 2026 bill spike decomposed (2026-05-02 via Carrier app data):** Mar→Apr bill jumped +2025 kWh (2526→4551). HVAC actually *decreased* −245 kWh (Mar 1007 → Apr 762, sum of main + master mini-split). The +2025 kWh increase is dominated by pool: pump turning on 24/7 (~500 kWh) + heat-pump compressor running for water-temp recovery (~900–1100 kWh estimated; real measurement pending via `local_filter_power` once logger v2 captures a few days). HVAC is ~18% of total daily load (~25 kWh/day in April), pool is ~30%+, "everything else" is ~45%. Big "everything else" bucket (~65 kWh/day = ~$265/month) is the next investigation target — water heater, fridge, electronics, phantom loads. Whole-home power monitoring (Emporia Vue 2 or IotaWatt) is the natural next step for visibility into this bucket. Future ADR.
 - **Heater logic:** set-and-hold — heater on if swim day, off if not. Heat pump owns cycling. **Open issue (ADR-006):** blueprint conflates heater-`on` (enabled/ready) with heater-actively-delivering. Result: pump runs 24/7 at 77% on swim-day stretches even when compressor is idle. Confirmed in 2026-04-28→05-01 CSV: 595 pump-on rows, 0 pump-off rows. Empirically validated 2026-05-01 via Hayward cloud activity log — heater compressor only ran 04:02–06:47 EDT (2h45m) yet pump ran 24h. **Signal source identified:** local `binary_sensor.<heater_equip>_heater_equipment_status` (compressor active boolean from `pyomnilogic_local.HeaterState`) plus cloud `water_heater` state as cross-validation. Blueprint v1.9.0 ready to implement.
@@ -172,7 +172,9 @@ See `docs/decisions/` for full ADRs. Quick reference:
 | 004 | Waterfall control: valve domain (post-1.0.0b5 of OmniLogic Local) |
 | 005 | http.server_host bound to LRD-Servers IP + localhost only (post dual-VLAN) |
 | 006 | (proposed) actively-heating vs enabled — pump flow tied to compressor demand, not heater enabled state |
-| 009 | (proposed) whole-home power monitoring — Emporia Vue 2 + ESPHome firmware flash recommended (2026-05-02 revision); install pending |
+| 009 | (proposed) whole-home power monitoring — 2× Vue 3 cloud-now-flash-later; install Sunday 2026-05-04. ESPHome 2026.4.0 issue resolved via emporia-vue-local @dev branch (per Discord 2026-05-02). |
 | 011 | (accepted) pool service mode — input_boolean.pool_service_lockout via panel-toggle detection |
 | 012 | (accepted) vacation mode — cross-cutting input_boolean.vacation, pool implementation first |
+| 013 | (accepted) current_water_temp fallback uses target_temp instead of 75 — fixes PUMP START gate firing on every poll when sensor reads `unknown` |
 | 014 | (proposed) battery health tracking — Battery Notes + logger v2 extension + auditor assertions |
+| 015 | (proposed, not yet drafted) independent water temp sensor — measure pool temp when pump is off; subsumes trusted-temp helper |

@@ -535,7 +535,7 @@
   mode: single
   max_exceeded: silent
 - id: "1775827717239"
-  alias: Pool Automation v1.10.0
+  alias: Pool Automation v1.10.1
   description: ""
   use_blueprint:
     path: LRD/pool_automation/pool_automation.yaml
