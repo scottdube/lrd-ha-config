@@ -24,6 +24,21 @@ input_boolean:
     icon: mdi:airplane
     # Cross-cutting: any automation can check this. Pool blueprint uses it
     # to switch from swim-day logic to filter-only logic.
+  pool_integration_recovering:
+    name: Pool Integration Recovering
+    icon: mdi:timer-sand
+    # ADR-016: gates the service-lockout detection automations during the
+    # 5-minute window after the OmniLogic Local integration recovers from
+    # an unavailable state (HA restart, network blip, controller restart).
+    # During recovery, the controller's autonomous state reconciliation can
+    # produce equipment state changes (pump off/on, waterfall close/open,
+    # heater off/on) that look like tech-initiated panel toggles to HA's
+    # logbook but aren't. Without this gate, those phantom changes engage
+    # service lockout, fire false-positive mobile pushes, and pause the
+    # blueprint until the next external transition clears the lockout.
+    # Set ON automatically by automation.pool_integration_recovery_debounce
+    # when the pump entity transitions out of 'unavailable'. Auto-clears
+    # 5 minutes later. See ADR-016.
 
 # ---------- Service lockout: detection automations ----------
 
@@ -64,6 +79,13 @@ automation:
           {{ elapsed > 30 }}
       - condition: state
         entity_id: input_boolean.pool_service_lockout
+        state: "off"
+      # ADR-016: integration-recovery debounce. Suppresses detection during
+      # the 5-min window after the OmniLogic Local integration recovers from
+      # unavailable, when controller-side state reconciliation can produce
+      # phantom transitions that look like panel-toggle events.
+      - condition: state
+        entity_id: input_boolean.pool_integration_recovering
         state: "off"
     action:
       - action: input_boolean.turn_on
@@ -109,6 +131,13 @@ automation:
       - condition: state
         entity_id: input_boolean.pool_service_lockout
         state: "on"
+      # ADR-016: same integration-recovery debounce as the off-detection.
+      # Without this, controller-side pump-on during recovery would clear a
+      # legitimate prior lockout (or its absence is fine but symmetric is
+      # safer — both detections gate on the same window).
+      - condition: state
+        entity_id: input_boolean.pool_integration_recovering
+        state: "off"
     action:
       - action: input_boolean.turn_off
         target:
@@ -167,3 +196,41 @@ automation:
             backstop. Pool blueprint resumed. If service work was actually
             ongoing, re-engage manually.
     mode: single
+
+  - alias: "Pool: Integration Recovery Debounce"
+    id: pool_integration_recovery_debounce
+    description: >
+      ADR-016: when the OmniLogic Local integration recovers from an
+      unavailable state (HA restart, network blip, controller restart),
+      the controller's autonomous state reconciliation can briefly cycle
+      pump/heater/waterfall in ways that look like external panel toggles
+      to the lockout detection automations. This automation sets
+      input_boolean.pool_integration_recovering ON for 5 minutes after
+      every recovery, gating the detection automations during that window.
+
+      Trigger: pump entity transitions OUT of 'unavailable' (any new
+      state). Watching the pump entity is sufficient — all OmniLogic Local
+      entities go unavailable together (they share the integration's
+      coordinator), so the pump's recovery is a faithful proxy for the
+      integration's overall recovery.
+
+      mode: restart so a flapping integration (recover, drop, recover
+      again within 5 min) keeps the gate held until things stabilize.
+
+      5 min based on the 2026-05-02 incident: controller cycled pump
+      off at 10:26:45 (within seconds of recovery) then back on at
+      10:30:11 (3m26s after recovery). 5 min comfortably brackets
+      both transitions with margin.
+    trigger:
+      - platform: state
+        entity_id: switch.omnilogic_pool_filter_pump
+        from: "unavailable"
+    action:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.pool_integration_recovering
+      - delay: "00:05:00"
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pool_integration_recovering
+    mode: restart
