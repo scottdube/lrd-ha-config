@@ -42,6 +42,11 @@ automation:
       The last_triggered check suppresses detection if the Pool Automation
       blueprint fired within the last 30 seconds — that's the window where
       coordinator updates legitimately propagate from blueprint actions.
+      NOTE: entity_id is `automation.pool_automation_v1_7_0` because HA
+      sticks entity IDs to the alias-at-creation-time (originally
+      v1.7.0). Alias is now v1.10.0 but entity_id never updated. If
+      automation is ever deleted and recreated, this reference needs an
+      update to match the new entity_id.
     trigger:
       - platform: state
         entity_id: switch.omnilogic_pool_filter_pump
@@ -54,7 +59,7 @@ automation:
              and trigger.to_state.context.parent_id is none }}
       - condition: template
         value_template: >
-          {% set last = state_attr('automation.pool_automation_v1_10_0', 'last_triggered') %}
+          {% set last = state_attr('automation.pool_automation_v1_7_0', 'last_triggered') %}
           {% set elapsed = (now() - last).total_seconds() if last else 999 %}
           {{ elapsed > 30 }}
       - condition: state
@@ -98,7 +103,7 @@ automation:
              and trigger.to_state.context.parent_id is none }}
       - condition: template
         value_template: >
-          {% set last = state_attr('automation.pool_automation_v1_10_0', 'last_triggered') %}
+          {% set last = state_attr('automation.pool_automation_v1_7_0', 'last_triggered') %}
           {% set elapsed = (now() - last).total_seconds() if last else 999 %}
           {{ elapsed > 30 }}
       - condition: state
