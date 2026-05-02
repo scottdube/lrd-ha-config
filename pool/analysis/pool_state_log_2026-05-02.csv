@@ -1,0 +1,122 @@
+# schema_version=2.0-phase1
+timestamp,row_type,trigger_entity,forecast_high,swim_day_raw,oat_weatherflow,illuminance_lux,precipitation_today,precipitation_yesterday,local_heater_state,local_heater_equip_status,local_heater_equip_state,local_heater_equip_enabled,local_heater_target,local_heater_solar_set_point,local_heater_why_on,local_filter_state,local_filter_state_enum,local_filter_why_on,local_filter_speed,local_filter_power,local_waterfall_state,local_waterfall_function,local_waterfall_why_on,local_chlorinator_state,local_chlorinator_percent,local_water_temp,local_water_temp_reliable,local_heater_estimated_power_w,local_pool_light_state,pool_service_lockout,vacation_mode,garage_ms_power_w,garage_ms_kwh_total,garage_ms_kwh_current
+2026-05-01 13:34:12,time_pattern,,91.0,Yes,90,129921,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 13:40:00,time_pattern,,91.0,Yes,90,30992,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,on,0.0,0.0,0.0
+2026-05-01 13:50:00,time_pattern,,91.0,Yes,90,114393,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,false,0,off,off,on,0.0,0.0,0.0
+2026-05-01 14:00:00,time_pattern,,91.0,Yes,90,123530,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,65,702,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 14:10:00,time_pattern,,91.0,Yes,90,89780,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,on,0.0,0.0,0.0
+2026-05-01 14:20:00,time_pattern,,91.0,Yes,90,52525,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,65,701,open,Waterfall,Manual On,on,20,89,false,0,off,off,on,0.0,0.0,0.0
+2026-05-01 14:30:00,time_pattern,,91.0,Yes,90,unavailable,0.0,0.0,on,off,Off,True,87,87,5,on,On,Manual On,65,701,open,Waterfall,Manual On,on,20,89,false,0,off,off,on,0.0,0.0,0.0
+2026-05-01 14:40:00,time_pattern,,91.0,Yes,90,61318,0.0,0.0,off,off,Off,True,87,87,1,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 14:50:00,time_pattern,,91.0,Yes,90,76336,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 15:00:00,time_pattern,,91.0,Yes,90,118118,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 15:10:00,time_pattern,,91.0,Yes,91,78296,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 15:20:00,time_pattern,,91.0,Yes,90,56684,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 15:30:00,time_pattern,,91.0,Yes,90,102597,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 15:40:00,time_pattern,,91.0,Yes,91,86478,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 15:50:00,time_pattern,,91.0,Yes,90,36674,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 16:00:00,time_pattern,,91.0,Yes,90,39708,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 16:10:00,time_pattern,,91.0,Yes,90,33120,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 16:20:00,time_pattern,,91.0,Yes,90,35273,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 16:30:00,time_pattern,,91.0,Yes,88,40238,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,445,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 16:40:00,time_pattern,,91.0,Yes,88,33561,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 16:50:00,time_pattern,,91.0,Yes,88,62335,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 17:00:00,time_pattern,,91.0,Yes,90,72937,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 17:10:00,time_pattern,,91.0,Yes,90,60157,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,89,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 17:20:00,time_pattern,,91.0,Yes,90,54663,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 17:30:00,time_pattern,,91.0,Yes,88,50888,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,false,0,off,off,off,0.0,0.0,0.0
+2026-05-01 17:40:00,time_pattern,,91.0,Yes,88,45710,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 17:50:00,time_pattern,,91.0,Yes,88,37338,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 18:00:00,time_pattern,,91.0,Yes,88,16829,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 18:10:00,time_pattern,,91.0,Yes,86,31665,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 18:20:00,time_pattern,,91.0,Yes,88,24779,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 18:30:00,time_pattern,,91.0,Yes,88,29595,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 18:40:00,time_pattern,,91.0,Yes,88,16737,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 18:50:00,time_pattern,,91.0,Yes,86,6135,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 19:00:00,time_pattern,,91.0,Yes,84,6971,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 19:10:00,time_pattern,,91.0,Yes,84,6457,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 19:20:00,time_pattern,,91.0,Yes,84,5650,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 19:30:00,time_pattern,,91.0,Yes,82,3946,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 19:40:00,time_pattern,,91.0,Yes,82,2767,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 19:50:00,time_pattern,,91.0,Yes,82,2177,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 20:00:00,time_pattern,,91.0,Yes,82,759,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-01 20:10:00,time_pattern,,91.0,Yes,81,162,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 20:20:00,time_pattern,,91.0,Yes,81,27,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 20:30:00,time_pattern,,91.0,Yes,79,3,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 20:40:00,time_pattern,,91.0,Yes,79,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 20:50:00,time_pattern,,91.0,Yes,79,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 21:00:00,time_pattern,,91.0,Yes,79,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 21:10:00,time_pattern,,91.0,Yes,77,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 21:20:00,time_pattern,,91.0,Yes,77,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 21:30:00,time_pattern,,91.0,Yes,77,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 21:40:00,time_pattern,,91.0,Yes,77,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 21:50:00,time_pattern,,91.0,Yes,75,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 22:00:00,time_pattern,,91.0,Yes,75,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,on,on,off,0.0,0.0,0.0
+2026-05-01 22:10:00,time_pattern,,91.0,Yes,75,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 22:20:00,time_pattern,,91.0,Yes,75,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 22:30:00,time_pattern,,91.0,Yes,75,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 22:40:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 22:50:00,time_pattern,,91.0,Yes,75,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 23:00:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 23:10:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 23:20:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 23:30:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 23:40:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-01 23:50:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-02 00:00:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,on,off,0.0,0.0,0.0
+2026-05-02 00:10:00,time_pattern,,91.0,Yes,73,1,0.0,0.0,on,off,Off,True,89,89,1,off,Off,Off,0,0,closed,Waterfall,No Message,on,20,unknown,false,0,off,off,off,0.0,0.0,0.0
+2026-05-02 00:20:00,time_pattern,,91.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,86,false,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 00:30:00,time_pattern,,91.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,86,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 00:40:00,time_pattern,,91.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,642,closed,Waterfall,No Message,on,20,86,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 00:50:00,time_pattern,,91.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,86,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 01:00:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 01:10:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 01:20:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 01:30:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 01:40:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 01:50:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,88,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 02:00:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,642,closed,Waterfall,No Message,on,20,88,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 02:10:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,88,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 02:20:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 02:30:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 02:40:00,time_pattern,,88.0,Yes,72,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 02:50:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 03:00:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 03:10:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 03:20:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 03:30:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 03:40:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 03:50:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 04:00:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 04:10:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 04:20:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 04:30:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 04:40:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 04:50:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 05:00:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 05:10:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 05:20:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 05:30:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 05:40:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 05:50:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 06:00:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 06:10:00,time_pattern,,88.0,Yes,70,1,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 06:20:00,time_pattern,,88.0,Yes,70,2,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 06:30:00,time_pattern,,88.0,Yes,70,19,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 06:40:00,time_pattern,,88.0,Yes,70,140,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 06:50:00,time_pattern,,88.0,Yes,70,567,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 07:00:00,time_pattern,,88.0,Yes,70,1472,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,55,411,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 07:10:00,time_pattern,,88.0,Yes,70,2933,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 07:20:00,time_pattern,,88.0,Yes,70,4578,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 07:30:00,time_pattern,,88.0,Yes,72,5090,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,642,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 07:40:00,time_pattern,,88.0,Yes,72,7332,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,87,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 07:50:00,time_pattern,,88.0,Yes,72,11386,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,88,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 08:00:00,time_pattern,,88.0,Yes,72,8384,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,652,closed,Waterfall,No Message,on,20,88,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 08:10:00,time_pattern,,88.0,Yes,72,11444,0.0,0.0,on,on,On,True,89,89,4,on,On,Manual On,65,692,open,Waterfall,Manual On,on,20,88,true,7800,off,off,off,0.0,0.0,0.0
+2026-05-02 08:20:00,time_pattern,,88.0,Yes,73,13633,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,65,691,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 08:30:00,time_pattern,,88.0,Yes,73,15108,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 08:40:00,time_pattern,,88.0,Yes,73,15952,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 08:50:00,time_pattern,,88.0,Yes,73,19593,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 09:00:00,time_pattern,,88.0,Yes,73,12706,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 09:10:00,time_pattern,,88.0,Yes,73,15167,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
+2026-05-02 09:20:00,time_pattern,,88.0,Yes,73,13837,0.0,0.0,on,off,Off,True,89,89,4,on,On,Manual On,55,436,open,Waterfall,Manual On,on,20,88,true,0,off,off,off,0.0,0.0,0.0
