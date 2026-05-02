@@ -36,19 +36,16 @@ Per ADR-015 "Thermal and condensation analysis" — these are required, not opti
 
 | Item | Qty / size | Unit cost | Notes |
 |---|---|---|---|
-| **Conformal coating** — MG Chemicals 419D acrylic, 12 oz spray can | 1 | $18–22 | Reuse for many future builds. Mask connectors before applying. |
+| **Boeshield T-9** — 12 oz spray can | 1 | $13–15 | Single-product solution for PCB protection + battery contacts + internal metal hardware. Active moisture displacement, leaves thin waxy film. Reapply at each battery swap (already an existing maintenance touch point). **Test on scrap ABS first** — 24h soak of a drop on the case material to verify no plastic crazing before applying broadly. Replaces both conformal coating and dielectric grease line items from the prior BOM. |
 | **Indicating silica gel desiccant** (color-changing beads, ~3 mm) | small jar (50–100 g) | $8–12 | 1–2 g per build; jar lasts dozens. Use indicating type so saturation is visible at battery swap. |
-| **Dielectric grease** — Permatex 22058 or equivalent | 0.33 oz tube | $5–7 | Apply to battery contacts and any electrical connection inside the case. |
+| **Silicone grease** — Super Lube silicone grease or equivalent | 1 oz tube | $5–7 | Gasket lubrication only — silicone-on-silicone compatibility with the original silicone gasket. Prevents bunching during threaded-ring tightening, fills groove micro-imperfections, gives even compression around perimeter. **Do not use T-9 here** — its hydrocarbon solvents aren't appropriate for the silicone gasket interface. |
 | **Hydrophobic vent membrane** — choose ONE: | | | |
 |  • Bud Industries IPV-1119 threaded breather (or equivalent M5/M6 ePTFE) | 1 | $10–15 | Engineered for the application; threads into a tapped hole. Cleanest install. |
 |  • DIY: ePTFE membrane sheet from McMaster (P/N 5239K11 or similar Goretex equivalent) | small piece | $15–25 (sheet) | Cut a ~10 mm circle, glue over a 3–5 mm hole with marine silicone. Sheet provides enough material for many builds. |
-| **Marine silicone sealant** — 3M 4200 Fast Cure or Permatex Marine Silicone | 3 oz tube | $8–10 | For vent perimeter, gasket backup, any new wire pass-through. |
+| **Marine silicone sealant** — 3M 4200 Fast Cure or Permatex Marine Silicone | 3 oz tube | $8–10 | For vent perimeter, any new wire pass-through. |
 | **Marine 2-part epoxy** — West System G/flex 650 or J-B Marine Weld | 2 × 1 oz tubes | $10–15 | For permanent re-seals if any are needed. Optional but cheap insurance. |
-| **Replacement gasket material** — choose ONE based on existing dimensions: | | | |
-|  • Viton (FKM) square-section profile cord from McMaster | ~1 ft | $15–25 | Best chlorine + salt + UV resistance. Cut to length, glue ends with cyanoacrylate to close the loop. |
-|  • Viton O-ring assortment kit | 1 | $20–30 | Fallback if exact square-section dimensions are obsolete. May need groove modification for ideal compression. |
-|  • EPDM square-section cord | ~1 ft | $8–15 | Cheaper alternative if Viton unavailable. Shorter service life in pool chemistry. |
-| **Moisture mitigation subtotal** (lower bound — single vent option, single gasket option) | | **~$74–100** | |
+| ~~Replacement gasket material~~ | — | $0 | **Resolved 2026-05-02:** reuse existing silicone gasket per ADR-015. Inspect for compression resilience + visible damage before reuse; clean with IPA before re-greasing. Viton replacement remains as fallback only if inspection fails. |
+| **Moisture mitigation subtotal** (lower bound — single vent option) | | **~$54–74** | |
 
 ---
 
@@ -58,15 +55,16 @@ Per ADR-015 "Thermal and condensation analysis" — these are required, not opti
 |---|---|
 | Electronics (incremental) | ~$0.60 |
 | Power | $5–6 |
-| Moisture mitigation | $74–100 |
-| **Total v1 build** | **~$80–110** |
+| Moisture mitigation | $54–74 |
+| **Total v1 build** | **~$60–80** |
 
-**At or near the $100 ADR-015 budget ceiling.** A few notes on this:
+**Comfortably under the $100 ADR-015 budget ceiling.** Notes on the simplification from the prior BOM revision:
 
-- The "money in chemicals" prediction held — moisture mitigation is ~85% of the spend
-- Most chemicals (conformal coating, dielectric grease, silicone, epoxy, desiccant) come in quantities much larger than this single build needs. **Per-build incremental cost amortized over future builds is much lower** — closer to $30–40 once the consumable inventory exists
-- The vent membrane choice has the biggest cost lever: a $10 threaded breather vs. $20 for membrane sheet that supplies many builds
-- Replacement gasket sourcing is the highest-uncertainty cost — depends on what dimensions are needed and what's available
+- Boeshield T-9 replaces both the conformal coating ($18–22) and dielectric grease ($5–7) line items — one product covers PCB protection, battery contacts, and metal hardware
+- Reusing the existing silicone gasket (ADR-015 resolution) eliminates the gasket-sourcing line item ($15–25) and removes the longest-lead-time / highest-uncertainty piece of the BOM
+- Most chemicals (T-9, silica gel, silicone grease, marine silicone, marine epoxy) come in quantities much larger than this single build needs. **Per-build incremental cost amortized over future builds drops to ~$25–35** once the consumable inventory exists
+- The vent membrane choice remains the biggest cost lever: a $10 threaded breather vs. $20 for membrane sheet that supplies many builds
+- T-9 introduces a maintenance reapplication cadence (every battery swap, ~12+ months) — acceptable because the swap is already an open-the-case touch point
 
 ---
 
