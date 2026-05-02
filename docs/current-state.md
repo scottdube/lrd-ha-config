@@ -2,7 +2,7 @@
 
 Active working notes. Update as work progresses. This is the file Cowork should reference most often when answering "where are we on X?"
 
-**Last updated:** 2026-05-02 (v1.10.1 + v1.10.2 deployed and validated; logger v2 phase 1.5 patched in repo — state-change triggers + context columns, awaiting push + deploy; ADR-015 accepted — external water temp sensor v1 path = case-reuse + NTC-reuse, EOM 2026-05-31 deploy target; Mac mini rsync still queued)
+**Last updated:** 2026-05-02 (v1.10.1 + v1.10.2 deployed and validated; logger v2 phase 1.5 patched in repo — state-change triggers + context columns, awaiting push + deploy; ADR-015 accepted — external water temp sensor v1 path = case-reuse + NTC-reuse, EOM 2026-05-31 deploy target; ADR-015 NTC calibration complete — 3-point Steinhart-Hart fit committed; Mac mini rsync still queued)
 
 ---
 
@@ -40,7 +40,7 @@ Requirements analysis complete and accepted 2026-05-02. Closes the structural bl
 - **Open build-phase decisions:** MCU SKU (C3 vs C6), power source (2× AA + boost vs 3× AA + LDO vs 1× 18650), tether strategy, gasket material (EPDM vs silicone vs Viton), calibration values, notification policy thresholds.
 - **Deadline:** EOM 2026-05-31 for stage 1 (deployed + entity contract met + gates A/B/D/E/F). Stage 2 (gate C — 5-7 day soak data quality verification) lands 5–7 days after deploy.
 - **Budget:** $100 ceiling; case-reuse path estimated $15–25 in parts.
-- **Calibration session in flight:** Scott calibrating reference thermometer 2026-05-02.
+- **Calibration complete 2026-05-02.** Three points captured (32.0°F/153kΩ, 73.7°F/52.6kΩ, 109.5°F/22.8kΩ), Steinhart-Hart coefficients fit, NTC characterized as 47 kΩ @ 25°C / Beta ≈ 3823. ESPHome multi-point calibration block ready. Full data + reference probe verification + in-service R sanity table in `pool/docs/external-water-temp-calibration.md`.
 
 ### Voice assistant satellites (ESPHome)
 - **First unit:** garage. Wired and flashed. Recovered 2026-04-28 from a stuck `voice_assistant.on_error` (pipeline pointed at a removed Ollama conversation entity — see ADR-003 for the canonical-vs-alternative pipeline policy).

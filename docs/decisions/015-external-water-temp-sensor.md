@@ -117,7 +117,7 @@ Logger v2 columns added: `external_water_temp`, `external_water_temp_age_min`, `
 5. **Tether strategy.** Untethered drifter vs. fixed-point tether vs. captive zone. Affects antenna position consistency, recovery effort.
 6. **Probe chamber depth below surface.** Working assumption 12–18"; verify against stratification concern.
 7. **New gasket material spec.** EPDM vs. silicone vs. Viton — chlorine + salt + UV durability ranking.
-8. **Calibration values.** Three (T, R) data points from build-week calibration session.
+8. ~~**Calibration values.** Three (T, R) data points from build-week calibration session.~~ **Resolved 2026-05-02** — see `pool/docs/external-water-temp-calibration.md`. Three points captured (32.0°F/153kΩ, 73.7°F/52.6kΩ, 109.5°F/22.8kΩ), Steinhart-Hart coefficients fit, NTC characterized as 47 kΩ @ 25°C / Beta ≈ 3823. ESPHome multi-point calibration block ready to drop into firmware.
 9. **Notification policy thresholds.** Every-tier-degradation vs. prolonged-only — deferred from section 5.
 10. **Replacement strategy.** Spare-on-shelf vs. on-demand build. No second TX13-class case on hand, so v2 of this sensor would either reuse the v1 case (no spare) or commit to a from-scratch DIY build with fresh enclosure.
 
@@ -222,6 +222,7 @@ ADR closes when all gates A–F pass per stage 1 + stage 2 timeline above. Audit
 - `pool/scripts/state_logger.py` — chlorinator entity confirms salt water; existing trusted-temp pattern (`WATER_TEMP_SETTLING_SECONDS = 600`)
 - `pool/docs/logger-v2.md` — placeholder columns already designed for this sensor
 - `pool/docs/auditor.md` — assertion framework
+- `pool/docs/external-water-temp-calibration.md` — NTC calibration data, Steinhart-Hart fit, ESPHome calibration block
 - `pool/README.md` — predictive-heating long-term goal
 - `docs/current-state.md` — Lanai AP, Lanai voice satellite, Zooz ZST39 LR controller availability
 - 2026-05-02 conversation: 8-section requirements analysis + case-reuse evaluation; existing TX13-R1 VER1.0 transmitter board identified, NTC measured 41.4 kΩ at ~87°F lanai-ambient, leak path attributed to threaded gasket (not wire pass-through)
