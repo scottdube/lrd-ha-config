@@ -2,7 +2,7 @@
 
 Active working notes. Update as work progresses. This is the file Cowork should reference most often when answering "where are we on X?"
 
-**Last updated:** 2026-05-02 (v1.10.1 + v1.10.2 deployed and validated; logger v2 phase 1.5 patched in repo — state-change triggers + context columns, awaiting push + deploy; Mac mini rsync still queued)
+**Last updated:** 2026-05-02 (v1.10.1 + v1.10.2 deployed and validated; logger v2 phase 1.5 patched in repo — state-change triggers + context columns, awaiting push + deploy; ADR-015 accepted — external water temp sensor v1 path = case-reuse + NTC-reuse, EOM 2026-05-31 deploy target; Mac mini rsync still queued)
 
 ---
 
@@ -29,6 +29,18 @@ Initiated 2026-05-01 after the waterfall incident exposed multiple blind spots i
 **Sequencing:** Find heater_equip binary_sensor entity ID → logger v2 phase 1 (parallel, non-breaking) → blueprint v1.9.0 fix → logger v2 phase 2+ → auditor phase 1.
 
 **Logger v2 phase 1 deployed and validated 2026-05-02** — 35 columns, ran clean overnight (120 rows, 0 gaps >12 min, 1 transient illuminance unavail). **Logger v2 phase 1.5 patched in repo 2026-05-02, awaiting push + deploy** — adds state-change triggers on pump/waterfall/heater + 9 context-capture columns (`<entity>_state_context_user_id`/`parent_id`/`last_changed`). Schema bumps to `2.0-phase1.5`, total 44 columns. Schema rotation logic preserves phase 1 CSV side-by-side as `pool_state_log.2.0-phase1.csv` after deploy. Cloud columns + trusted-temp + rsync backup are phase 2/3.
+
+### External water temp sensor (ADR-015)
+Requirements analysis complete and accepted 2026-05-02. Closes the structural blind spot ADR-013 patched tactically: the OmniLogic in-line probe reads `unknown` whenever pump is off (no flow), leaving the blueprint without real water temp during pump-off windows.
+
+- **v1 hardware path: case-reuse + NTC-reuse.** Existing TX13-class floating thermometer case is mechanically intact (probe chamber, threaded gasket ring, battery compartment). Original PCB is corroded beyond repair (humid salt-air ingress through degraded gasket, NOT through wire pass-through). In-place NTC tested healthy at 41.4 kΩ at ~87°F lanai-ambient — consistent with 50 kΩ @ 25°C, Beta ≈ 3400–3500 class. Wire pass-through epoxy seal survived 20+ years and stays.
+- **Build:** ESP32-C3/C6 + 47 kΩ 0.1% reference resistor + ESP32 ADC. ESPHome `resistance` + `ntc` platforms with declarative Steinhart-Hart calibration (3-point: ice bath, room temp, ~104°F warm water). Replaces threaded gasket O-ring, conformal coats new PCB.
+- **Cascading fallback chain (replaces direct sensor read in blueprint):** Tier 1 `external_water_temp` fresh → Tier 2 `local_water_temp` reliable → Tier 3 `target_temp` (ADR-013).
+- **Logger v2 columns to add (phase 2+):** `external_water_temp`, `external_water_temp_age_min`, `external_water_temp_fresh`, `water_temp_authoritative`, `water_temp_delta`. Auditor candidates W1/W2 follow.
+- **Open build-phase decisions:** MCU SKU (C3 vs C6), power source (2× AA + boost vs 3× AA + LDO vs 1× 18650), tether strategy, gasket material (EPDM vs silicone vs Viton), calibration values, notification policy thresholds.
+- **Deadline:** EOM 2026-05-31 for stage 1 (deployed + entity contract met + gates A/B/D/E/F). Stage 2 (gate C — 5-7 day soak data quality verification) lands 5–7 days after deploy.
+- **Budget:** $100 ceiling; case-reuse path estimated $15–25 in parts.
+- **Calibration session in flight:** Scott calibrating reference thermometer 2026-05-02.
 
 ### Voice assistant satellites (ESPHome)
 - **First unit:** garage. Wired and flashed. Recovered 2026-04-28 from a stuck `voice_assistant.on_error` (pipeline pointed at a removed Ollama conversation entity — see ADR-003 for the canonical-vs-alternative pipeline policy).
@@ -177,5 +189,5 @@ See `docs/decisions/` for full ADRs. Quick reference:
 | 012 | (accepted) vacation mode — cross-cutting input_boolean.vacation, pool implementation first |
 | 013 | (accepted) current_water_temp fallback uses target_temp instead of 75 — fixes PUMP START gate firing on every poll when sensor reads `unknown` |
 | 014 | (proposed) battery health tracking — Battery Notes + logger v2 extension + auditor assertions |
-| 015 | (proposed, not yet drafted) independent water temp sensor — measure pool temp when pump is off; subsumes trusted-temp helper |
+| 015 | (accepted) independent water temp sensor — case-reuse + NTC-reuse v1 path; EOM 2026-05-31 deploy target; build-phase decisions deferred (MCU SKU, power source, tether, gasket spec, calibration values, notification thresholds) |
 | 016 | (accepted) integration-recovery debounce — 5-min suppression of service-lockout detection after OmniLogic Local recovers from unavailable; closes false-positive class observed 2026-05-02 |
