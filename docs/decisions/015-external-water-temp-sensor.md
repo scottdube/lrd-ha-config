@@ -108,11 +108,55 @@ Logger v2 columns added: `external_water_temp`, `external_water_temp_age_min`, `
 
 ---
 
+## Thermal and condensation analysis (added 2026-05-02)
+
+The original case-reuse decision assumed the threaded gasket was the primary failure mode, with humid salt-air ingress as the corrosion driver. **Empirical observation during calibration changed that read.**
+
+### Observation
+
+During the 2026-05-02 NTC calibration session, **visible condensation formed inside the upper compartment within ~15 minutes of submerging the lower body in the 32°F ice bath** — without solar gain, without long-term humidity exposure, without gasket leakage. The case had been opened, electronics removed, then loosely reassembled at lab humidity (~75°F / 60% RH) before the calibration dunk.
+
+### Why it happened (psychrometric basics)
+
+- Trapped air inside the case at sealing time: ~75°F / 60% RH → dew point ~60°F
+- Submerging the lower body in 32°F ice water rapidly cooled interior surfaces of the lower compartment well below the 60°F dew point
+- Any surface below dew point condenses water vapor out of the trapped air — visible droplets formed within minutes
+
+### Why this is the load-bearing failure analysis
+
+The original PCB's corrosion pattern matches this mechanism better than gasket leakage:
+- Corrosion concentrated at battery contacts and slide switches (interior surfaces, cool side)
+- Wire pass-through epoxy intact (a continuous liquid-water seal would have failed if liquid water was the path)
+- Original gasket condition consistent with normal compression-set aging, not catastrophic leak
+
+### What this means in service
+
+Condensation cycles run **continuously**, multiple times per day, regardless of gasket integrity:
+- Overnight pool water cooling drops the lower body below dew point of trapped upper-compartment air
+- Solar gain on the clear dome over the dark LCD drives a daily 30–60°F internal top-to-bottom gradient (worst-case Florida noon estimate)
+- Each cycle re-exposes interior contacts to condensed moisture, accelerating salt-corrosion when any salt aerosol is present
+- A "perfect" gasket only slows molecular permeation through ABS — it does not prevent condensation of already-trapped humidity
+
+### Required mitigations (not optional — promoted from "open design decisions")
+
+| Mitigation | Addresses |
+|---|---|
+| **Hydrophobic vent membrane** (Goretex / ePTFE breather) installed in upper compartment wall | Pressure equalization during thermal cycles without pumping air through gasket; root cause of breathing-induced air exchange |
+| **Indicating silica gel desiccant** (1–2 g) inside upper compartment, replaced with each battery swap | Captures initial trapped humidity + any diffusion ingress between swaps |
+| **Conformal coating** on all PCB conductors (MG Chemicals 419D acrylic or equivalent) | Decouples electronics reliability from interior humidity — moisture can land on coating without reaching copper |
+| **Dielectric grease** on battery contacts | Prevents condensation droplets from completing a salt-corrosion cell across spring contacts |
+| **Reflective treatment** on inside of clear dome (aluminum tape or white vinyl) + remove dead LCD | Eliminates the daily solar-gain gradient driver |
+| **Replace threaded gasket** with proper material (Viton preferred) | Reduces molecular permeation rate; secondary defense |
+
+The vent membrane is the single highest-leverage mitigation because it addresses the root mechanism (thermal-cycle-driven air pumping). Without it, every other mitigation fights the symptoms of an air exchange that happens by design every time the case heats and cools.
+
+---
+
 ## Open design decisions (deferred to build phase)
 
-1. **Specific MCU SKU.** ESP32-C3 vs C6 — C6 adds Thread/Matter and BLE 5 (future-proofing); C3 is cheaper and proven. Both meet the 3.0 V floor and ESPHome compatibility.
-2. **Power source detail.** 2× AA as-is (~3.0 V fresh, drops to ~2.0 V end-of-life — below ESP32-C3 minimum) vs. 3× AA (~4.5 V, requires LDO) vs. 1× 18650 LiPo (~3.7 V nominal, requires modifying battery compartment). Affects 6-month battery target verification.
-3. **Voltage regulator / boost circuit** if 2× AA retained.
+1. ~~**Specific MCU SKU.**~~ **Resolved 2026-05-02:** ESP32-C6 (XIAO form factor, on hand). Future-proofing via WiFi 6 / BLE 5 / 802.15.4 (Thread / Zigbee / Matter) was the deciding factor — v1 ships on WiFi 2.4 GHz, but v2 has the option to switch radio paths without a hardware respin. ESPHome supports it natively (verify ESPHome version ≥ 2024.x at build time).
+2. ~~**Power source detail.**~~ **Fully resolved 2026-05-02:** 2× AA lithium primary (Energizer Ultimate Lithium class) in the existing battery compartment. Preserves all original infrastructure (contacts, compartment dimensions, threaded-ring service access). Decision drivers: leakage immunity in the salt-humid environment (matches the case's inherited failure mode — original alkalines corroded the contacts), voltage stability across discharge keeps the ESP32-C6 fed directly without a regulator, low self-discharge for 6+ month unattended use, lower contamination consequence if the gasket ever fails. Trade-offs accepted: ~3–5× cost-per-swap vs alkaline, flatter discharge curve makes voltage-based remaining-life telemetry weak (mitigated by tracking cycle count + cumulative awake-time in ESPHome instead).
+3. ~~**Voltage regulator / boost circuit.**~~ **Fully resolved 2026-05-02:** none. ESP32-C6 fed directly from 2× lithium primary AA. Cells hold ≥3.0 V series for ~80–85% of capacity, well within the C6's 3.0–3.6 V spec. The 15–20% remaining capacity past the discharge cliff isn't worth a $2–3 boost-converter BOM, 4–6 added components, ~10% efficiency penalty as regulator heat, and an extra failure mode. PCB design simplified accordingly — no boost-converter footprint reserved. If chemistry ever flips to alkaline mid-life, a boost converter rides on an inline daughterboard rather than a respin.
 4. **Antenna geometry inside ABS plastic case at 2.4 GHz.** Plastic is RF-transparent at this frequency, but range-test before sealing.
 5. **Tether strategy.** Untethered drifter vs. fixed-point tether vs. captive zone. Affects antenna position consistency, recovery effort.
 6. **Probe chamber depth below surface.** Working assumption 12–18"; verify against stratification concern.
@@ -136,6 +180,7 @@ Two-stage milestone per section 8:
 5. Replace gasket, install electronics, conformal-coat, seal threaded ring
 6. 72-hour dry-bench burn-in (verify deep-sleep current, WiFi reconnect behavior)
 7. 24-hour empty-case submersion test (gasket + new wire passages — verify no ingress before risking electronics)
+7a. **Float buoyancy / trim test** — lithium primary AA cells are ~17 g lighter than the alkalines the case was originally balanced for. Float in water with batteries installed, verify probe chamber vent slots are fully submerged at rest. If float rides too high, add small ballast (lead shot, stainless washer) inside lower compartment to restore original waterline before sealing
 8. Deploy to pool with electronics, confirm `sensor.pool_water_temp_external` populating in HA
 9. Add Logger v2 columns
 10. Update blueprint to read `water_temp_authoritative` (or external direct if logger phase 2 not ready by deploy)
@@ -223,6 +268,7 @@ ADR closes when all gates A–F pass per stage 1 + stage 2 timeline above. Audit
 - `pool/docs/logger-v2.md` — placeholder columns already designed for this sensor
 - `pool/docs/auditor.md` — assertion framework
 - `pool/docs/external-water-temp-calibration.md` — NTC calibration data, Steinhart-Hart fit, ESPHome calibration block
+- `pool/docs/external-water-temp-bom.md` — bill of materials with sourcing notes; reflects the moisture-mitigation requirements from this ADR's thermal/condensation analysis
 - `pool/README.md` — predictive-heating long-term goal
 - `docs/current-state.md` — Lanai AP, Lanai voice satellite, Zooz ZST39 LR controller availability
 - 2026-05-02 conversation: 8-section requirements analysis + case-reuse evaluation; existing TX13-R1 VER1.0 transmitter board identified, NTC measured 41.4 kΩ at ~87°F lanai-ambient, leak path attributed to threaded gasket (not wire pass-through)
