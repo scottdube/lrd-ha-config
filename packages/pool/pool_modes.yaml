@@ -34,6 +34,14 @@ automation:
       Pool tech (or anyone) toggles pump off via Hayward panel — change
       arrives via the integration coordinator with no HA context. Set
       lockout, notify Scott. Per ADR-011.
+      HOTFIX 2026-05-02 (within ADR-011): added last_triggered window
+      check. The OmniLogic Local integration's coordinator updates state
+      AFTER the blueprint's action, with its own coordinator context (no
+      parent_id from the original action). Without this check, every
+      blueprint-initiated pump on/off triggers a false-positive lockout.
+      The last_triggered check suppresses detection if the Pool Automation
+      blueprint fired within the last 30 seconds — that's the window where
+      coordinator updates legitimately propagate from blueprint actions.
     trigger:
       - platform: state
         entity_id: switch.omnilogic_pool_filter_pump
@@ -44,6 +52,11 @@ automation:
         value_template: >
           {{ trigger.to_state.context.user_id is none
              and trigger.to_state.context.parent_id is none }}
+      - condition: template
+        value_template: >
+          {% set last = state_attr('automation.pool_automation_v1_10_0', 'last_triggered') %}
+          {% set elapsed = (now() - last).total_seconds() if last else 999 %}
+          {{ elapsed > 30 }}
       - condition: state
         entity_id: input_boolean.pool_service_lockout
         state: "off"
@@ -71,6 +84,8 @@ automation:
     description: >
       Pool tech finishes work, toggles pump back on via Hayward panel.
       Symmetric to the off detection — clear the lockout, notify. Per ADR-011.
+      HOTFIX 2026-05-02: same last_triggered window check as the off
+      detection, for the same reason.
     trigger:
       - platform: state
         entity_id: switch.omnilogic_pool_filter_pump
@@ -81,6 +96,11 @@ automation:
         value_template: >
           {{ trigger.to_state.context.user_id is none
              and trigger.to_state.context.parent_id is none }}
+      - condition: template
+        value_template: >
+          {% set last = state_attr('automation.pool_automation_v1_10_0', 'last_triggered') %}
+          {% set elapsed = (now() - last).total_seconds() if last else 999 %}
+          {{ elapsed > 30 }}
       - condition: state
         entity_id: input_boolean.pool_service_lockout
         state: "on"
