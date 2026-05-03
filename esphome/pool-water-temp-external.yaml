@@ -53,6 +53,12 @@ binary_sensor:
   - platform: homeassistant
     id: ota_mode_flag
     entity_id: input_boolean.pool_float_ota_mode
+    on_release:
+      then:
+        - logger.log: "OTA mode flag cleared - resuming sleep cycle"
+        - deep_sleep.allow: deep_sleep_main
+        - deep_sleep.enter:
+            id: deep_sleep_main
 
 sensor:
   - platform: adc
