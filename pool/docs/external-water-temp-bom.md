@@ -25,7 +25,7 @@ This BOM reflects the build *as of* the 2026-05-02 condensation analysis (ADR-01
 
 | Item | Qty | Unit cost | Subtotal | Notes |
 |---|---|---|---|---|
-| Energizer Ultimate Lithium AA (or equivalent lithium primary) | 2 | $2.50–3.00 | $5–6 | Buy 4-pack to keep one set as spare. Avoid alkalines per ADR-015 chemistry decision. |
+| Energizer Ultimate Lithium AA (or equivalent lithium primary) | 2 | $2.50–3.00 | $5–6 | Buy 4-pack to keep one set as spare. Avoid alkalines per ADR-015 chemistry decision. Original case shipped with AAA alkaline; AA fits "a little tight but doable" — minor compartment adjustment may be needed. AA capacity (~2700 mAh useful) gives comfortable battery life margin (12+ months typical, 17 months optimized). |
 | **Power subtotal** | | | **~$5–6** | |
 
 ---
