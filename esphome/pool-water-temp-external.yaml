@@ -5,7 +5,17 @@ substitutions:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  comment: "Floating pool water temp sensor per ADR-015. Continuous-run config (deep sleep TODO — safe_mode interaction debugging deferred)."
+  comment: "Floating pool water temp sensor per ADR-015. Deep sleep diagnostic config — verbose logging to find where script blocks."
+  on_boot:
+    priority: -100
+    then:
+      - logger.log:
+          level: WARN
+          format: "BOOT_DIAG: on_boot priority -100 fired"
+      - script.execute: take_reading_and_sleep
+      - logger.log:
+          level: WARN
+          format: "BOOT_DIAG: on_boot completed (script.execute returned)"
 
 esp32:
   board: esp32-c6-devkitc-1
@@ -31,6 +41,39 @@ wifi:
   ap:
     ssid: "Pool Float Fallback"
     password: !secret fallback_password
+
+deep_sleep:
+  id: deep_sleep_main
+  run_duration: 90s
+  sleep_duration: 1min
+
+script:
+  - id: take_reading_and_sleep
+    then:
+      - logger.log:
+          level: WARN
+          format: "SCRIPT_DIAG: started"
+      - component.update: pool_temp_voltage
+      - delay: 500ms
+      - logger.log:
+          level: WARN
+          format: "SCRIPT_DIAG: ADC sampled, waiting for api.connected"
+      - wait_until:
+          condition:
+            api.connected:
+          timeout: 25s
+      - logger.log:
+          level: WARN
+          format: "SCRIPT_DIAG: api.connected wait done (connected or timed out)"
+      - delay: 2s
+      - logger.log:
+          level: WARN
+          format: "SCRIPT_DIAG: about to call deep_sleep.enter"
+      - deep_sleep.enter:
+          id: deep_sleep_main
+      - logger.log:
+          level: WARN
+          format: "SCRIPT_DIAG: deep_sleep.enter returned (should NEVER print if sleep worked)"
 
 sensor:
   - platform: adc
