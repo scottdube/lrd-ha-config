@@ -41,8 +41,8 @@ CSV_DEFAULT = "/config/pool_state_log.csv"
 OUT_DEFAULT = "/config/pool/audit/"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
-NOTIFY_TARGET = "mobile_app_iphone_sd"
-AUDITOR_VERSION = "1.0.0"
+NOTIFY_TARGET = "scott_and_ha"
+AUDITOR_VERSION = "1.1.0"
 
 WATERFALL_START_DEFAULT = time(8, 0)
 WATERFALL_END_DEFAULT = time(20, 0)
@@ -131,13 +131,14 @@ def transitions(rows: list[dict], col: str, want_truthy_first: bool):
         prev_ts = ts
 
 
-def push_notify(title: str, message: str) -> bool:
+def push_notify(title: str, message: str, ha_base: str, token_file: str,
+                notify_target: str) -> bool:
     try:
-        token = Path(TOKEN_FILE).read_text().strip()
+        token = Path(token_file).read_text().strip()
     except OSError:
         return False
     req = urllib.request.Request(
-        f"{HA_BASE}/api/services/notify/{NOTIFY_TARGET}",
+        f"{ha_base}/api/services/notify/{notify_target}",
         data=json.dumps({"title": title, "message": message}).encode(),
         headers={"Authorization": f"Bearer {token}",
                  "Content-Type": "application/json"},
@@ -152,10 +153,13 @@ def push_notify(title: str, message: str) -> bool:
 
 def assert_d1(rows, cols) -> Result:
     r = Result("D1", "swim_day_consistency", "PASS",
-               expected="swim_day_raw constant across day", severity="low")
+               expected="swim_day_raw constant across day (ignoring transient unavailable)",
+               severity="low")
     if "swim_day_raw" not in cols:
         r.status = "SKIP"; r.reason = "swim_day_raw column missing"; return r
-    vals = {row.get("swim_day_raw") for row in rows if row.get("swim_day_raw")}
+    vals = {row.get("swim_day_raw") for row in rows
+            if row.get("swim_day_raw")
+            and row.get("swim_day_raw").lower() not in ("unavailable", "unknown")}
     if len(vals) > 1:
         r.status = "FAIL"
         r.observed = f"swim_day_raw took multiple values: {sorted(vals)}"
@@ -190,7 +194,8 @@ def assert_d2(rows, cols) -> Result:
 
 def assert_d3(rows, cols) -> Result:
     r = Result("D3", "sensor_availability", "PASS",
-               expected=f"no critical sensor unavailable >{SENSOR_UNAVAIL_FAIL_MIN} cumulative min",
+               expected=f"no critical sensor unavailable >{SENSOR_UNAVAIL_FAIL_MIN} cumulative min "
+                        f"(water_temp exempt while pump is off — sensor settles only with flow)",
                severity="med")
     critical = ["local_water_temp", "oat_weatherflow",
                 "local_filter_state", "local_waterfall_state"]
@@ -206,6 +211,8 @@ def assert_d3(rows, cols) -> Result:
         for c in have:
             v = (a.get(c) or "").lower()
             if v in ("unavailable", "unknown", ""):
+                if c == "local_water_temp" and pump_on(a) is not True:
+                    continue
                 bad_minutes[c] += dur
     bad = {k: v for k, v in bad_minutes.items() if v > SENSOR_UNAVAIL_FAIL_MIN}
     if bad:
@@ -267,6 +274,10 @@ def assert_w2(rows, cols, swim) -> Result:
     target = datetime.combine(rows[0] and parse_ts(rows[0]["timestamp"]).date()
                               or date.today(), WATERFALL_START_DEFAULT)
     tol = timedelta(minutes=WATERFALL_TRANSITION_TOL_MIN)
+    if datetime.now() < target + tol:
+        r.status = "SKIP"
+        r.reason = f"audit run before open-window deadline ({(target+tol).strftime('%H:%M')})"
+        return r
     found = None
     for ts, prev, cur in transitions(rows, "local_waterfall_state", True):
         if to_bool(prev) is False and to_bool(cur) is True:
@@ -287,12 +298,16 @@ def assert_w3(rows, cols) -> Result:
                severity="high")
     if "local_waterfall_state" not in cols:
         r.status = "SKIP"; r.reason = "column missing"; return r
-    ever_open = any(to_bool(row.get("local_waterfall_state")) is True for row in rows)
-    if not ever_open:
-        r.status = "SKIP"; r.reason = "waterfall never opened today"; return r
     target_date = parse_ts(rows[0]["timestamp"]).date()
     target = datetime.combine(target_date, WATERFALL_END_DEFAULT)
     tol = timedelta(minutes=WATERFALL_TRANSITION_TOL_MIN)
+    if datetime.now() < target + tol:
+        r.status = "SKIP"
+        r.reason = f"audit run before close-window deadline ({(target+tol).strftime('%H:%M')})"
+        return r
+    ever_open = any(to_bool(row.get("local_waterfall_state")) is True for row in rows)
+    if not ever_open:
+        r.status = "SKIP"; r.reason = "waterfall never opened today"; return r
     found = None
     for ts, prev, cur in transitions(rows, "local_waterfall_state", False):
         if to_bool(prev) is True and to_bool(cur) is False:
@@ -367,48 +382,57 @@ def assert_p2(rows, cols, swim) -> Result:
 
 def assert_p3(rows, cols) -> Result:
     r = Result("P3", "pump_speed_when_heating", status="PASS",
-               expected=f"pump_speed ≥ {HEATER_PUMP_SPEED_MIN}% when heater actively delivering",
+               expected=f"pump_speed ≥ {HEATER_PUMP_SPEED_MIN}% on heater-active time_pattern rows; "
+                        f"first heater-active row of each run skipped (race: logger snapshot at same "
+                        f"instant blueprint fires, before pump-speed command lands)",
                severity="high")
     needed = ["local_filter_speed", "local_heater_equip_status"]
     if any(c not in cols for c in needed):
         r.status = "SKIP"; r.reason = "required columns missing"; return r
     violations = []
-    in_run = 0
+    prev_tp_heater_active = False
     for row in rows:
-        if heater_active(row) is True:
-            in_run += 1
-            if in_run <= HEATER_TRANSITION_GRACE_ROWS:
-                continue
+        if row.get("row_type") != "time_pattern":
+            continue
+        cur = heater_active(row) is True
+        if cur and not prev_tp_heater_active:
+            prev_tp_heater_active = cur
+            continue
+        prev_tp_heater_active = cur
+        if cur:
             spd = to_float(row.get("local_filter_speed"))
             if spd is not None and spd < HEATER_PUMP_SPEED_MIN:
                 violations.append({"timestamp": row["timestamp"],
                                    "local_filter_speed": row.get("local_filter_speed")})
-        else:
-            in_run = 0
     if violations:
         r.status = "FAIL"
-        r.observed = f"{len(violations)} rows heater-active with pump_speed < {HEATER_PUMP_SPEED_MIN}%"
+        r.observed = f"{len(violations)} time_pattern rows heater-active with pump_speed < {HEATER_PUMP_SPEED_MIN}%"
         r.violating_rows = violations[:10]
     else:
-        r.observed = "all heater-active rows had pump at heater speed (post-transition)"
+        r.observed = "all heater-active time_pattern rows had pump at heater speed (post-first)"
     return r
 
 
 def assert_p4(rows, cols) -> Result:
     r = Result("P4", "pump_speed_when_idle", status="PASS",
-               expected=f"pump_speed ≤ {IDLE_PUMP_SPEED_MAX}% when pump on but not heating",
+               expected=f"pump_speed ≤ {IDLE_PUMP_SPEED_MAX}% on idle time_pattern rows; first idle "
+                        f"row after each heater run skipped (race: pump-speed-down command lands "
+                        f"after the time_pattern snapshot at the same instant)",
                severity="med")
     needed = ["local_filter_speed", "local_heater_equip_status", "local_filter_state"]
     if any(c not in cols for c in needed):
         r.status = "SKIP"; r.reason = "required columns missing"; return r
     violations = []
-    rows_since_heater_off = 999
+    prev_tp_heater_active = False
     for row in rows:
-        if heater_active(row) is True:
-            rows_since_heater_off = 0
+        if row.get("row_type") != "time_pattern":
             continue
-        rows_since_heater_off += 1
-        if rows_since_heater_off <= HEATER_TRANSITION_GRACE_ROWS:
+        cur = heater_active(row) is True
+        if not cur and prev_tp_heater_active:
+            prev_tp_heater_active = cur
+            continue
+        prev_tp_heater_active = cur
+        if cur:
             continue
         if pump_on(row) is True:
             spd = to_float(row.get("local_filter_speed"))
@@ -417,10 +441,10 @@ def assert_p4(rows, cols) -> Result:
                                    "local_filter_speed": row.get("local_filter_speed")})
     if violations:
         r.status = "FAIL"
-        r.observed = f"{len(violations)} idle-pump rows with speed > {IDLE_PUMP_SPEED_MAX}%"
+        r.observed = f"{len(violations)} idle-pump time_pattern rows with speed > {IDLE_PUMP_SPEED_MAX}%"
         r.violating_rows = violations[:10]
     else:
-        r.observed = "idle pump always within speed limit (post-transition)"
+        r.observed = "idle pump always within speed limit on time_pattern checks (post-first)"
     return r
 
 
@@ -609,6 +633,12 @@ def main():
     p.add_argument("--success-summary", action="store_true",
                    help="push notification on PASS too")
     p.add_argument("--print", action="store_true", help="print summary to stdout")
+    p.add_argument("--ha-base", default=HA_BASE,
+                   help=f"HA base URL for notify pushes (default {HA_BASE})")
+    p.add_argument("--token-file", default=TOKEN_FILE,
+                   help=f"path to file containing HA long-lived token (default {TOKEN_FILE})")
+    p.add_argument("--notify-target", default=NOTIFY_TARGET,
+                   help=f"HA notify service name (default {NOTIFY_TARGET})")
     args = p.parse_args()
 
     if not args.date and not args.date_range:
@@ -636,10 +666,12 @@ def main():
                 detail = a.get("observed") or a.get("reason") or ""
                 print(f"  {tag} {a['id']} {a['name']}: {detail}")
         if not args.no_notify and result["summary"]["failed"] > 0:
-            push_notify(f"Pool Audit FAIL {d}", fail_message(result))
+            push_notify(f"Pool Audit FAIL {d}", fail_message(result),
+                        args.ha_base, args.token_file, args.notify_target)
             exit_code = 1
         elif not args.no_notify and args.success_summary:
-            push_notify(f"Pool Audit OK {d}", success_message(result))
+            push_notify(f"Pool Audit OK {d}", success_message(result),
+                        args.ha_base, args.token_file, args.notify_target)
 
     sys.exit(exit_code)
 

@@ -36,6 +36,14 @@ pool_state_log.csv     # v2 logger output (logger-v2 spec)
 pool_action_log.csv    # logger v2 phase 4 action log
 .state_logger_token    # long-lived access token for state_logger.py
 
+# Live rsync mirror of the NUC's pool_state_log.csv. Refreshed every 5 min
+# by ~/Library/LaunchAgents/com.scottdube.ha.pool-log-rsync.plist.
+# See pool/docs/rsync-setup.md.
+pool/analysis/pool_state_log_live.csv
+
+# Auditor output. Re-derivable from the CSV; not worth tracking churn.
+pool/audit/
+
 # Lock files
 *.lock
 

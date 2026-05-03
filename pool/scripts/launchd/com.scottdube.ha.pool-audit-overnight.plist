@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs audit_yesterday.sh nightly at 00:05 local. Pushes mobile + bell on
+  FAIL via the scott_and_ha notify group.
+
+  Designed for the always-on Mac mini. The MacBook would also work but is
+  unreliable for overnight execution because of sleep.
+
+  Install:
+      cp pool/scripts/launchd/com.scottdube.ha.pool-audit-overnight.plist \
+         ~/Library/LaunchAgents/
+      launchctl load ~/Library/LaunchAgents/com.scottdube.ha.pool-audit-overnight.plist
+
+  Prerequisites: rsync agent installed, repo cloned to
+  /Users/scottdube/code/home-assistant, ~/.ha_token contains a HA long-lived
+  access token (mode 600), notify.scott_and_ha deployed in HA.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottdube.ha.pool-audit-overnight</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/scottdube/code/home-assistant/pool/scripts/audit_yesterday.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>5</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/scottdube/Library/Logs/ha-pool-audit.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/scottdube/Library/Logs/ha-pool-audit.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+</dict>
+</plist>
