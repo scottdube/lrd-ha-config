@@ -1,0 +1,28 @@
+# Shared notify groups
+#
+# Centralizes notification fan-out so individual automations don't have to
+# repeat the channel list. Add a new service here, every consumer picks it up.
+#
+# Group "scott_and_ha":
+#   - mobile_app_iphone_sd  → push to Scott's iPhone (interruption-level supported)
+#   - persistent_notification → bell icon in HA sidebar (Notifications panel)
+#
+# Used by:
+#   - packages/pool/pool_modes.yaml   (service-lockout engage/clear/auto-clear)
+#   - (future) battery-health alerts (ADR-014)
+#   - (future) pool audit FAIL pushes
+#
+# Notes:
+#   - The notify.persistent_notification service auto-generates a notification_id
+#     per call. If a future use case needs explicit ID lifecycle (engage → dismiss
+#     on clear), call persistent_notification.create / .dismiss directly with an
+#     ID rather than going through this group, OR add a notify script wrapper.
+#   - Mobile-specific payload (data.push, data.actions) is harmless to non-mobile
+#     services — they ignore extra fields.
+
+notify:
+  - name: scott_and_ha
+    platform: group
+    services:
+      - service: mobile_app_iphone_sd
+      - service: persistent_notification
