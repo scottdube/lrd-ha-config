@@ -5,17 +5,11 @@ substitutions:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  comment: "Floating pool water temp sensor per ADR-015. Deep sleep diagnostic config — verbose logging to find where script blocks."
+  comment: "Floating pool water temp sensor per ADR-015. Production: 30-min cadence, ~6s wake. OTA mode via input_boolean.pool_float_ota_mode for maintenance pushes. safe_mode boot_is_good_after fix is critical for deep_sleep on subsequent wakes."
   on_boot:
     priority: -100
     then:
-      - logger.log:
-          level: WARN
-          format: "BOOT_DIAG: on_boot priority -100 fired"
       - script.execute: take_reading_and_sleep
-      - logger.log:
-          level: WARN
-          format: "BOOT_DIAG: on_boot completed (script.execute returned)"
 
 esp32:
   board: esp32-c6-devkitc-1
@@ -42,45 +36,30 @@ wifi:
     ssid: "Pool Float Fallback"
     password: !secret fallback_password
 
+# safe_mode default boot_is_good_after of 60s silently blocks deep_sleep on
+# every wake (both script-triggered deep_sleep.enter and run_duration).
+# 5s allows the ~6s wake-publish-sleep cycle to actually enter sleep.
+# num_attempts=100 effectively disables boot-loop detection.
+safe_mode:
+  boot_is_good_after: 5s
+  num_attempts: 100
+
 deep_sleep:
   id: deep_sleep_main
-  run_duration: 90s
-  sleep_duration: 1min
+  run_duration: 30s
+  sleep_duration: 30min
 
-script:
-  - id: take_reading_and_sleep
-    then:
-      - logger.log:
-          level: WARN
-          format: "SCRIPT_DIAG: started"
-      - component.update: pool_temp_voltage
-      - delay: 500ms
-      - logger.log:
-          level: WARN
-          format: "SCRIPT_DIAG: ADC sampled, waiting for api.connected"
-      - wait_until:
-          condition:
-            api.connected:
-          timeout: 25s
-      - logger.log:
-          level: WARN
-          format: "SCRIPT_DIAG: api.connected wait done (connected or timed out)"
-      - delay: 2s
-      - logger.log:
-          level: WARN
-          format: "SCRIPT_DIAG: about to call deep_sleep.enter"
-      - deep_sleep.enter:
-          id: deep_sleep_main
-      - logger.log:
-          level: WARN
-          format: "SCRIPT_DIAG: deep_sleep.enter returned (should NEVER print if sleep worked)"
+binary_sensor:
+  - platform: homeassistant
+    id: ota_mode_flag
+    entity_id: input_boolean.pool_float_ota_mode
 
 sensor:
   - platform: adc
     pin: GPIO0
     id: pool_temp_voltage
     attenuation: 12db
-    update_interval: 60s
+    update_interval: never
     samples: 16
 
   - platform: resistance
@@ -106,10 +85,34 @@ sensor:
 
   - platform: wifi_signal
     name: "Pool Float WiFi Signal"
-    update_interval: 60s
+    id: pool_float_wifi
+    update_interval: never
     entity_category: diagnostic
 
   - platform: uptime
     name: "Pool Float Uptime"
-    update_interval: 60s
+    id: pool_float_uptime
+    update_interval: never
     entity_category: diagnostic
+
+script:
+  - id: take_reading_and_sleep
+    then:
+      - component.update: pool_temp_voltage
+      - component.update: pool_float_uptime
+      - component.update: pool_float_wifi
+      - delay: 500ms
+      - wait_until:
+          condition:
+            api.connected:
+          timeout: 25s
+      - delay: 2s
+      - if:
+          condition:
+            binary_sensor.is_on: ota_mode_flag
+          then:
+            - logger.log: "OTA mode active - sleep prevented"
+            - deep_sleep.prevent: deep_sleep_main
+          else:
+            - deep_sleep.enter:
+                id: deep_sleep_main

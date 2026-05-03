@@ -1,0 +1,38 @@
+input_boolean:
+  pool_float_ota_mode:
+    name: "Pool Float OTA Mode"
+    icon: mdi:upload-network
+
+automation:
+  - id: pool_float_ota_mode_warn_1h
+    alias: Pool Float OTA Mode - Warn at 1h
+    description: Notify if OTA mode left enabled (battery drain risk - device stays awake continuously while flag is on, draining at ~50x normal cycle rate)
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.pool_float_ota_mode
+        to: "on"
+        for:
+          hours: 1
+    actions:
+      - action: notify.scott_and_ha
+        data:
+          title: "Pool Float Still in OTA Mode"
+          message: "OTA mode on for 1h. Battery drains ~50x normal rate while OTA mode is on. Toggle off if no OTA in progress."
+
+  - id: pool_float_ota_mode_auto_clear_6h
+    alias: Pool Float OTA Mode - Auto Clear at 6h
+    description: Dead-man backstop - clear OTA mode if forgotten. 6h continuous wake consumes ~18% of AA lithium capacity, equivalent to ~2 months of normal-cycle operation.
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.pool_float_ota_mode
+        to: "on"
+        for:
+          hours: 6
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pool_float_ota_mode
+      - action: notify.scott_and_ha
+        data:
+          title: "Pool Float OTA Mode Auto-Cleared"
+          message: "Was on for 6h - dead-man timer fired. About 18% of AA capacity consumed."
