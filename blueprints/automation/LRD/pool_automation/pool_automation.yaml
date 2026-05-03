@@ -654,6 +654,30 @@ action:
               # v1.10.0: gated on `not service_active` (ADR-011). When in
               # vacation_mode, uses vacation_filter window instead of
               # heat-time-based pump_should_start_minutes (ADR-012).
+              # HOTFIX 2026-05-03: added upper-bound gate to the normal-mode
+              # condition. Previously PUMP START would re-fire any time the
+              # pump was off AND current_minutes >= pump_should_start_minutes
+              # — including after WATERFALL END had turned it off at 20:00 for
+              # the night. Result observed 2026-05-02: pump turned off at
+              # 20:00:01 by WATERFALL END branch, then turned BACK ON at
+              # 20:10:01 by PUMP START — defeating the entire ADR-006
+              # overnight-savings premise.
+              #
+              # The upper bound uses OR logic across two signals:
+              #   - current_minutes < waterfall_end_minutes (waterfall window)
+              #   - not filtration_complete (filtration target not yet met)
+              #
+              # Combined: pump runs until BOTH waterfall window has closed
+              # AND filtration target has been met. Whichever lasts longer
+              # determines pump runtime. Handles three cases:
+              #   1. Waterfall window > filtration time (Scott's setup):
+              #      filtration completes first; waterfall window is the
+              #      binding constraint. Pump turns off at waterfall_end.
+              #   2. No waterfall (or very short window): filtration_complete
+              #      is the binding constraint. Pump runs until filter target
+              #      met, then stops.
+              #   3. Long filtration target: if filtration > waterfall window,
+              #      pump runs past waterfall_end until filter target met.
               - conditions:
                   - condition: template
                     value_template: >
@@ -666,6 +690,7 @@ action:
                       {% else %}
                         {{ not pump_is_on
                            and current_minutes >= pump_should_start_minutes
+                           and (current_minutes < waterfall_end_minutes or not filtration_complete)
                            and swimming_day }}
                       {% endif %}
                 sequence:
