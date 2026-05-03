@@ -1,0 +1,275 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 880" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <style>
+    .wire { stroke: #111; stroke-width: 2; fill: none; stroke-linecap: square; }
+    .wire-bat { stroke: #111; stroke-width: 3; fill: none; stroke-linecap: square; }
+    .wire-unused { stroke: #bbb; stroke-width: 1; stroke-dasharray: 3,3; fill: none; }
+    .ic-body { fill: #1a1a1a; stroke: #444; stroke-width: 1.5; }
+    .pad-pin { fill: #d6b15a; stroke: #8a6a1f; stroke-width: 1; }
+    .pad-bat { fill: #d6b15a; stroke: #8a6a1f; stroke-width: 1; }
+    .silkscreen { fill: #fff; font-size: 9px; font-family: monospace; }
+    .label { fill: #111; }
+    .pin-num { fill: #555; font-size: 10px; }
+    .annotation { fill: #2a4d6e; font-style: italic; font-size: 12px; }
+    .net-label { fill: #b13a00; font-weight: bold; font-size: 13px; }
+    .junction { fill: #111; }
+    .used-highlight { fill: #ffe14a; stroke: #b13a00; stroke-width: 1.5; }
+  </style>
+
+  <text x="550" y="30" text-anchor="middle" font-size="18" font-weight="bold" class="label">Pool Water Temp External — Schematic v3</text>
+  <text x="550" y="50" text-anchor="middle" class="annotation">Seeed XIAO ESP32-C6 + 47kΩ divider + factory NTC (per ADR-015) — pinout verified against Scott's actual board</text>
+
+  <!-- ====== XIAO ESP32-C6 BOARD VIEW ====== -->
+  <!-- Board body (PCB look) -->
+  <rect x="450" y="200" width="180" height="240" class="ic-body" rx="6"/>
+
+  <!-- USB-C connector at top -->
+  <rect x="510" y="180" width="60" height="22" fill="#888" stroke="#444" stroke-width="1" rx="2"/>
+  <text x="540" y="195" text-anchor="middle" fill="#fff" font-size="10">USB-C</text>
+
+  <!-- Onboard chip antenna at bottom-right of board -->
+  <rect x="595" y="448" width="22" height="10" fill="#fafafa" stroke="#666" stroke-width="1"/>
+  <text x="606" y="456" text-anchor="middle" fill="#111" font-size="8">CHIP ANT</text>
+
+  <!-- U.FL connector at bottom-left of board -->
+  <circle cx="475" cy="453" r="6" fill="#aaa" stroke="#444" stroke-width="1"/>
+  <circle cx="475" cy="453" r="2" fill="#444"/>
+  <text x="475" y="472" text-anchor="middle" fill="#111" font-size="9">U.FL</text>
+
+  <!-- Antenna selection jumper indicator (between U.FL and chip ant on the board RF path) -->
+  <text x="540" y="453" text-anchor="middle" fill="#fff" font-size="8">RF select</text>
+  <text x="540" y="463" text-anchor="middle" fill="#fff" font-size="8">(0Ω jumper)</text>
+
+  <!-- Board label silkscreen -->
+  <rect x="478" y="288" width="124" height="36" fill="#fafafa" stroke="#bbb" rx="2"/>
+  <text x="540" y="304" text-anchor="middle" fill="#111" font-size="10" font-weight="bold">seeed studio</text>
+  <text x="540" y="316" text-anchor="middle" fill="#111" font-size="9">XIAO-ESP32-C6</text>
+
+  <!-- LEFT-SIDE PINS (top to bottom: VBUS, GND, 3V3, D10, D9, D8, D7) -->
+  <!-- Pin spacing: 7 pins, board height 240 from y=200 to y=440. Pin 1 at y=220, last pin y=420, step ~33px -->
+
+  <!-- Pin labels on left side: positioned to the LEFT of the pad, silkscreen on the BOARD -->
+
+  <!-- L1: VBUS -->
+  <rect x="440" y="215" width="12" height="10" class="pad-pin"/>
+  <text x="475" y="223" fill="#fff" font-size="9" font-family="monospace">VBUS</text>
+  <text x="430" y="223" text-anchor="end" class="silkscreen" fill="#888" font-size="10">VBUS</text>
+
+  <!-- L2: GND -->
+  <rect x="440" y="245" width="12" height="10" class="pad-pin"/>
+  <text x="475" y="253" fill="#fff" font-size="9" font-family="monospace">GND</text>
+  <text x="430" y="253" text-anchor="end" class="silkscreen" fill="#888" font-size="10">GND</text>
+
+  <!-- L3: 3V3  *** USED *** -->
+  <rect x="440" y="275" width="12" height="10" class="used-highlight"/>
+  <text x="475" y="283" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">3V3</text>
+  <text x="430" y="283" text-anchor="end" class="net-label" font-size="11">3V3 ← div top</text>
+
+  <!-- L4: D10 -->
+  <rect x="440" y="335" width="12" height="10" class="pad-pin"/>
+  <text x="475" y="343" fill="#fff" font-size="9" font-family="monospace">D10</text>
+
+  <!-- L5: D9 -->
+  <rect x="440" y="365" width="12" height="10" class="pad-pin"/>
+  <text x="475" y="373" fill="#fff" font-size="9" font-family="monospace">D9</text>
+
+  <!-- L6: D8 -->
+  <rect x="440" y="395" width="12" height="10" class="pad-pin"/>
+  <text x="475" y="403" fill="#fff" font-size="9" font-family="monospace">D8</text>
+
+  <!-- L7: D7 -->
+  <rect x="440" y="425" width="12" height="10" class="pad-pin"/>
+  <text x="475" y="433" fill="#fff" font-size="9" font-family="monospace">D7</text>
+
+  <!-- RIGHT-SIDE PINS (top to bottom: D0, D1, D2, D3, D4, D5, D6) -->
+
+  <!-- R1: D0  *** USED (ADC) *** -->
+  <rect x="628" y="215" width="12" height="10" class="used-highlight"/>
+  <text x="605" y="223" fill="#fff" font-size="9" font-family="monospace" text-anchor="end" font-weight="bold">D0</text>
+  <text x="650" y="223" class="net-label" font-size="11">D0 ← ADC tap</text>
+  <text x="650" y="234" class="annotation" font-size="10">(GPIO0 / ADC1_CH0)</text>
+
+  <!-- R2: D1 -->
+  <rect x="628" y="245" width="12" height="10" class="pad-pin"/>
+  <text x="605" y="253" fill="#fff" font-size="9" font-family="monospace" text-anchor="end">D1</text>
+
+  <!-- R3: D2 -->
+  <rect x="628" y="275" width="12" height="10" class="pad-pin"/>
+  <text x="605" y="283" fill="#fff" font-size="9" font-family="monospace" text-anchor="end">D2</text>
+
+  <!-- R4: D3 -->
+  <rect x="628" y="335" width="12" height="10" class="pad-pin"/>
+  <text x="605" y="343" fill="#fff" font-size="9" font-family="monospace" text-anchor="end">D3</text>
+
+  <!-- R5: D4 -->
+  <rect x="628" y="365" width="12" height="10" class="pad-pin"/>
+  <text x="605" y="373" fill="#fff" font-size="9" font-family="monospace" text-anchor="end">D4</text>
+
+  <!-- R6: D5 -->
+  <rect x="628" y="395" width="12" height="10" class="pad-pin"/>
+  <text x="605" y="403" fill="#fff" font-size="9" font-family="monospace" text-anchor="end">D5</text>
+
+  <!-- R7: D6  *** USED (GND for divider) *** Actually we want GND, not D6 -->
+  <rect x="628" y="425" width="12" height="10" class="pad-pin"/>
+  <text x="605" y="433" fill="#fff" font-size="9" font-family="monospace" text-anchor="end">D6</text>
+
+  <!-- BAT+ / BAT- solder pads on UNDERSIDE — drawn at bottom of board with dashed lines indicating "underside" -->
+  <text x="540" y="495" text-anchor="middle" font-size="11" font-style="italic" fill="#666">─ underside solder pads ─</text>
+
+  <rect x="490" y="505" width="20" height="14" class="used-highlight"/>
+  <text x="500" y="516" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">−</text>
+  <text x="500" y="535" text-anchor="middle" class="net-label" font-size="11">BAT−</text>
+
+  <rect x="570" y="505" width="20" height="14" class="used-highlight"/>
+  <text x="580" y="516" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">+</text>
+  <text x="580" y="535" text-anchor="middle" class="net-label" font-size="11">BAT+</text>
+
+  <text x="540" y="555" text-anchor="middle" font-size="10" fill="#666">(2× AA leads soldered here, on board underside)</text>
+
+  <!-- ====== BATTERY PACK on the left ====== -->
+  <text x="160" y="170" text-anchor="middle" font-weight="bold" class="label">2× AA Lithium Primary</text>
+  <text x="160" y="187" text-anchor="middle" font-size="12" class="label">(3.0V series, in existing case compartment)</text>
+
+  <!-- Cell 1 (top) -->
+  <line x1="140" y1="250" x2="180" y2="250" class="wire-bat"/>
+  <line x1="148" y1="262" x2="172" y2="262" class="wire" stroke-width="4"/>
+  <text x="190" y="260" class="label" font-size="11">+ cell 1 (1.5V)</text>
+  <line x1="140" y1="280" x2="180" y2="280" class="wire-bat"/>
+  <line x1="148" y1="292" x2="172" y2="292" class="wire" stroke-width="4"/>
+
+  <line x1="160" y1="262" x2="160" y2="280" class="wire"/>
+  <line x1="160" y1="292" x2="160" y2="320" class="wire"/>
+
+  <!-- Cell 2 (bottom) -->
+  <line x1="140" y1="320" x2="180" y2="320" class="wire-bat"/>
+  <line x1="148" y1="332" x2="172" y2="332" class="wire" stroke-width="4"/>
+  <text x="190" y="330" class="label" font-size="11">+ cell 2 (1.5V)</text>
+  <line x1="140" y1="350" x2="180" y2="350" class="wire-bat"/>
+  <line x1="148" y1="362" x2="172" y2="362" class="wire" stroke-width="4"/>
+
+  <text x="135" y="246" text-anchor="end" class="net-label">BAT+</text>
+  <text x="135" y="366" text-anchor="end" class="net-label">BAT−</text>
+
+  <!-- ====== BAT+ wire to BAT+ pad on board underside ====== -->
+  <line x1="160" y1="250" x2="160" y2="570" class="wire"/>
+  <line x1="160" y1="570" x2="580" y2="570" class="wire"/>
+  <line x1="580" y1="570" x2="580" y2="519" class="wire"/>
+
+  <!-- ====== BAT− wire to BAT− pad on board underside ====== -->
+  <line x1="160" y1="362" x2="160" y2="600" class="wire"/>
+  <line x1="160" y1="600" x2="500" y2="600" class="wire"/>
+  <line x1="500" y1="600" x2="500" y2="519" class="wire"/>
+
+  <!-- Ground symbol on the BAT- run -->
+  <line x1="350" y1="600" x2="350" y2="625" class="wire"/>
+  <line x1="336" y1="625" x2="364" y2="625" class="wire-bat"/>
+  <line x1="341" y1="631" x2="359" y2="631" class="wire"/>
+  <line x1="346" y1="637" x2="354" y2="637" class="wire"/>
+  <text x="370" y="631" class="label" font-size="11">GND (chassis return)</text>
+
+  <!-- ====== VOLTAGE DIVIDER on right ====== -->
+  <!-- 3V3 wire from L3 pad (left side at x=440, y=280) — has to route LEFT then DOWN then RIGHT to reach the divider on the right side. To avoid crossing the IC body, route it OVER the top of the board. -->
+
+  <!-- Better routing: go right from D0 (right side, x=628, y=220) is the ADC. The 3V3 is on the LEFT side at x=440, y=280. Route 3V3 OVER the top of the board to reach the divider on the right. -->
+
+  <!-- 3V3 wire from L3 pad: left to x=420, up to y=130, right to x=860, down to top of resistor -->
+  <line x1="440" y1="280" x2="420" y2="280" class="wire"/>
+  <line x1="420" y1="280" x2="420" y2="130" class="wire"/>
+  <line x1="420" y1="130" x2="860" y2="130" class="wire"/>
+  <line x1="860" y1="130" x2="860" y2="220" class="wire"/>
+
+  <text x="640" y="123" class="net-label">3V3 (LDO output)</text>
+
+  <!-- 47k resistor at x=860, y=220 → y=300 -->
+  <polyline points="860,220 860,225 850,230 870,240 850,250 870,260 850,270 870,280 860,285 860,295" class="wire"/>
+  <text x="880" y="240" class="label" font-weight="bold">47 kΩ</text>
+  <text x="880" y="256" class="label" font-size="11">0.1%</text>
+  <text x="880" y="270" class="label" font-size="11">metal-film</text>
+
+  <!-- ADC tap junction at x=860, y=300 (slightly above D0 at y=220 — needs to bring tap to y=220) -->
+  <!-- Actually: junction at y=300, then route LEFT to D0 pin at y=220 means going up. Cleaner: route junction UP to D0. -->
+
+  <line x1="860" y1="295" x2="860" y2="300" class="wire"/>
+  <circle cx="860" cy="300" r="4" class="junction"/>
+  <text x="800" y="296" text-anchor="end" class="net-label">ADC tap</text>
+
+  <!-- ADC tap → D0: tap is at (860, 300), D0 pin is at (640, 220). Route: down from D0 to y=300, then right to x=860 -->
+  <line x1="640" y1="220" x2="700" y2="220" class="wire"/>
+  <line x1="700" y1="220" x2="700" y2="300" class="wire"/>
+  <line x1="700" y1="300" x2="860" y2="300" class="wire"/>
+
+  <!-- NTC continues from junction: down to y=320, then NTC zigzag, then continues -->
+  <line x1="860" y1="300" x2="860" y2="325" class="wire"/>
+  <polyline points="860,325 860,330 850,335 870,345 850,355 870,365 850,375 870,385 860,390 860,395" class="wire"/>
+  <!-- Diagonal arrow to indicate variable resistor (thermistor) -->
+  <line x1="843" y1="402" x2="877" y2="346" class="wire"/>
+  <polygon points="877,346 866,348 873,355" fill="#111" stroke="#111"/>
+
+  <text x="880" y="345" class="label" font-weight="bold">NTC</text>
+  <text x="880" y="361" class="label" font-size="11">~47 kΩ @ 25°C</text>
+  <text x="880" y="375" class="label" font-size="11">β ≈ 3823</text>
+  <text x="880" y="395" class="annotation">in probe chamber,</text>
+  <text x="880" y="409" class="annotation">via daughterboard</text>
+  <text x="880" y="423" class="annotation">pads</text>
+
+  <!-- GND wire from NTC bottom (860, 395) → down to y=470 → left to GND pin on left side -->
+  <!-- Pin GND is at (440, 250) on left side. To get there from x=860 at y=470 we'd cross the board. Better: use GND pin on right-bottom? But there's no GND pin on right side of the actual XIAO C6. Routing options: left-side GND pin via going down and around, OR use BAT- pad which is GND. -->
+
+  <!-- Easiest: route the divider GND back to the BAT- pad which is also GND (since BAT- = chassis ground via the LDO). But that's the underside pad. -->
+
+  <!-- Cleanest: route the divider GND DOWN and LEFT to meet the same chassis-GND wire from battery. -->
+
+  <line x1="860" y1="395" x2="860" y2="645" class="wire"/>
+  <line x1="860" y1="645" x2="350" y2="645" class="wire"/>
+  <line x1="350" y1="645" x2="350" y2="625" class="wire"/>
+  <text x="850" y="645" text-anchor="end" class="net-label" dy="-5">GND</text>
+
+  <!-- Junction dot where divider GND meets battery GND chassis -->
+  <circle cx="350" cy="645" r="4" class="junction"/>
+
+  <!-- ====== ANTENNA SELECTION CALLOUT ====== -->
+  <g transform="translate(60, 690)">
+    <rect x="-10" y="-10" width="500" height="135" fill="#eef5ff" stroke="#3a6ea8" stroke-width="1" rx="4"/>
+    <text x="0" y="10" font-weight="bold" class="label" fill="#3a6ea8">Antenna selection (default: chip; alternative: U.FL)</text>
+
+    <!-- Chip antenna -->
+    <rect x="20" y="35" width="60" height="20" fill="#fafafa" stroke="#666" rx="2"/>
+    <text x="50" y="49" text-anchor="middle" font-size="10">CHIP ANT</text>
+
+    <!-- WiFi RF input on ESP32-C6 module -->
+    <rect x="190" y="35" width="80" height="20" fill="#1a1a1a" rx="2"/>
+    <text x="230" y="49" text-anchor="middle" fill="#fff" font-size="10">ESP32-C6 RF</text>
+
+    <!-- 0Ω jumper (rotatable / re-solderable position) -->
+    <line x1="80" y1="45" x2="125" y2="45" class="wire"/>
+    <rect x="125" y="40" width="20" height="10" fill="#d6b15a" stroke="#8a6a1f"/>
+    <text x="135" y="48" text-anchor="middle" font-size="8">0Ω</text>
+    <line x1="145" y1="45" x2="190" y2="45" class="wire"/>
+
+    <text x="135" y="65" text-anchor="middle" class="annotation" font-size="10">default position</text>
+
+    <!-- U.FL alternate path -->
+    <circle cx="50" cy="95" r="8" fill="#aaa" stroke="#444"/>
+    <circle cx="50" cy="95" r="3" fill="#444"/>
+    <text x="50" y="115" text-anchor="middle" font-size="10">U.FL</text>
+
+    <line x1="58" y1="95" x2="125" y2="95" class="wire-unused"/>
+    <rect x="125" y="90" width="20" height="10" fill="none" stroke="#888" stroke-dasharray="2,2"/>
+    <text x="135" y="98" text-anchor="middle" font-size="8" fill="#888">0Ω</text>
+    <line x1="145" y1="95" x2="190" y2="95" class="wire-unused"/>
+    <line x1="190" y1="95" x2="190" y2="55" class="wire-unused"/>
+
+    <text x="155" y="115" class="annotation" font-size="10">alternate position (move 0Ω here)</text>
+  </g>
+
+  <!-- ====== BUILD NOTES ====== -->
+  <g transform="translate(60, 690)">
+    <rect x="510" y="-10" width="510" height="135" fill="#fffceb" stroke="#c89800" stroke-width="1" rx="4"/>
+    <text x="520" y="10" font-weight="bold" class="label">Build notes</text>
+    <text x="520" y="32" font-size="11" class="label">• Wires used (5 connections to board): BAT+ pad ← battery+, BAT− pad ← battery−,</text>
+    <text x="520" y="46" font-size="11" class="label">  3V3 pin → 47k top, D0 pin ← ADC tap, GND chassis ← divider return</text>
+    <text x="520" y="64" font-size="11" class="label">• ADC pin D0 = GPIO0 = ADC1_CH0 (verify D0/D1/D2 ADC mapping at build time)</text>
+    <text x="520" y="82" font-size="11" class="label">• Power topology: BAT pads → onboard LDO → 3.3V on 3V3 pin. Lithium primary holds</text>
+    <text x="520" y="96" font-size="11" class="label">  voltage above LDO dropout for ~80%+ of capacity; last few % unrecoverable. OK.</text>
+    <text x="520" y="114" font-size="11" font-weight="bold" fill="#a32" class="label">• Bench test: USB-C only (no batteries). Charger may push current into primary cells.</text>
+  </g>
+</svg>

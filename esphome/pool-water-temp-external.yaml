@@ -1,0 +1,72 @@
+substitutions:
+  device_name: pool-water-temp-external
+  friendly_name: "Pool Water Temp External"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Floating pool water temp sensor per ADR-015. Continuous-run config (deep sleep TODO — safe_mode interaction debugging deferred)."
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret legacy_iot_ssid
+  password: !secret legacy_iot_password
+  power_save_mode: NONE
+  fast_connect: false
+  ap:
+    ssid: "Pool Float Fallback"
+    password: !secret fallback_password
+
+sensor:
+  - platform: adc
+    pin: GPIO0
+    id: pool_temp_voltage
+    attenuation: 12db
+    update_interval: 60s
+    samples: 16
+
+  - platform: resistance
+    sensor: pool_temp_voltage
+    configuration: DOWNSTREAM
+    resistor: 47kOhm
+    id: pool_temp_resistance
+
+  - platform: ntc
+    sensor: pool_temp_resistance
+    calibration:
+      - 153kOhm -> 0.0°C
+      - 52.6kOhm -> 23.17°C
+      - 22.8kOhm -> 43.06°C
+    name: "Pool Water Temp External"
+    id: pool_temp_external
+    unit_of_measurement: "°F"
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - lambda: return x * 9.0 / 5.0 + 32.0;
+
+  - platform: wifi_signal
+    name: "Pool Float WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: "Pool Float Uptime"
+    update_interval: 60s
+    entity_category: diagnostic
