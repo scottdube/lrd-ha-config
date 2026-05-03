@@ -1,25 +1,91 @@
+# Garage Bench Light
+# Watch-presence-driven (sensor.scottwatchbt) with stay-on timer + watch
+# beacon keep-alive. Inhibited while input_boolean.golfing is on.
+#
+# Requires helper: timer.garage_bench_light_timer
+#   Settings -> Devices & Services -> Helpers -> Add -> Timer
+#   Name: "Garage Bench Light Timer"   Duration: 0
+#
+# Logic:
+#   watch -> garage         : light on, start 10-min timer (or restart if running)
+#   watch -> not_home       : light off, cancel timer
+#   heartbeat (every 2 min) : restart 10-min timer if watch is still in garage
+#   timer finished          : light off
+#   golfing == on           : automation skipped entirely
+#
+# CHANGELOG:
+#   2026-05-03 - Add stay-on timer with watch-beacon keep-alive heartbeat,
+#                add golfing inhibit. Replaces simple BT-state toggle.
+
 automation:
   - alias: Garage Bench Light
-    description: Turn on bench light when present, off when away
+    description: Watch presence + 10-min stay-on with periodic keep-alive
+    mode: parallel
+    max_exceeded: silent
     triggers:
       - trigger: state
         entity_id: sensor.scottwatchbt
+        to: garage
+        id: arrived_garage
+      - trigger: state
+        entity_id: sensor.scottwatchbt
+        to: not_home
+        id: left_home
+      - trigger: time_pattern
+        minutes: "/2"
+        id: heartbeat
+      - trigger: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.garage_bench_light_timer
+        id: timer_finished
+    conditions:
+      - condition: state
+        entity_id: input_boolean.golfing
+        state: "off"
     actions:
       - choose:
           - conditions:
-              - condition: state
-                entity_id: sensor.scottwatchbt
-                state: garage
+              - condition: trigger
+                id: arrived_garage
             sequence:
               - action: light.turn_on
                 target:
                   entity_id: light.s2_dimmer
+              - action: timer.start
+                target:
+                  entity_id: timer.garage_bench_light_timer
+                data:
+                  duration: "00:10:00"
+
           - conditions:
+              - condition: trigger
+                id: left_home
+            sequence:
+              - action: timer.cancel
+                target:
+                  entity_id: timer.garage_bench_light_timer
+              - action: light.turn_off
+                target:
+                  entity_id: light.s2_dimmer
+
+          - conditions:
+              - condition: trigger
+                id: heartbeat
               - condition: state
                 entity_id: sensor.scottwatchbt
-                state: not_home
+                state: garage
+            sequence:
+              - action: timer.start
+                target:
+                  entity_id: timer.garage_bench_light_timer
+                data:
+                  duration: "00:10:00"
+
+          - conditions:
+              - condition: trigger
+                id: timer_finished
             sequence:
               - action: light.turn_off
                 target:
                   entity_id: light.s2_dimmer
-    mode: single

@@ -585,7 +585,8 @@
       door_name: "Garage Doors "
       lights:
         - light.garage_lights
-      timer_duration: 1
+      timer_duration: 10
+      motion_timeout: 10
       motion_sensor: binary_sensor.garage_person_detected
       inhibit_boolean: input_boolean.golfing
       light_timer: timer.timer_garage_lights
