@@ -33,6 +33,11 @@ if [[ ! -f "$TOKEN_FILE" ]]; then
     exit 1
 fi
 
+cd "$REPO_ROOT"
+if ! git pull --ff-only --quiet 2>&1; then
+    echo "WARN: git pull failed; running audit against last-known code" >&2
+fi
+
 mkdir -p "$OUT_DIR"
 
 python3 "${REPO_ROOT}/pool/scripts/auditor.py" \
