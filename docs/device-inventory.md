@@ -107,9 +107,10 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 
 ## WeatherFlow
 
-| Device | Notes |
-|---|---|
-| Tempest hub | On IoT VLAN. Cloud + Local integrations both available. |
+| Device | MAC | Notes |
+|---|---|---|
+| Tempest hub | `6c:2a:df:e1:95:00` | On IoT VLAN. Cloud + Local integrations both available. UDP broadcast on port 50222 must reach HA NUC's `eno1.4` sub-interface for Local feed. Recorded after 2026-05-04 outage where hub disappeared from UniFi client list briefly post-reboot. |
+| Tempest station | TBD | Outdoor solar-powered unit. Reports to hub via RF. Captures last-seen via the WeatherFlow mobile app. |
 
 ---
 
