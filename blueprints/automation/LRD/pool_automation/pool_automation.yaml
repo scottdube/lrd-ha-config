@@ -4,6 +4,28 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.11.0 Sticky swim_day with morning lock + waterfall-window guard on
+#          NOT-A-SWIM-DAY shutdown branch (ADR-017). Closes the 2026-05-03
+#          incident where WeatherFlow forecast updated 81→77°F at 19:00 →
+#          live swim_day flipped Yes→No → blueprint shut down pool at 19:10
+#          via NOT-A-SWIM-DAY branch, 50 min before normal end-of-window.
+#
+#          New optional input `swim_day_boolean`: when wired, blueprint
+#          reads today's swim-day decision from this input_boolean instead
+#          of recomputing forecast_high >= min_swim_temp every poll. The
+#          companion `automation.pool_lock_swim_day_at_morning` (in
+#          packages/pool/pool_modes.yaml) sets the boolean at 05:55 daily.
+#          Defaults to empty for backward-compat — blueprint falls back to
+#          v1.10.x live evaluation if input is unset.
+#
+#          NOT-A-SWIM-DAY branch additionally gated on `current_minutes <
+#          waterfall_start_minutes` so it can only fire pre-window (default
+#          before 08:00). Defense in depth: if morning-lock helper has any
+#          issue and swim_day flips False mid-day, the shutdown branch is
+#          inert. Equipment shutdown post-window is owned by WATERFALL END,
+#          which has no swim_day dependency and respects waterfall_end_time
+#          directly.
+#
 #  v1.10.1 current_water_temp fallback fix (ADR-013). When the OmniLogic
 #          water sensor reads 'unknown' (pump off → no flow for sensor to
 #          settle), the prior float(75) fallback drove hours_to_heat to 14
@@ -200,6 +222,19 @@ blueprint:
             input_boolean.vacation (defined in
             packages/pool/pool_modes.yaml).
           default: input_boolean.vacation
+          selector:
+            entity:
+              domain: input_boolean
+        swim_day_boolean:
+          name: Swim Day Locked Boolean (optional)
+          description: >
+            input_boolean that holds today's swim_day decision, set externally
+            by a morning-lock automation at 05:55. Blueprint reads from this
+            boolean instead of recomputing forecast_high vs min_swim_temp each
+            poll, so mid-day forecast updates don't disrupt active pool days.
+            Per ADR-017. If left empty, blueprint falls back to legacy live
+            forecast evaluation (v1.10.x behavior).
+          default: ""
           selector:
             entity:
               domain: input_boolean
@@ -445,6 +480,7 @@ variables:
   heater_active_binary_sensor: !input heater_active_binary_sensor
   service_lockout_boolean: !input service_lockout_boolean
   vacation_boolean: !input vacation_boolean
+  swim_day_boolean: !input swim_day_boolean
   pump_switch: !input pump_switch
   pump_speed_entity: !input pump_speed_entity
   waterfall_switch: !input waterfall_switch
@@ -503,7 +539,18 @@ variables:
   significant_rain: >
     {{ rain_today >= rain_threshold or rain_yesterday >= rain_threshold }}
   swimming_day: >
-    {{ forecast_high >= min_swim_temp }}
+    {# v1.11.0 (ADR-017): prefer the externally-locked swim_day boolean.
+       Set at 05:55 daily by automation.pool_lock_swim_day_at_morning.
+       Fallback to live forecast comparison preserves v1.10.x behavior
+       for installs that haven't wired the boolean. Mid-day forecast
+       wiggles can no longer flip swim_day for the day, which closes the
+       2026-05-03 incident class (forecast 81→77 at 19:00 → blueprint
+       shut down the pool at 19:10 via NOT-A-SWIM-DAY branch). #}
+    {% if swim_day_boolean %}
+      {{ is_state(swim_day_boolean, 'on') }}
+    {% else %}
+      {{ forecast_high >= min_swim_temp }}
+    {% endif %}
   heatpump_ok: >
     {{ current_air_temp >= min_heatpump_air_temp }}
   heater_needed: >
@@ -799,6 +846,14 @@ action:
               # (swim_day=False AND not vacation_mode), OR in vacation_mode
               # past the vacation filter end window. Gated on `not
               # service_active` so we don't shut down on a tech mid-work.
+              # v1.11.0 (ADR-017): non-swim-day branch additionally gated
+              # on `current_minutes < waterfall_start_minutes` so it can
+              # only fire pre-window (default before 08:00). Prevents
+              # mid-day equipment shutdown if swim_day flips False after
+              # the pool has already opened — defense in depth on top of
+              # the morning-lock helper. After waterfall_start, equipment
+              # shutdown is owned exclusively by WATERFALL END, which has
+              # no swim_day dependency.
               - conditions:
                   - condition: template
                     value_template: >
@@ -808,7 +863,8 @@ action:
                         {{ pump_is_on
                            and current_minutes >= vacation_filter_end_minutes }}
                       {% else %}
-                        {{ not swimming_day and pump_is_on }}
+                        {{ not swimming_day and pump_is_on
+                           and current_minutes < waterfall_start_minutes }}
                       {% endif %}
                 sequence:
                   - action: switch.turn_off

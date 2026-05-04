@@ -550,7 +550,7 @@
   max: 10
   max_exceeded: silent
 - id: "1775827717239"
-  alias: Pool Automation v1.10.1
+  alias: Pool Automation v1.11.0
   description: ""
   trace:
     stored_traces: 20
@@ -572,6 +572,9 @@
       # v1.10.0: mode helpers from packages/pool/pool_modes.yaml
       service_lockout_boolean: input_boolean.pool_service_lockout
       vacation_boolean: input_boolean.vacation
+      # v1.11.0 (ADR-017): morning-locked swim_day. Set at 05:55 daily by
+      # automation.pool_lock_swim_day_at_morning.
+      swim_day_boolean: input_boolean.pool_swim_day_today
 - id: "1775847529638"
   alias: Garage Door Activated Lights with Motion Keep-Alive
   description: ""
