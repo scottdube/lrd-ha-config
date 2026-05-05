@@ -8,7 +8,7 @@ HA Cloud subscription. Provides Cloud STT/TTS, remote access, the Alexa Smart Ho
 
 - **Service:** Home Assistant Cloud (Nabu Casa)
 - **Account:** scott@dubecars.com
-- **Status (2026-04-28):** **Trial — expires May 4, 2026.** Decision pending: subscribe (recommended given the dependencies below) or lapse.
+- **Status (2026-05-05):** **Active — annual subscription, restored 2026-05-05.** Trial lapsed 2026-05-04, broke Alexa + Cloud STT/TTS + remote URL. Subscribed via portal same day; HA-side reconnect required sign-out + sign-in (see Known quirks). Verified: Alexa control of exposed entity ✓, `*.ui.nabu.casa` from cellular ✓, voice satellite assumed ✓ (not on-site to test, same Cloud connection).
 - **Instance name:** LRD Home
 - **Instance ID:** `ee341ebb55d84283873f2876ba13cba2`
 - **HA Core at trial signup:** 2026.4.4
@@ -56,6 +56,7 @@ The starred default and the LRD Voice Assistant pipeline use different conversat
 - **STT/TTS latency** can spike during Nabu Casa-side incidents. Voice satellite UX degrades during these windows. No automatic fallback configured today.
 - **Conversation agent drift** is a real risk. If the LRD Voice Assistant pipeline's OpenAI agent becomes unavailable (API key issue, service outage, billing), satellites enter the same red-LED retry loop seen with the Ollama incident on 2026-04-28. Periodic agent health audit recommended (cleanup-plan reference).
 - **Google Assistant bridge enabled but unfinished.** Either finish the Google Home app setup or disable the toggle. Currently consumes no resources but shows up in the UI as "Continue setting up..." which is noise.
+- **Post-lapse reconnect requires sign-out, not just sign-in (observed 2026-05-05).** When a trial lapses and is then converted to a paid subscription, the HA instance does NOT reconnect to Cloud just by hitting "sign in" in Settings → Home Assistant Cloud. The stale session token won't refresh. Required recovery: sign out first, then sign back in. Until you do this, the Nabu Casa portal will show your subscription as Active while simultaneously showing "Your instance is not connected" under Remote access — that mismatch is the diagnostic signal.
 
 ---
 
