@@ -24,9 +24,12 @@ http:
   server_host:
     - 192.168.50.11
     - 127.0.0.1
+    - 172.30.32.1
 ```
 
-HA Core's web server binds **only** to the LRD-Servers IP and localhost. Even though the host has an interface at `192.168.11.155`, the web UI does not listen there.
+HA Core's web server binds to the LRD-Servers IP, localhost, and the hassio Docker bridge interface. Even though the host has an interface at `192.168.11.155`, the web UI does not listen there.
+
+The `172.30.32.1` entry is the **hassio Docker bridge IP** that Core uses to talk to the Supervisor. Without this entry, Supervisor's WebSocket connection to Core fails — see Revision 2026-05-06 below.
 
 Mobile app, browser access from trusted clients, and Nabu Casa cloud relay all reach HA via `192.168.50.11:8123` (or via Nabu Casa's outbound tunnel, which is unaffected). The IoT-side `192.168.11.155` IP is reserved for inbound broadcast/multicast reception only.
 
@@ -48,5 +51,18 @@ During the recovery, the HA File Editor add-on silently mangled the YAML list fo
 
 ### Tripwires for future HA work
 - Don't remove `http.server_host` without a replacement that preserves the bind restriction.
+- **`server_host` MUST include the hassio Docker bridge IP (`172.30.32.1`)** in addition to user-facing IPs and localhost. Without it, Supervisor cannot connect to Core's WebSocket from its own container, and every Supervisor↔Core operation that requires WebSocket coordination silently fails (backups most visibly). The original ADR-005 deployment omitted this and broke Supervisor↔Core for ~6 days before the symptom became severe enough to surface. See Revision 2026-05-06.
 - Don't delete the `eno1.4` sub-interface on HA OS — local integration that depends on IoT-VLAN broadcasts will silently break. Persistence is handled by HA Supervisor (`ha network vlan` command) — no `.nmconnection` edits needed.
 - If networking is re-architected, broadcast/multicast adjacency is the constraint to design around. ADR-011 (network-docs) explains the trade-offs.
+
+## Revision 2026-05-06 — Supervisor bridge IP added to server_host
+
+**Symptom observed today:** Manual backups failed with "Failed to inform HA Core: Can't connect to Home Assistant Core WebSocket, the API is not reachable." Daily automatic backups had been silently failing since 2026-04-30 (the last successful backup). Google Drive Backup app's 3-hour scheduled runs each failed and progressively wedged Supervisor's job-group state, surfacing today as "backup already in progress" UI errors that blocked Core restart and the ESPHome Device Builder app update.
+
+**Root cause:** ADR-005's original `server_host` list (`192.168.50.11` + `127.0.0.1`) excluded the hassio Docker bridge IP `172.30.32.1`, which is the address Supervisor uses to reach Core's HTTP/WebSocket endpoint from its own container. Core's HTTP server bound only to user-facing IPs and the container's loopback — the bridge interface had no listener. Supervisor's WebSocket connection attempts were refused at the TCP level, and every Supervisor-mediated operation that needed Core (backups, service calls, hardware events propagated to Core, etc.) failed silently.
+
+**Why it took 6 days to surface:** HA Core's HTTP/UI continued to work (Scott uses 192.168.50.11), Studio Code Server worked (uses localhost), and direct API calls from Scott's browser worked. The break was confined to the internal Supervisor↔Core control channel, which is invisible from the user's normal interaction pattern until a Supervisor-mediated operation fails. With Core watchdog also disabled (separately), nothing auto-recovered. The Google Drive Backup app's 3-hour cadence accumulated failures that eventually wedged enough state to make the failure visible.
+
+**Fix applied:** Added `172.30.32.1` to the `server_host` list. Verified by clearing job-group locks (`ha jobs reset`), restarting Core, and confirming WebSocket warnings no longer appear in supervisor logs.
+
+**Lesson:** When restricting `http.server_host` on HA OS / Supervised installs, always include the supervisor-facing bridge IP. Default Docker bridge for hassio is `172.30.32.0/24` with Core at `.32.1`. The `ha core info` command's `ip_address` field reports the current bridge IP — this is the value to include.
