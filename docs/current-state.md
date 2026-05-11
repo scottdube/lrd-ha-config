@@ -2,7 +2,7 @@
 
 Active working notes. Update as work progresses. This is the file Cowork should reference most often when answering "where are we on X?"
 
-**Last updated:** 2026-05-05 (**Nabu Casa subscription restored** after 2026-05-04 trial lapse broke Alexa + Cloud STT/TTS + remote URL; sign-out+sign-in recovery quirk logged; ADR-011 service mode end-to-end validated via panel-toggle test — detect→suppress→clear; ADR-016 deployed; **notify.scott_and_ha group live** — mobile + HA bell fan-out; **auditor v1.1.0 built and running** — Phase 1 + ADR-006 P-series; **rsync mirroring deployed** NUC→MacBook + NUC→Mac mini @ 5 min; **overnight audit launchd installed on Mac mini** scheduled 00:05 daily, FAIL-only push via scott_and_ha; logger v2 phase 1.5 deployed — schema rotation observed at 2026-05-02 12:10; **ADR-017 + Blueprint v1.11.0 deployed and validated** — sticky swim_day morning lock + NOT-A-SWIM-DAY waterfall-window guard, closes 19:10 forecast-flip shutdown incident; ADR-015 firmware bench validation complete + **custom Battery_Base v6 designed** — re-clocked lips matching contact slots, no inter-cell intersection, ready to print; HA NUC IP correction landed in memory — .50.11 user-accessible, .11.155 IoT-only)
+**Last updated:** 2026-05-11 (**Vue 3 install kicked off Panel A** — second unit (intended Panel B) installed in Panel A on stock Emporia cloud firmware, mains CTs (200A) on Panel A feed + branch slot 7 (Pool Subpanel) wired and reading; first unit ESPHome flash attempt blocked — `esptool chip-id` returns "No serial data received" through 3D-printed pogo jig + HJHYUL CP2102 adapter; **BDM frame on order** for second flash attempt, suspected root cause is intermittent pad contact on the jig; integrations/emporia-vue-3.md seeded with workflow + failure modes; plan = finish all 16 Panel A branch CTs this afternoon on cloud firmware so flash success tomorrow is a simple board swap; remaining Panel A circuits per `energy/docs/install-checklist-panel-a.md`. Prior: **Nabu Casa subscription restored** after 2026-05-04 trial lapse broke Alexa + Cloud STT/TTS + remote URL; sign-out+sign-in recovery quirk logged; ADR-011 service mode end-to-end validated via panel-toggle test — detect→suppress→clear; ADR-016 deployed; **notify.scott_and_ha group live** — mobile + HA bell fan-out; **auditor v1.1.0 built and running** — Phase 1 + ADR-006 P-series; **rsync mirroring deployed** NUC→MacBook + NUC→Mac mini @ 5 min; **overnight audit launchd installed on Mac mini** scheduled 00:05 daily, FAIL-only push via scott_and_ha; logger v2 phase 1.5 deployed — schema rotation observed at 2026-05-02 12:10; **ADR-017 + Blueprint v1.11.0 deployed and validated** — sticky swim_day morning lock + NOT-A-SWIM-DAY waterfall-window guard, closes 19:10 forecast-flip shutdown incident; ADR-015 firmware bench validation complete + **custom Battery_Base v6 designed** — re-clocked lips matching contact slots, no inter-cell intersection, ready to print; HA NUC IP correction landed in memory — .50.11 user-accessible, .11.155 IoT-only)
 
 ---
 
@@ -86,6 +86,18 @@ Requirements analysis complete and accepted 2026-05-02. Closes the structural bl
 - **Toilet fan (ZEN75, node 256) is dead** after a strange firmware update. Needs reinclusion or recovery. `device-inventory.md` had this as `?` — now confirmed.
 - **Kwikset 916 (node 038) battery at 30%** — replacement window opening. Other Kwikset (node 008) at 100%.
 
+### Whole-home power monitoring (Vue 3 install — Panel A active, Panel B pending flash)
+- **Hardware on hand:** 2× Emporia Vue 3 (ESP32, `board: esp32dev` per digiblur's reference config). All CTs + antennas + Phoenix-plug bundles received.
+- **Panel A state (2026-05-11):** Second Vue unit physically installed in Panel A on **stock Emporia cloud firmware** (flash attempt deferred to Panel B unit only). Mains CTs (200A, both legs) wired around Panel A feed. Branch CT slot 1 (Pool Subpanel, 60A 2P — reassigned from original slot 7) wired and reading. Remaining 15 branch CT slots per `energy/docs/install-checklist-panel-a.md` to be installed this afternoon. Walk-flip calibration pending per checklist's "Walk-and-flip" section. **Slot 13 reassigned 2026-05-11** from Nook Recs to Garage Mini Split (Carrier 38MARBQ24AA3, 35A 2P) for cross-validation against Midea AC LAN's `sensor.garage_ms_power_realtime` — single CT on either leg + 240V tag in Emporia app. Rationale: Midea power is inferred to be inverter-derived (DC-bus shunt × estimated efficiency, ±10–20% class) vs Vue CT's true-RMS ±1–2%, and the Midea sensor floors standby to 0 W. Closes the ADR-009 cross-validation gap that the original Panel A checklist had over-pruned by skipping the mini-split entirely.
+- **Panel B unit status:** Held back from install. Was the first flash attempt target; `esptool chip-id` via the 3D-printed pogo jig + HJHYUL CP2102 adapter (Amazon B0FJRTL572) returned `Failed to connect to Espressif device: No serial data received`. Most likely root cause is intermittent pad contact from the 3D-printed jig. **BDM frame on order** as the next attempt. Other suspect path: CP2102 internal 3.3V LDO is rated ~100 mA per the Silicon Labs datasheet and may be marginal for ESP32 boot current — workaround if BDM still fails is external 3.3V supply or large bulk cap at the Vue pads.
+- **Swap plan (after BDM arrives, target 2026-05-12):** Flash Panel B unit on the bench. If successful, physically swap the Vue boards in Panel A — CTs stay in place, only the device changes. The unit currently in Panel A (cloud) then becomes the Panel B target and gets flashed in its turn (or alternatively kept on cloud as a quick-fallback duplicate). If flash continues to fail, fall back to two-Vue cloud install and revisit IotaWatt per ADR-009's open fallback.
+- **ESPHome path when flashed:** External component `github://emporia-vue-local/esphome@dev` per ADR-009 + Discord 2026-05-02 confirmation. Need to set Vue 3 sensor variant in YAML. `esp32: board: esp32dev` (classic ESP32, NOT S3 — corrected after digiblur config inspection).
+- **macOS flashing tooling:** `esptool` installed via Homebrew. USB-TTL enumerates as `/dev/cu.usbserial-0001` on Scott's MacBook. Wiring rule for Vue (not standard for ESP32): adapter TXD→Vue TXD, adapter RXD→Vue RXD (not crossed). Bootloader: IO0 to GND before power-up. Full workflow + failure modes in `integrations/emporia-vue-3.md`.
+- **Open follow-ups:**
+  - Add Vue 3 (Panel A unit, cloud firmware) entry to `device-inventory.md` once on cloud + reading. Record S/N + MAC + Emporia account binding.
+  - Update `device-inventory.md` and `integrations/emporia-vue-3.md` versioning section after BDM-frame flash attempt — success or failure.
+  - Once on ESPHome: extend `pool/scripts/state_logger.py` with `home_*` columns per ADR-009 Implementation step 5. Defer while on cloud firmware (cloud entity names different).
+
 ---
 
 ## Recently completed
@@ -147,11 +159,8 @@ Requirements analysis complete and accepted 2026-05-02. Closes the structural bl
 - 5 more units to build after garage proves out.
 - Decide locations: kitchen, master bedroom, lanai, ?, ?
 
-### Whole-home power monitoring (planned)
-- ADR-009 drafted 2026-05-02 covering Emporia Vue 2 vs IotaWatt trade-off.
-- New sub-project at `energy/` with planning docs.
-- Hardware not yet purchased; pre-purchase checklist in `energy/README.md`.
-- Logger v2 will extend with `home_*` columns once installed.
+### Whole-home power monitoring
+- Promoted to **In flight** 2026-05-11 — see the "Whole-home power monitoring (Vue 3 install — Panel A active, Panel B pending flash)" section above.
 
 ### Integrations to evaluate
 - **ChefsTemp** — feature-request email drafted but not sent (waiting on Breezo support reply first). BLE proxy possible if API not granted.

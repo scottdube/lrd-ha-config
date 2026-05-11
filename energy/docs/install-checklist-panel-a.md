@@ -35,19 +35,19 @@ Walk-flip test plan: with each CT installed and Vue online, turn on a known load
 
 | Slot | Circuit | Breaker | Panel side | Walk-flip test load | Expected W | Verified | Notes |
 |------|---------|---------|------------|---------------------|------------|----------|-------|
-| 1 | Wall Oven | 30A 2P | L | Bake preheat 350°F | ~3000W | ☐ | 240V circuit — measure one leg |
+| 1 | Pool Subpanel | 60A 2P | R | Pool pump + heater both running | ~700–8000W | ☐ | 240V — backsolves heater power per ADR-006. Slot reassigned from 7→1 during 2026-05-11 install (physical wiring already done at slot 1). |
 | 2 | Air #1 Condenser | 40A 2P | L | Run AC at low temp setpoint | ~3000–5000W | ☐ | 240V — main HVAC outdoor unit |
 | 3 | Air #2 Handler | 30A 2P | L | Master mini-split fan high | ~200–500W | ☐ | 240V — indoor blower |
 | 4 | Microwave | 20A | L | Microwave 60s on high | ~1100W | ☐ | 120V |
 | 5 | Refrigerator | 20A | R | Compressor cycle (or trigger door alarm) | ~150–250W | ☐ | 120V continuous |
 | 6 | Water Heater | 30A 2P | R | Hot tap for 30s | ~4500W | ☐ | 240V — confirm draw at heating element |
-| 7 | Pool Subpanel | 60A 2P | R | Pool pump + heater both running | ~700–8000W | ☐ | 240V — backsolves heater power per ADR-006 |
+| 7 | Wall Oven | 30A 2P | L | Bake preheat 350°F | ~3000W | ☐ | 240V circuit — measure one leg. Slot reassigned from 1→7 during 2026-05-11 install. |
 | 8 | Kitchen GFI + recs (stove wall, island) | 20A | L | Toaster on island | ~1000W | ☐ | 120V |
 | 9 | Kitchen GFI + recs (sink wall) | 20A | R | Coffee maker | ~1000W | ☐ | 120V |
 | 10 | Irrigation / Post Light / Attic / Ceiling recs | 15A | L | Irrigation cycle | ~50–200W | ☐ | 120V — outdoor + always-on lights |
 | 11 | Summer Kitchen GFI #1 | 20A | R | Plug in load on summer kitchen outlet | ~100W+ | ☐ | 120V outdoor |
 | 12 | Garage GFI + W/PS (side wall) | 20A | R | Plug in tool / known load | varies | ☐ | 120V workshop |
-| 13 | Nook Recs | 20A AFCI | L | Plug-in test load in nook | varies | ☐ | 120V family activity |
+| 13 | Garage Mini Split (Carrier 38MARBQ24AA3) | 35A 2P | R | Mini-split run high cool | ~500–2500W | ☐ | 240V — single CT on either leg, set "240V" / ×2 tag in Emporia app. Cross-validates against `sensor.garage_ms_power_realtime` (Midea LAN). Reassigned from Nook Recs on 2026-05-11 per accuracy discussion. |
 | 14 | Dining Room Recs | 20A AFCI | L | Plug-in test load in dining | varies | ☐ | 120V family activity |
 | 15 | Guest / Pool Bath GFIs | 20A | R | Hairdryer in guest bath | ~1500W | ☐ | 120V |
 | 16 | Bedroom 2 OR Bedroom 3 (pick one) | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V — pick the more-used room |
@@ -58,7 +58,9 @@ Walk-flip test plan: with each CT installed and Vue online, turn on a known load
 
 - Smokes — few watts, not worth a CT slot
 - One of the bedroom AFCI circuits (whichever you don't pick for slot 16)
-- The 35A 2P "Garage / Mini Split" entry — already monitored via Midea AC LAN (`garage_ms_power_w`)
+- Nook Recs (20A AFCI) — displaced 2026-05-11 by Garage Mini Split cross-validation on slot 13. "Varies" background load with no automation depending on per-circuit data; can be revisited if data gaps emerge.
+
+**Note on Garage Mini Split (slot 13, not skipped):** Originally listed as skipped because the unit reports `sensor.garage_ms_power_realtime` via Midea AC LAN. Promoted to slot 13 on 2026-05-11 to cross-validate the Midea-reported power against an independent CT measurement. Midea's `realtime_power` is inferred to be inverter-derived (DC-bus shunt × estimated efficiency) rather than a true-RMS AC measurement, which is typically ±10–20% vs the Vue CT's ±1–2%. The CT also surfaces standby draw that the Midea sensor floors to 0 W. Reference: ADR-009 cross-validation table.
 
 ---
 
