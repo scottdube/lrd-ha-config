@@ -30,24 +30,26 @@
 
 ## Branch CT priority list (16 of 16 slots used)
 
+**Slot ordering rule (added 2026-05-12):** Vue 3 branch CT ports run 1→16 left-to-right across the top edge (verified visually on installed unit). To minimize CT wire crossing at the Vue, **LEFT-side panel breakers map to slots 1–8 (left half of Vue's top edge), RIGHT-side panel breakers map to slots 9–16 (right half)**.
+
 | Slot | Circuit | Breaker | Panel side | Walk-flip test load | Expected W | Verified | Notes |
 |------|---------|---------|------------|---------------------|------------|----------|-------|
-| 1 | Dryer | 30A 2P | L | Run dryer 1 min on high | ~5000W | ☐ | 240V — heating element + drum motor |
-| 2 | Cooktop | 40A 2P | L | Burner on high | ~2000–4000W | ☐ | 240V — single burner test |
-| 3 | Air #1 Handler | 60A 2P | R | Run main HVAC, especially in heat strip mode | ~500W (fan) to ~10000W+ (strip heat) | ☐ | 240V — has electric resistance backup heat |
-| 4 | Air #2 Condenser | 25A 2P | R | Master mini-split run | ~1500–3000W | ☐ | 240V — outdoor compressor |
-| 5 | Washer + Laundry Rec | 20A | L | Run washer on heavy cycle | ~500W (motor) | ☐ | 120V — washer motor + incidental loads |
-| 6 | Garbage Disposal | 20A | R | Run disposal 5s | ~500W | ☐ | 120V |
-| 7 | Dishwasher | 20A | R | Start dishwasher cycle | ~1200W | ☐ | 120V — heating element when active |
-| 8 | Master Bath GFI / Rec / Shower Term | 20A | R | Hairdryer in master bath | ~1500W | ☐ | 120V |
-| 9 | Garage 20A Dedicated GFI | 20A | R | Plug in known load | varies | ☐ | 120V — confirm what's normally on this circuit |
-| 10 | Garage GFI + W/PS (panel wall) | 20A | R | Plug in workshop tool | varies | ☐ | 120V |
-| 11 | Summer Kitchen GFI #2 | 20A | R | Plug in outdoor load | ~100W+ | ☐ | 120V outdoor |
-| 12 | Family Room / Lanai Fans / Sum Kitch Cans / Foyer / Entry | 15A AFCI | L | Lanai fans on high | ~200–400W aggregate | ☐ | 120V — flagged for Florida summer fan usage |
-| 13 | Master Bed / Lanai Cans | 15A AFCI | L | Lanai cans on | ~50–100W | ☐ | 120V |
-| 14 | General Loads (garage/chime/laundry/nook/kitch/master hall) | 15A AFCI | L | Hall lights | ~50W | ☐ | 120V — aggregated lighting across zones |
-| 15 | Garage Counter Top + Under Cab Lighting | 20A | L | Plug in garage tool / under-cab lights on | varies | ☐ | 120V |
-| 16 | Master Bath / Hall / Closets | 15A AFCI | L | Bathroom lights on | ~50W | ☐ | 120V |
+| 1 | Dryer | 30A 2P | L | Run dryer 1 min on high | ~5000W | ☐ | 240V — heating element + drum motor. Single CT, `multiply: 2` filter in YAML. |
+| 2 | Cooktop | 40A 2P | L | Burner on high | ~2000–4000W | ☐ | 240V — single burner test. Single CT, `multiply: 2`. |
+| 3 | Washer + Laundry Rec | 20A | L | Run washer on heavy cycle | ~500W (motor) | ☐ | 120V — washer motor + incidental loads |
+| 4 | Family Room / Lanai Fans / Sum Kitch Cans / Foyer / Entry | 15A AFCI | L | Lanai fans on high | ~200–400W aggregate | ☐ | 120V — flagged for Florida summer fan usage |
+| 5 | Master Bed / Lanai Cans | 15A AFCI | L | Lanai cans on | ~50–100W | ☐ | 120V |
+| 6 | General Loads (garage/chime/laundry/nook/kitch/master hall) | 15A AFCI | L | Hall lights | ~50W | ☐ | 120V — aggregated lighting across zones |
+| 7 | Garage Counter Top + Under Cab Lighting | 20A | L | Plug in garage tool / under-cab lights on | varies | ☐ | 120V |
+| 8 | Master Bath / Hall / Closets | 15A AFCI | L | Bathroom lights on | ~50W | ☐ | 120V |
+| 9 | Air #1 Handler | 60A 2P | R | Run main HVAC, especially in heat strip mode | ~500W (fan) to ~10000W+ (strip heat) | ☐ | 240V — has electric resistance backup heat. Single CT, `multiply: 2`. |
+| 10 | Air #2 Condenser | 25A 2P | R | Run Air #2 (Carrier Infinity) | ~1500–3000W | ☐ | 240V — outdoor compressor. Single CT, `multiply: 2`. Terminology: Air #2 is a Carrier Infinity central system, NOT a mini split. |
+| 11 | Garbage Disposal | 20A | R | Run disposal 5s | ~500W | ☐ | 120V |
+| 12 | Dishwasher | 20A | R | Start dishwasher cycle | ~1200W | ☐ | 120V — heating element when active |
+| 13 | Master Bath GFI / Rec / Shower Term | 20A | R | Hairdryer in master bath | ~1500W | ☐ | 120V |
+| 14 | Garage 20A Dedicated GFI | 20A | R | Plug in known load | varies | ☐ | 120V — confirm what's normally on this circuit |
+| 15 | Garage GFI + W/PS (panel wall) | 20A | R | Plug in workshop tool | varies | ☐ | 120V |
+| 16 | Summer Kitchen GFI #2 | 20A | R | Plug in outdoor load | ~100W+ | ☐ | 120V outdoor |
 
 ---
 

@@ -132,6 +132,18 @@ sensor:
           id: phase_b_power
           device_class: power
           filters: [*pos]
+      - phase_id: phase_a
+        input: "1"
+        power:
+          id: cir1_dryer
+          device_class: power
+          filters: [*neg, multiply: 2]
+      - phase_id: phase_a
+        input: "2"
+        power:
+          id: cir2_cooktop
+          device_class: power
+          filters: [*neg, multiply: 2]
 
     on_update:
       then:
@@ -149,6 +161,27 @@ sensor:
     name: "Total Power"
     source_id: total_power
     filters: *throttle_avg
+  - platform: copy
+    name: "Circuit 1 Dryer Power"
+    source_id: cir1_dryer
+    filters: *throttle_avg
+  - platform: copy
+    name: "Circuit 2 Cooktop Power"
+    source_id: cir2_cooktop
+    filters: *throttle_avg
+
+  - platform: total_daily_energy
+    name: "Circuit 1 Dryer Daily Energy"
+    power_id: cir1_dryer
+    accuracy_decimals: 0
+    restore: false
+    filters: *throttle_time
+  - platform: total_daily_energy
+    name: "Circuit 2 Cooktop Daily Energy"
+    power_id: cir2_cooktop
+    accuracy_decimals: 0
+    restore: false
+    filters: *throttle_time
 
   - platform: template
     lambda: return id(phase_a_power).state + id(phase_b_power).state;

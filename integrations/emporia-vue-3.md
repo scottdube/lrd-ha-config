@@ -18,7 +18,7 @@ Whole-home power monitoring hardware. Two units total — one per panel (Panel A
 | Panel | Unit | Firmware | Mains | Branch CTs wired | Status |
 |---|---|---|---|---|---|
 | A | Unit #2 (Vue Gen 3) | Emporia cloud | Both legs, 200A | 16/16 (2026-05-11 evening) | Active on cloud, sum-sanity +1.7%, no polarity flips |
-| B (bench, pre-install) | Unit #1 (Vue Gen 3, MAC `94:54:C5:6E:6E:38`) | **ESPHome (emporia-vue-panel-b.yaml), barebones mains-only** | — | — | Flashed + bench bring-up complete 2026-05-12 16:06 EDT. IP 192.168.11.216 on IoT VLAN, RSSI −30 dB, API + OTA up, no I2C errors. Voltage/power readings nonsense on bench (no 240V) but entity surface complete. Ready to pull BDM + install. |
+| B | Unit #1 (Vue Gen 3, MAC `94:54:C5:6E:6E:38`) | **ESPHome (emporia-vue-panel-b.yaml), mains-only** | Both legs, 200A | 0/16 (OTA additions pending) | **Installed + live in Panel B 2026-05-12.** IP 192.168.11.216 on IoT VLAN, RSSI −30 dB. Calibration validated against multimeter: L1 Vue 122.5 V vs MM 122.9 V (−0.33%), L2 Vue 122.8 V vs MM 123.1 V (−0.24%). L2 Phase Angle 180° (correct split-phase). Frequency 59.8 Hz. Total mains 1.16 kW at install snapshot. Default `calibration: 0.01925` left untuned — within Class 0.5 utility-meter accuracy out of the box. |
 
 **Bench bring-up notes (2026-05-12):** Boot log clean. Verified the Vue 3-specific config (variant: vue3, sda 5/scl 18 with strapping warning ignored, calibration 0.01925) initializes without I2C errors. Bench-only artifacts to ignore: L1 Frequency reads `inf Hz` (no voltage zero-crossings), L2 Phase Angle reads `nan` (no reference), L2 Power reads ~4.7 MW (ADC noise floor × calibration on unconnected phase). All resolve to sane values once 240V is applied at the panel.
 
