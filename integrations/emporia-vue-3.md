@@ -13,16 +13,75 @@ Whole-home power monitoring hardware. Two units total — one per panel (Panel A
 
 ---
 
-## Current deployment (2026-05-11)
+## Current deployment
 
 | Panel | Unit | Firmware | Mains | Branch CTs wired | Status |
 |---|---|---|---|---|---|
-| A | Unit #2 (Vue Gen 3) | Emporia cloud | Both legs, 200A | Slot 7 (Pool Subpanel) — others pending this afternoon | Active, reading via cloud |
-| B | Unit #1 (Vue Gen 3) | Not flashed; bench | — | — | Held back — flash attempt blocked, BDM frame on order |
+| A | Unit #2 (Vue Gen 3) | Emporia cloud | Both legs, 200A | 16/16 (2026-05-11 evening) | Active on cloud, sum-sanity +1.7%, no polarity flips |
+| B (bench) | Unit #1 (Vue Gen 3, MAC `94:54:C5:6E:6E:38`) | Not yet flashed; serial connection verified | — | — | esptool `chip-id` confirms ESP32-D0WD-V3 rev v3.1 via BDM frame 2026-05-12. Ready to flash. |
 
-Swap plan: flash Unit #1 on the bench once BDM frame arrives. If successful, swap boards in Panel A (CTs stay in place — only the Vue board moves). The board pulled from Panel A then gets flashed (or stays on cloud as a redundant fallback) and goes into Panel B.
+**Chip confirmed (2026-05-12):** ESP32-D0WD-V3 rev v3.1, 40 MHz crystal, classic dual-core + LP core, 240 MHz, Vref calibration in eFuse. Validates `board: esp32dev` in the ESPHome YAML (NOT esp32s3). esptool v5.2.0 on macOS, HJHYUL CP2102 adapter at `/dev/cu.usbserial-0001`, baud 115200 for handshake. Flash chip: 8 MB SPI (manufacturer 0xA1, device 0x4017, 3.3V strapping).
+
+**Stock firmware backup (2026-05-12):** Two independent full-flash reads, MD5 matched across both → backup is canonical.
+
+- File: `~/Documents/Claude/Projects/home-assistant/emporia_vue3_unit1_9454C56E6E38_stock_backup_001.bin` (paired with `_002.bin`)
+- Size: 8,388,608 bytes (exact 8 MB)
+- MD5: `dc3ef5c186b5338f261bb1bfeefb85f0`
+- SHA-256: (TBD — run `shasum -a 256` on either file and record here)
+- Read baud: 230400 (115200 handshake → 230400 transfer, ~6.5 min per read)
+- Restore command (if ever needed): `esptool --port /dev/cu.usbserial-0001 --baud 230400 write-flash --flash-size detect 0x0 <backup.bin>` with IO0 grounded during power-up.
+
+Swap plan: flash Unit #1 (bench) with ESPHome. If successful, swap boards in Panel A — CTs stay in place, only the Vue board moves. The Panel A board pulled (cloud firmware, MAC TBD on retrieval) then either stays on cloud as redundant fallback or gets flashed in turn and goes into Panel B.
 
 ---
+
+## ESPHome YAML — Vue 3 specifics (verified 2026-05-12 from upstream)
+
+Several settings differ from Vue 2 and from older blog-post examples (including digiblur's 2024 reference). The current canonical Vue 3 config per [emporia-vue-local docs](https://emporia-vue-local.github.io/docs/tutorial/configuration/) and [Discussion #367](https://github.com/emporia-vue-local/esphome/discussions/367):
+
+| Item | Vue 2 | Vue 3 (canonical) |
+|---|---|---|
+| `external_components source` | `github://emporia-vue-local/esphome@dev` | same |
+| `variant` | `vue2` | **`vue3`** |
+| `i2c sda` | 21 | **5** (with `ignore_strapping_warning: true`) |
+| `i2c scl` | 22 | **18** |
+| `calibration` starting point | 0.022 | **0.01925** |
+| Status LED pin | 23 | **2** (strapping warning), plus optional `ethernet_led` on GPIO 4 |
+| CT filter convention | `*pos` | **`*neg`** for branch CTs (Vue 3 measures opposite polarity by default) |
+
+Pre-existing local secrets reference different keys than upstream examples — match your `secrets.yaml`:
+- `key: !secret api_encryption_key` (upstream example uses `api_key`)
+- `password: !secret ota_password` (upstream example uses `ota_key`)
+
+## First-flash YAML
+
+`esphome/emporia-vue-panel-b.yaml` — **mains-only** for the first flash. Validates toolchain + Wi-Fi + HA integration. Branch CTs added incrementally via OTA after first boot. No `cir1`..`cir16` defined yet — keeps the initial cycle short and removes one whole class of failure modes for the first OTA validation.
+
+## Flash workflow — first time (BDM still attached)
+
+1. **Push the YAML to the repo + pull on NUC** so the ESPHome dashboard sees the new config.
+2. **ESPHome dashboard** (HA → Apps → ESPHome) → find `emporiavue-panel-b` → **Install** → **Manual download** → choose **Modern format (.factory.bin)**. Save to Mac.
+3. **Put Vue in bootloader** (IO0 to GND, power-cycle via 3.3V toggle).
+4. **Erase flash first** (recommended for clean transition off stock):
+   ```
+   esptool --port /dev/cu.usbserial-0001 --baud 230400 erase-flash
+   ```
+5. **Write the firmware** (factory.bin starts at 0x0):
+   ```
+   esptool --port /dev/cu.usbserial-0001 --baud 230400 write-flash --flash-size detect 0x0 ~/Downloads/emporiavue-panel-b.factory.bin
+   ```
+6. Power-cycle without IO0 grounded. Vue should boot ESPHome, connect to IoT VLAN Wi-Fi, and appear in HA as `emporiavue-panel-b`.
+
+## Flash workflow — OTA (after first flash)
+
+Subsequent updates go through the ESPHome dashboard's "Install → Wirelessly" path — no BDM, no esptool. The pattern for adding branch CTs:
+
+1. Add a `ct_clamps` block for the next slot to the YAML, plus its `copy` + `total_daily_energy` sensors.
+2. Push + pull on NUC.
+3. ESPHome dashboard → Install → Wirelessly → wait for compile + upload + reboot (~1 min).
+4. Verify the new entity appears in HA and reads sensibly.
+5. Walk-flip if needed.
+6. Repeat for the next slot.
 
 ## Flashing — workflow for macOS
 
@@ -93,9 +152,9 @@ Modern `esptool` accepts hyphens (`write-flash`, `--flash-size`). The older `esp
 
 ### 1. "No serial data received" — most common
 
-Confirmed on 2026-05-11 attempt #1 with Unit #1 via 3D-printed pogo jig + HJHYUL CP2102 adapter. Suspect order:
+Confirmed on 2026-05-11 attempt #1 with Unit #1 via 3D-printed pogo jig + HJHYUL CP2102 adapter. **Resolved 2026-05-12 with BDM frame** — chip-id succeeded first try after BDM swap, confirming the 3D-printed pogo jig was the contact-reliability bottleneck. Suspect order:
 
-- **Intermittent pad contact** through the 3D-printed jig — pogo pins not landing reliably on the small Vue 3 pads. **Most likely root cause.** Fix: BDM frame (on order 2026-05-11) for rigid, square pin landing.
+- **Intermittent pad contact** through the 3D-printed jig — pogo pins not landing reliably on the small Vue 3 pads. **Confirmed root cause** (BDM frame fix worked first try).
 - **CP2102 internal 3.3V LDO undersized.** The CP2102 internal regulator output is rated nominal (Silicon Labs CP2102 datasheet); ESP32 boot current can exceed this. Workaround: 100–470 µF bulk cap across 3.3V/GND right at the Vue pads, or external 3.3V bench supply with adapter providing only GND/TXD/RXD.
 - **Bootloader sequence wrong.** IO0 must be at GND *before* power-up, not after. Re-test the sequence under any failure.
 - **RX/TX crossed.** Standard ESP32 wiring crosses them; Vue does not. Easy reflex error.

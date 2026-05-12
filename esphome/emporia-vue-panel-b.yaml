@@ -1,0 +1,166 @@
+# Emporia Vue 3 — Panel B
+#
+# First-flash YAML: mains only (no branch CTs). Validates toolchain + Wi-Fi + HA
+# integration. Branch CTs added incrementally via OTA after first boot.
+#
+# Hardware: Emporia Vue Gen 3, MAC 94:54:C5:6E:6E:38, ESP32-D0WD-V3, 8 MB flash.
+# Stock firmware backed up 2026-05-12 (MD5 dc3ef5c186b5338f261bb1bfeefb85f0).
+#
+# Upstream reference: https://emporia-vue-local.github.io/docs/tutorial/configuration/
+# Vue 3 specifics from Discussion #367 (Nov 2025).
+# See integrations/emporia-vue-3.md for the flash + OTA workflow.
+
+esphome:
+  name: emporiavue-panel-b
+  friendly_name: Emporia Vue Panel B
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    version: recommended
+
+external_components:
+  - source: github://emporia-vue-local/esphome@dev
+    components:
+      - emporia_vue
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  logs:
+    sensor: INFO
+
+preferences:
+  flash_write_interval: "48h"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "EmporiaVuePanelB Fallback"
+    password: !secret fallback_password
+  on_connect:
+    - light.turn_on: wifi_led
+  on_disconnect:
+    - light.turn_off: wifi_led
+
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+switch:
+  - platform: restart
+    name: Restart
+
+light:
+  - platform: status_led
+    id: wifi_led
+    pin:
+      number: 2
+      ignore_strapping_warning: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: status_led
+    id: ethernet_led
+    pin: 4
+    restore_mode: ALWAYS_OFF
+
+i2c:
+  sda:
+    number: 5
+    ignore_strapping_warning: true
+  scl: 18
+  scan: false
+  frequency: 400kHz
+  timeout: 1ms
+  id: i2c_a
+
+.filters:
+  - &throttle_avg
+    throttle_average: 5s
+  - &throttle_time
+    throttle: 60s
+  - &neg
+    lambda: 'return max(-x, 0.0f);'
+  - &pos
+    lambda: 'return max(x, 0.0f);'
+  - &abs
+    lambda: 'return abs(x);'
+
+sensor:
+  - platform: emporia_vue
+    variant: vue3
+    i2c_id: i2c_a
+    phases:
+      - id: phase_a
+        input: BLACK
+        calibration: 0.01925
+        voltage:
+          name: "L1 Voltage"
+          filters: [*throttle_avg, *pos]
+        frequency:
+          name: "L1 Frequency"
+          filters: [*throttle_avg, *pos]
+      - id: phase_b
+        input: RED
+        calibration: 0.01925
+        voltage:
+          name: "L2 Voltage"
+          filters: [*throttle_avg, *pos]
+        phase_angle:
+          name: "L2 Phase Angle"
+          filters: [*throttle_avg, *pos]
+
+    ct_clamps:
+      - phase_id: phase_a
+        input: "A"
+        power:
+          id: phase_a_power
+          device_class: power
+          filters: [*pos]
+      - phase_id: phase_b
+        input: "B"
+        power:
+          id: phase_b_power
+          device_class: power
+          filters: [*pos]
+
+    on_update:
+      then:
+        - component.update: total_power
+
+  - platform: copy
+    name: "L1 Power"
+    source_id: phase_a_power
+    filters: *throttle_avg
+  - platform: copy
+    name: "L2 Power"
+    source_id: phase_b_power
+    filters: *throttle_avg
+  - platform: copy
+    name: "Total Power"
+    source_id: total_power
+    filters: *throttle_avg
+
+  - platform: template
+    lambda: return id(phase_a_power).state + id(phase_b_power).state;
+    update_interval: never
+    id: total_power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: "W"
+
+  - platform: total_daily_energy
+    name: "Total Daily Energy"
+    power_id: total_power
+    accuracy_decimals: 0
+    restore: false
+    filters: *throttle_time
