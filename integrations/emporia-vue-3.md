@@ -18,7 +18,9 @@ Whole-home power monitoring hardware. Two units total — one per panel (Panel A
 | Panel | Unit | Firmware | Mains | Branch CTs wired | Status |
 |---|---|---|---|---|---|
 | A | Unit #2 (Vue Gen 3) | Emporia cloud | Both legs, 200A | 16/16 (2026-05-11 evening) | Active on cloud, sum-sanity +1.7%, no polarity flips |
-| B (bench) | Unit #1 (Vue Gen 3, MAC `94:54:C5:6E:6E:38`) | Not yet flashed; serial connection verified | — | — | esptool `chip-id` confirms ESP32-D0WD-V3 rev v3.1 via BDM frame 2026-05-12. Ready to flash. |
+| B (bench, pre-install) | Unit #1 (Vue Gen 3, MAC `94:54:C5:6E:6E:38`) | **ESPHome (emporia-vue-panel-b.yaml), barebones mains-only** | — | — | Flashed + bench bring-up complete 2026-05-12 16:06 EDT. IP 192.168.11.216 on IoT VLAN, RSSI −30 dB, API + OTA up, no I2C errors. Voltage/power readings nonsense on bench (no 240V) but entity surface complete. Ready to pull BDM + install. |
+
+**Bench bring-up notes (2026-05-12):** Boot log clean. Verified the Vue 3-specific config (variant: vue3, sda 5/scl 18 with strapping warning ignored, calibration 0.01925) initializes without I2C errors. Bench-only artifacts to ignore: L1 Frequency reads `inf Hz` (no voltage zero-crossings), L2 Phase Angle reads `nan` (no reference), L2 Power reads ~4.7 MW (ADC noise floor × calibration on unconnected phase). All resolve to sane values once 240V is applied at the panel.
 
 **Chip confirmed (2026-05-12):** ESP32-D0WD-V3 rev v3.1, 40 MHz crystal, classic dual-core + LP core, 240 MHz, Vref calibration in eFuse. Validates `board: esp32dev` in the ESPHome YAML (NOT esp32s3). esptool v5.2.0 on macOS, HJHYUL CP2102 adapter at `/dev/cu.usbserial-0001`, baud 115200 for handshake. Flash chip: 8 MB SPI (manufacturer 0xA1, device 0x4017, 3.3V strapping).
 
