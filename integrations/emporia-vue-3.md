@@ -27,7 +27,7 @@ Whole-home power monitoring hardware. Two units total — one per panel (Panel A
 - File: `~/Documents/Claude/Projects/home-assistant/emporia_vue3_unit1_9454C56E6E38_stock_backup_001.bin` (paired with `_002.bin`)
 - Size: 8,388,608 bytes (exact 8 MB)
 - MD5: `dc3ef5c186b5338f261bb1bfeefb85f0`
-- SHA-256: (TBD — run `shasum -a 256` on either file and record here)
+- SHA-256: `5719873286c44dd5081a8a331dfbfc67c93c7789ef3b683f97219d0152013d46` (verified on `_001.bin` 2026-05-12; `_002.bin` is byte-identical per MD5 match, so same SHA-256)
 - Read baud: 230400 (115200 handshake → 230400 transfer, ~6.5 min per read)
 - Restore command (if ever needed): `esptool --port /dev/cu.usbserial-0001 --baud 230400 write-flash --flash-size detect 0x0 <backup.bin>` with IO0 grounded during power-up.
 
