@@ -48,17 +48,17 @@ Walk-flip test plan: with each CT installed and Vue online, turn on a known load
 | 11 | Summer Kitchen GFI #1 | 20A | R | Plug in load on summer kitchen outlet | ~100W+ | ☐ | 120V outdoor |
 | 12 | Garage GFI + W/PS (side wall) | 20A | R | Plug in tool / known load | varies | ☐ | 120V workshop |
 | 13 | Garage Mini Split (Carrier 38MARBQ24AA3) | 35A 2P | R | Mini-split run high cool | ~500–2500W | ☐ | 240V — single CT on either leg, set "240V" / ×2 tag in Emporia app. Cross-validates against `sensor.garage_ms_power_realtime` (Midea LAN). Reassigned from Nook Recs on 2026-05-11 per accuracy discussion. |
-| 14 | Dining Room Recs | 20A AFCI | L | Plug-in test load in dining | varies | ☐ | 120V family activity |
+| 14 | Guest Room 3 | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V — reassigned from Dining Room Recs on 2026-05-11. Emporia app label still reads "Dining Room Recs" — rename to "Guest Room 3" in app config. |
 | 15 | Guest / Pool Bath GFIs | 20A | R | Hairdryer in guest bath | ~1500W | ☐ | 120V |
-| 16 | Bedroom 2 OR Bedroom 3 (pick one) | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V — pick the more-used room |
+| 16 | Guest Room 2 | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V — reassigned from "Bedroom 2 OR Bedroom 3 (pick one)" on 2026-05-11. Emporia app label currently "Bedroom 2" (same physical room) — optional rename to "Guest Room 2" for consistency. |
 
 ---
 
 ## Skipped from Panel A (intentional)
 
 - Smokes — few watts, not worth a CT slot
-- One of the bedroom AFCI circuits (whichever you don't pick for slot 16)
-- Nook Recs (20A AFCI) — displaced 2026-05-11 by Garage Mini Split cross-validation on slot 13. "Varies" background load with no automation depending on per-circuit data; can be revisited if data gaps emerge.
+- Nook Recs (20A AFCI) — displaced 2026-05-11 by Garage Mini Split cross-validation on slot 13
+- Dining Room Recs (20A AFCI) — displaced 2026-05-11 by Guest Room 3 on slot 14. Reason: dining room is essentially never used; both guest bedrooms now monitored instead
 
 **Note on Garage Mini Split (slot 13, not skipped):** Originally listed as skipped because the unit reports `sensor.garage_ms_power_realtime` via Midea AC LAN. Promoted to slot 13 on 2026-05-11 to cross-validate the Midea-reported power against an independent CT measurement. Midea's `realtime_power` is inferred to be inverter-derived (DC-bus shunt × estimated efficiency) rather than a true-RMS AC measurement, which is typically ±10–20% vs the Vue CT's ±1–2%. The CT also surfaces standby draw that the Midea sensor floors to 0 W. Reference: ADR-009 cross-validation table.
 
