@@ -3,13 +3,13 @@
 **Panel**: B (right panel — laundry / cooktop / master mini-split condenser / Air #1 handler)
 **Vue 3 device**: TBD (record S/N during install: __________________)
 **Install date**: __________________
-**Status**: Planning — install AFTER Panel A is dialed in
+**Status**: Ready to install — Panel A complete + verified 2026-05-11. Pending: BDM-frame flash attempt on the Panel B unit (BDM arriving 2026-05-12). Install proceeds either with ESPHome firmware (if flash succeeds) or stock Emporia cloud firmware (fallback).
 
 ---
 
 ## Pre-install
 
-- [ ] Panel A install complete and verified (Panel B benefits from lessons learned on A)
+- [x] Panel A install complete and verified — 16/16 wired, sum-sanity +1.7%, no polarity flips needed (2026-05-11)
 - [ ] Second Vue 3 hardware on hand
 - [ ] All 16× 50A branch CTs + 2× 200A mains CTs from bundle accounted for
 - [ ] Antenna on hand
