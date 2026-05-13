@@ -9,7 +9,7 @@
 - Wiring harness (L1/L2/N/L3 green Phoenix) on RIGHT side
 - "emporia" logo upside down
 - Silkscreen "1" on FAR RIGHT end of top edge; silkscreen "16" on FAR LEFT
-- **Locality rule (inverted from Panel B): RIGHT-side panel breakers → slots 1–8; LEFT-side breakers → slots 9–16.**
+- **Locality rule (inverted from Panel B): RIGHT-side panel breakers → slots 1–8; LEFT-side breakers → slots 9–16.** Panel A has 8 LEFT + 8 RIGHT breakers — clean locality, no crossover.
 
 See `panel-a-slot-remap.pdf` for the old→new slot mapping used during plug labeling.
 
@@ -51,12 +51,12 @@ Walk-flip test plan: turn on the listed load, watch the matching `sensor.emporia
 | 2 | Refrigerator | 20A | R | Compressor cycle (or trigger door alarm) | ~150–250W | ☐ | 120V continuous. (was old slot 5) |
 | 3 | Water Heater | 30A 2P | R | Hot tap for 30s | ~4500W | ☐ | 240V, ×2 — confirm draw at heating element. (was old slot 6) |
 | 4 | Kitchen GFI + recs (sink wall) | 20A | R | Coffee maker | ~1000W | ☐ | 120V. (was old slot 9) |
-| 5 | Summer Kitchen GFI #1 | 20A | R | Plug in load on summer kitchen outlet | ~100W+ | ☐ | 120V outdoor. (was old slot 11) |
-| 6 | Garage GFI + W/PS (side wall) | 20A | R | Plug in tool / known load | varies | ☐ | 120V workshop. (was old slot 12) |
-| 7 | Garage Mini Split (Carrier 38MARBQ24AA3) | 35A 2P | R | Mini-split run high cool | ~500–2500W | ☐ | 240V, ×2 — single CT on either leg. Cross-validates against `sensor.garage_ms_power_realtime` (Midea LAN). (was old slot 13) |
+| 5 | Air #2 Handler | 30A 2P | R | Run Air #2 (Carrier Infinity) fan high | ~200–500W | ☐ | 240V, ×2 — indoor blower. Air #2 is a Carrier Infinity central system, NOT a mini split. (was old slot 3 — moved here from new slot 8 due to cable length) |
+| 6 | Summer Kitchen GFI #1 | 20A | R | Plug in load on summer kitchen outlet | ~100W+ | ☐ | 120V outdoor. (was old slot 11) |
+| 7 | Garage GFI + W/PS (side wall) | 20A | R | Plug in tool / known load | varies | ☐ | 120V workshop. (was old slot 12) |
 | 8 | Guest / Pool Bath GFIs | 20A | R | Hairdryer in guest bath | ~1500W | ☐ | 120V. (was old slot 15) |
 | 9 | Air #1 Condenser | 40A 2P | L | Run AC at low temp setpoint | ~3000–5000W | ☐ | 240V, ×2 — main HVAC outdoor unit (Carrier Infinity). (was old slot 2) |
-| 10 | Air #2 Handler | 30A 2P | L | Run Air #2 (Carrier Infinity) fan high | ~200–500W | ☐ | 240V, ×2 — indoor blower. Air #2 is a Carrier Infinity central system, NOT a mini split. (was old slot 3) |
+| 10 | Garage Mini Split (Carrier 38MARBQ24AA3) | 35A 2P | L | Mini-split run high cool | ~500–2500W | ☐ | 240V, ×2 — single CT on either leg. Cross-validates against `sensor.garage_ms_power_realtime` (Midea LAN). (was old slot 13) |
 | 11 | Microwave | 20A | L | Microwave 60s on high | ~1100W | ☐ | 120V. (was old slot 4) |
 | 12 | Wall Oven | 30A 2P | L | Bake preheat 350°F | ~3000W | ☐ | 240V, ×2 — measure one leg. (was old slot 7) |
 | 13 | Kitchen GFI + recs (stove wall, island) | 20A | L | Toaster on island | ~1000W | ☐ | 120V. (was old slot 8) |
