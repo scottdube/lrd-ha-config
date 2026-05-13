@@ -1,9 +1,17 @@
 # Panel A Install Checklist — Vue 3 + CTs
 
 **Panel**: A (left panel — pool side / main HVAC condenser / water heater)
-**Vue 3 device**: TBD (record S/N during install: __________________)
-**Install date**: __________________
-**Status**: Planning
+**Vue 3 device**: Unit #2 (S/N TBD — record during reflash: __________________)
+**Status**: Initial cloud install complete 2026-05-11; ESPHome reflash + post-remap reassembly pending 2026-05-12.
+
+**Vue 3 orientation in Panel A: rotated 180° from Panel B.** Verified 2026-05-12:
+- Antenna SMA jack on LEFT side of device
+- Wiring harness (L1/L2/N/L3 green Phoenix) on RIGHT side
+- "emporia" logo upside down
+- Silkscreen "1" on FAR RIGHT end of top edge; silkscreen "16" on FAR LEFT
+- **Locality rule (inverted from Panel B): RIGHT-side panel breakers → slots 1–8; LEFT-side breakers → slots 9–16.**
+
+See `panel-a-slot-remap.pdf` for the old→new slot mapping used during plug labeling.
 
 ---
 
@@ -29,28 +37,32 @@ Both Vue 3 mains CTs go around Panel A's incoming feed conductors — one per le
 
 ---
 
-## Branch CT priority list (16 of 16 slots used)
+## Branch CT priority list (16 of 16 slots used — post-remap 2026-05-12)
 
-Walk-flip test plan: with each CT installed and Vue online, turn on a known load on that circuit and verify the Vue dashboard shows wattage on the expected CT slot. If wattage shows negative, flip CT polarity in software (Emporia app has this option).
+Slot ordering follows the inverted locality rule (RIGHT-side panel breakers in slots 1–8, LEFT-side in slots 9–16) chosen to minimize CT wire crossing at the Vue. See `panel-a-slot-remap.pdf` for old→new mapping during plug labeling.
+
+For 240V circuits (slots 1, 3, 7, 9, 10, 12): single CT on either leg + `multiply: 2` filter in the ESPHome YAML — same pattern proven on Panel B. The phase_id (phase_a / phase_b) for each slot will be set per the multimeter mapping recorded during reassembly.
+
+Walk-flip test plan: turn on the listed load, watch the matching `sensor.emporiavue_panel_a_circuit_N_*_power` entity in HA. If reads 0 W under load with the *neg filter, swap `phase_id` in YAML (most common fix). If reads ~half the expected value, the `multiply: 2` filter wasn't applied.
 
 | Slot | Circuit | Breaker | Panel side | Walk-flip test load | Expected W | Verified | Notes |
 |------|---------|---------|------------|---------------------|------------|----------|-------|
-| 1 | Pool Subpanel | 60A 2P | R | Pool pump + heater both running | ~700–8000W | ☐ | 240V — backsolves heater power per ADR-006. Slot reassigned from 7→1 during 2026-05-11 install (physical wiring already done at slot 1). |
-| 2 | Air #1 Condenser | 40A 2P | L | Run AC at low temp setpoint | ~3000–5000W | ☐ | 240V — main HVAC outdoor unit |
-| 3 | Air #2 Handler | 30A 2P | L | Master mini-split fan high | ~200–500W | ☐ | 240V — indoor blower |
-| 4 | Microwave | 20A | L | Microwave 60s on high | ~1100W | ☐ | 120V |
-| 5 | Refrigerator | 20A | R | Compressor cycle (or trigger door alarm) | ~150–250W | ☐ | 120V continuous |
-| 6 | Water Heater | 30A 2P | R | Hot tap for 30s | ~4500W | ☐ | 240V — confirm draw at heating element |
-| 7 | Wall Oven | 30A 2P | L | Bake preheat 350°F | ~3000W | ☐ | 240V circuit — measure one leg. Slot reassigned from 1→7 during 2026-05-11 install. |
-| 8 | Kitchen GFI + recs (stove wall, island) | 20A | L | Toaster on island | ~1000W | ☐ | 120V |
-| 9 | Kitchen GFI + recs (sink wall) | 20A | R | Coffee maker | ~1000W | ☐ | 120V |
-| 10 | Irrigation / Post Light / Attic / Ceiling recs | 15A | L | Irrigation cycle | ~50–200W | ☐ | 120V — outdoor + always-on lights |
-| 11 | Summer Kitchen GFI #1 | 20A | R | Plug in load on summer kitchen outlet | ~100W+ | ☐ | 120V outdoor |
-| 12 | Garage GFI + W/PS (side wall) | 20A | R | Plug in tool / known load | varies | ☐ | 120V workshop |
-| 13 | Garage Mini Split (Carrier 38MARBQ24AA3) | 35A 2P | R | Mini-split run high cool | ~500–2500W | ☐ | 240V — single CT on either leg, set "240V" / ×2 tag in Emporia app. Cross-validates against `sensor.garage_ms_power_realtime` (Midea LAN). Reassigned from Nook Recs on 2026-05-11 per accuracy discussion. |
-| 14 | Guest Room 3 | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V — reassigned from Dining Room Recs on 2026-05-11. Emporia app label still reads "Dining Room Recs" — rename to "Guest Room 3" in app config. |
-| 15 | Guest / Pool Bath GFIs | 20A | R | Hairdryer in guest bath | ~1500W | ☐ | 120V |
-| 16 | Guest Room 2 | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V — reassigned from "Bedroom 2 OR Bedroom 3 (pick one)" on 2026-05-11. Emporia app label currently "Bedroom 2" (same physical room) — optional rename to "Guest Room 2" for consistency. |
+| 1 | Pool Subpanel | 60A 2P | R | Pool pump + heater both running | ~700–8000W | ☐ | 240V, ×2. Backsolves heater power per ADR-006. (was old slot 1 — no change) |
+| 2 | Refrigerator | 20A | R | Compressor cycle (or trigger door alarm) | ~150–250W | ☐ | 120V continuous. (was old slot 5) |
+| 3 | Water Heater | 30A 2P | R | Hot tap for 30s | ~4500W | ☐ | 240V, ×2 — confirm draw at heating element. (was old slot 6) |
+| 4 | Kitchen GFI + recs (sink wall) | 20A | R | Coffee maker | ~1000W | ☐ | 120V. (was old slot 9) |
+| 5 | Summer Kitchen GFI #1 | 20A | R | Plug in load on summer kitchen outlet | ~100W+ | ☐ | 120V outdoor. (was old slot 11) |
+| 6 | Garage GFI + W/PS (side wall) | 20A | R | Plug in tool / known load | varies | ☐ | 120V workshop. (was old slot 12) |
+| 7 | Garage Mini Split (Carrier 38MARBQ24AA3) | 35A 2P | R | Mini-split run high cool | ~500–2500W | ☐ | 240V, ×2 — single CT on either leg. Cross-validates against `sensor.garage_ms_power_realtime` (Midea LAN). (was old slot 13) |
+| 8 | Guest / Pool Bath GFIs | 20A | R | Hairdryer in guest bath | ~1500W | ☐ | 120V. (was old slot 15) |
+| 9 | Air #1 Condenser | 40A 2P | L | Run AC at low temp setpoint | ~3000–5000W | ☐ | 240V, ×2 — main HVAC outdoor unit (Carrier Infinity). (was old slot 2) |
+| 10 | Air #2 Handler | 30A 2P | L | Run Air #2 (Carrier Infinity) fan high | ~200–500W | ☐ | 240V, ×2 — indoor blower. Air #2 is a Carrier Infinity central system, NOT a mini split. (was old slot 3) |
+| 11 | Microwave | 20A | L | Microwave 60s on high | ~1100W | ☐ | 120V. (was old slot 4) |
+| 12 | Wall Oven | 30A 2P | L | Bake preheat 350°F | ~3000W | ☐ | 240V, ×2 — measure one leg. (was old slot 7) |
+| 13 | Kitchen GFI + recs (stove wall, island) | 20A | L | Toaster on island | ~1000W | ☐ | 120V. (was old slot 8) |
+| 14 | Irrigation / Post Light / Attic / Ceiling recs / Network Rack | 15A | L | Irrigation cycle OR check network rack baseline ~250W | ~50–250W | ☐ | 120V — outdoor + always-on lights + UDM Pro / NUC / switches. Network rack is the dominant always-on load. (was old slot 10) |
+| 15 | Guest Room 3 | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V. (was old slot 14) |
+| 16 | Guest Room 2 | 15A AFCI | L | Plug-in lamp test | varies | ☐ | 120V. (was old slot 16 — no change) |
 
 ---
 
