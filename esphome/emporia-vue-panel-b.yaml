@@ -132,61 +132,79 @@ sensor:
           id: phase_b_power
           device_class: power
           filters: [*pos]
-      - phase_id: phase_a
-        input: "1"
-        power:
-          id: cir1_dryer
-          device_class: power
-          filters: [*neg, multiply: 2]
-      - phase_id: phase_a
-        input: "2"
-        power:
-          id: cir2_cooktop
-          device_class: power
-          filters: [*neg, multiply: 2]
+      - { phase_id: phase_a, input:  "1", power: { id:  cir1_dryer,                device_class: power, filters: [ *neg, multiply: 2 ] } }
+      - { phase_id: phase_a, input:  "2", power: { id:  cir2_cooktop,              device_class: power, filters: [ *neg, multiply: 2 ] } }
+      - { phase_id: phase_a, input:  "3", power: { id:  cir3_washer,               device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input:  "4", power: { id:  cir4_familyrm_lanai,       device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_a, input:  "5", power: { id:  cir5_masterbed_lanai,      device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input:  "6", power: { id:  cir6_general_loads,        device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_a, input:  "7", power: { id:  cir7_garage_counter,       device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_a, input:  "8", power: { id:  cir8_masterbath_hall,      device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input:  "9", power: { id:  cir9_air1_handler,         device_class: power, filters: [ *neg, multiply: 2 ] } }
+      - { phase_id: phase_b, input: "10", power: { id: cir10_air2_condenser,       device_class: power, filters: [ *neg, multiply: 2 ] } }
+      - { phase_id: phase_a, input: "11", power: { id: cir11_disposal,             device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input: "12", power: { id: cir12_dishwasher,           device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_a, input: "13", power: { id: cir13_masterbath_gfi,       device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input: "14", power: { id: cir14_garage_dedicated_gfi, device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_a, input: "15", power: { id: cir15_garage_gfi_panel,     device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input: "16", power: { id: cir16_summer_kitchen2,      device_class: power, filters: [ *neg ] } }
 
     on_update:
       then:
         - component.update: total_power
+        - component.update: balance_power
 
-  - platform: copy
-    name: "L1 Power"
-    source_id: phase_a_power
-    filters: *throttle_avg
-  - platform: copy
-    name: "L2 Power"
-    source_id: phase_b_power
-    filters: *throttle_avg
-  - platform: copy
-    name: "Total Power"
-    source_id: total_power
-    filters: *throttle_avg
-  - platform: copy
-    name: "Circuit 1 Dryer Power"
-    source_id: cir1_dryer
-    filters: *throttle_avg
-  - platform: copy
-    name: "Circuit 2 Cooktop Power"
-    source_id: cir2_cooktop
-    filters: *throttle_avg
+  - { platform: copy, name: "L1 Power",          source_id: phase_a_power, filters: *throttle_avg }
+  - { platform: copy, name: "L2 Power",          source_id: phase_b_power, filters: *throttle_avg }
+  - { platform: copy, name: "Total Power",       source_id: total_power,   filters: *throttle_avg }
+  - { platform: copy, name: "Unmonitored Power", source_id: balance_power, filters: *throttle_avg }
 
-  - platform: total_daily_energy
-    name: "Circuit 1 Dryer Daily Energy"
-    power_id: cir1_dryer
-    accuracy_decimals: 0
-    restore: false
-    filters: *throttle_time
-  - platform: total_daily_energy
-    name: "Circuit 2 Cooktop Daily Energy"
-    power_id: cir2_cooktop
-    accuracy_decimals: 0
-    restore: false
-    filters: *throttle_time
+  - { platform: copy, name:  "Circuit 1 Dryer Power",                 source_id:  cir1_dryer,                filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 2 Cooktop Power",               source_id:  cir2_cooktop,              filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 3 Washer Power",                source_id:  cir3_washer,               filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 4 Family Rm Lanai Power",       source_id:  cir4_familyrm_lanai,       filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 5 Master Bed Lanai Power",      source_id:  cir5_masterbed_lanai,      filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 6 General Loads Power",         source_id:  cir6_general_loads,        filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 7 Garage Counter Power",        source_id:  cir7_garage_counter,       filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 8 Master Bath Hall Power",      source_id:  cir8_masterbath_hall,      filters: *throttle_avg }
+  - { platform: copy, name:  "Circuit 9 Air 1 Handler Power",         source_id:  cir9_air1_handler,         filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 10 Air 2 Condenser Power",       source_id: cir10_air2_condenser,       filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 11 Disposal Power",              source_id: cir11_disposal,             filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 12 Dishwasher Power",            source_id: cir12_dishwasher,           filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 13 Master Bath GFI Power",       source_id: cir13_masterbath_gfi,       filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 14 Garage GFI Dedicated Power",  source_id: cir14_garage_dedicated_gfi, filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 15 Garage GFI Panel Wall Power", source_id: cir15_garage_gfi_panel,     filters: *throttle_avg }
+  - { platform: copy, name: "Circuit 16 Summer Kitchen 2 Power",      source_id: cir16_summer_kitchen2,      filters: *throttle_avg }
 
   - platform: template
     lambda: return id(phase_a_power).state + id(phase_b_power).state;
     update_interval: never
     id: total_power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: "W"
+
+  - platform: template
+    lambda: !lambda |-
+      return max(0.0f, id(total_power).state -
+        id( cir1_dryer).state -
+        id( cir2_cooktop).state -
+        id( cir3_washer).state -
+        id( cir4_familyrm_lanai).state -
+        id( cir5_masterbed_lanai).state -
+        id( cir6_general_loads).state -
+        id( cir7_garage_counter).state -
+        id( cir8_masterbath_hall).state -
+        id( cir9_air1_handler).state -
+        id(cir10_air2_condenser).state -
+        id(cir11_disposal).state -
+        id(cir12_dishwasher).state -
+        id(cir13_masterbath_gfi).state -
+        id(cir14_garage_dedicated_gfi).state -
+        id(cir15_garage_gfi_panel).state -
+        id(cir16_summer_kitchen2).state);
+    update_interval: never
+    id: balance_power
     device_class: power
     state_class: measurement
     unit_of_measurement: "W"
@@ -197,3 +215,27 @@ sensor:
     accuracy_decimals: 0
     restore: false
     filters: *throttle_time
+
+  - platform: total_daily_energy
+    name: "Unmonitored Daily Energy"
+    power_id: balance_power
+    accuracy_decimals: 0
+    restore: false
+    filters: *throttle_time
+
+  - { power_id:  cir1_dryer,                platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 1 Dryer Daily Energy",                filters: *throttle_time }
+  - { power_id:  cir2_cooktop,              platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 2 Cooktop Daily Energy",              filters: *throttle_time }
+  - { power_id:  cir3_washer,               platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 3 Washer Daily Energy",               filters: *throttle_time }
+  - { power_id:  cir4_familyrm_lanai,       platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 4 Family Rm Lanai Daily Energy",      filters: *throttle_time }
+  - { power_id:  cir5_masterbed_lanai,      platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 5 Master Bed Lanai Daily Energy",     filters: *throttle_time }
+  - { power_id:  cir6_general_loads,        platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 6 General Loads Daily Energy",        filters: *throttle_time }
+  - { power_id:  cir7_garage_counter,       platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 7 Garage Counter Daily Energy",       filters: *throttle_time }
+  - { power_id:  cir8_masterbath_hall,      platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 8 Master Bath Hall Daily Energy",     filters: *throttle_time }
+  - { power_id:  cir9_air1_handler,         platform: total_daily_energy, accuracy_decimals: 0, restore: false, name:  "Circuit 9 Air 1 Handler Daily Energy",        filters: *throttle_time }
+  - { power_id: cir10_air2_condenser,       platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 10 Air 2 Condenser Daily Energy",      filters: *throttle_time }
+  - { power_id: cir11_disposal,             platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 11 Disposal Daily Energy",             filters: *throttle_time }
+  - { power_id: cir12_dishwasher,           platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 12 Dishwasher Daily Energy",           filters: *throttle_time }
+  - { power_id: cir13_masterbath_gfi,       platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 13 Master Bath GFI Daily Energy",      filters: *throttle_time }
+  - { power_id: cir14_garage_dedicated_gfi, platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 14 Garage GFI Dedicated Daily Energy", filters: *throttle_time }
+  - { power_id: cir15_garage_gfi_panel,     platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 15 Garage GFI Panel Wall Daily Energy", filters: *throttle_time }
+  - { power_id: cir16_summer_kitchen2,      platform: total_daily_energy, accuracy_decimals: 0, restore: false, name: "Circuit 16 Summer Kitchen 2 Daily Energy",     filters: *throttle_time }
