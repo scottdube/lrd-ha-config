@@ -140,7 +140,7 @@ sensor:
           device_class: power
           filters: [*pos]
       - { phase_id: phase_a, input:  "1", power: { id:  cir1_pool_subpanel,   device_class: power, filters: [ *neg, multiply: 2 ] } }
-      - { phase_id: phase_a, input: "14", power: { id: cir14_network_rack,    device_class: power, filters: [ *neg ] } }
+      - { phase_id: phase_b, input: "14", power: { id: cir14_network_rack,    device_class: power, filters: [ *neg ] } }
 
     on_update:
       then:
