@@ -85,8 +85,8 @@ Walk-flip test plan: turn on the listed load, watch the matching `sensor.emporia
 - [ ] Antenna routed out bottom knockout (testing) OR through prepared old-work box (permanent)
 - [ ] Power restored to panel
 - [ ] Vue 3 LED indicates power + WiFi connection
-- [ ] Emporia cloud account: device registered
-- [ ] HA → HACS → emporia_vue integration → device visible
+- [ ] ESPHome dashboard shows `emporiavue-panel-a` Online (post-reflash)
+- [ ] HA → Settings → Devices & Services → ESPHome device auto-discovered + configured
 - [ ] All 16 CT entities visible in HA Developer Tools → States
 
 ---
