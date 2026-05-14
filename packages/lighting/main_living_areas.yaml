@@ -1,0 +1,284 @@
+# Main living areas — lux-driven daytime cycling + dusk hold + presence on/off.
+#
+# Targets: living room cans, kitchen cans, under-cabinet lights.
+#
+# Phases:
+#   - Cycling (09:00 → sunset-1h): lux below 9000 (5 min) → ON; lux above
+#     12000 (5 min) → OFF. Full-track behavior (option a, no manual override
+#     tracking). 09:00 wake re-evaluates current lux.
+#   - Dusk hold (at sunset-1h): lights ON, latched. Bedtime automation
+#     handles OFF.
+#
+# Gates:
+#   - input_boolean.vacation = off (ADR-012 cross-cutting pattern)
+#   - At least one of person.scott / person.mary at home
+#
+# Presence behaviors:
+#   - Everyone leaves: 15-min delayed off + set house_empty_extended flag.
+#     Returns within 15 min cancel the off.
+#   - Welcome home: first arrival to empty house (house_empty_extended=on)
+#     → turn on lights if lux<9000 OR past sunset-1h. Flag cleared on any
+#     return (whether or not lights actually came on).
+#
+# Sister entity light.wall_dimmer_switch_kitche_4 (Kitchen 4 Cans) is NOT
+# commanded directly — existing sync automations at automations.yaml:326–410
+# mirror it to/from light.kit_cans_wall_dimmer_switch.
+#
+# Manual override caveat (option a, accepted): manual changes via wall
+# switch / UI / voice during the cycling phase will be overwritten at the
+# next lux trigger. Living with this for now. Upgrade path: per-light
+# auto-tracking booleans (option b) or Z-Wave Central Scene event listeners
+# (option c).
+
+input_boolean:
+  house_empty_extended:
+    name: House Empty Extended
+    icon: mdi:home-export-outline
+    # Set by automation.main_living_everyone_leaves 15 min after both
+    # persons go not_home. Read by automation.main_living_welcome_home
+    # to differentiate true returns from quick errands. Cleared on any
+    # arrival to home.
+
+automation:
+  - id: main_living_lux_cycling
+    alias: "Main Living: Lux Cycling"
+    description: >
+      Daytime lux-driven cycling for main living areas (09:00 → sunset-1h).
+      <9000 lux for 5 min → lights ON. >12000 lux for 5 min → lights OFF.
+      09:00 wake re-evaluates current lux. No manual override tracking.
+    mode: single
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.st_00184974_illuminance
+        below: 9000
+        for: "00:05:00"
+        id: lux_low
+      - trigger: numeric_state
+        entity_id: sensor.st_00184974_illuminance
+        above: 12000
+        for: "00:05:00"
+        id: lux_high
+      - trigger: time
+        at: "09:00:00"
+        id: wake
+    conditions:
+      - condition: state
+        entity_id: input_boolean.vacation
+        state: "off"
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: person.scott
+            state: home
+          - condition: state
+            entity_id: person.mary
+            state: home
+      - condition: time
+        after: "09:00:00"
+      - condition: sun
+        before: sunset
+        before_offset: "-01:00:00"
+    actions:
+      - choose:
+          # lux_low → ON at target brightness per fixture
+          - conditions:
+              - condition: trigger
+                id: lux_low
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: light.living_wall_dimmer_switch
+                data:
+                  brightness_pct: 60
+              - action: light.turn_on
+                target:
+                  entity_id: light.kit_cans_wall_dimmer_switch
+                data:
+                  brightness_pct: 80
+              - action: light.turn_on
+                target:
+                  entity_id: light.wall_dimmer_switch_under_cab
+                data:
+                  brightness_pct: 100
+
+          # lux_high → all OFF
+          - conditions:
+              - condition: trigger
+                id: lux_high
+            sequence:
+              - action: light.turn_off
+                target:
+                  entity_id:
+                    - light.living_wall_dimmer_switch
+                    - light.kit_cans_wall_dimmer_switch
+                    - light.wall_dimmer_switch_under_cab
+
+          # wake (09:00) → re-evaluate current lux, sync state
+          - conditions:
+              - condition: trigger
+                id: wake
+            sequence:
+              - choose:
+                  - conditions:
+                      - condition: numeric_state
+                        entity_id: sensor.st_00184974_illuminance
+                        below: 9000
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: light.living_wall_dimmer_switch
+                        data:
+                          brightness_pct: 60
+                      - action: light.turn_on
+                        target:
+                          entity_id: light.kit_cans_wall_dimmer_switch
+                        data:
+                          brightness_pct: 80
+                      - action: light.turn_on
+                        target:
+                          entity_id: light.wall_dimmer_switch_under_cab
+                        data:
+                          brightness_pct: 100
+                  - conditions:
+                      - condition: numeric_state
+                        entity_id: sensor.st_00184974_illuminance
+                        above: 12000
+                    sequence:
+                      - action: light.turn_off
+                        target:
+                          entity_id:
+                            - light.living_wall_dimmer_switch
+                            - light.kit_cans_wall_dimmer_switch
+                            - light.wall_dimmer_switch_under_cab
+                  # 9000-12000 dead band at 09:00 → no action
+
+  - id: main_living_dusk_hold
+    alias: "Main Living: Dusk Hold"
+    description: >
+      Sunset minus 1 hour → latch lights ON regardless of current lux.
+      Bedtime automation handles OFF. No further cycling action after this.
+    mode: single
+    triggers:
+      - trigger: sun
+        event: sunset
+        offset: "-01:00:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.vacation
+        state: "off"
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: person.scott
+            state: home
+          - condition: state
+            entity_id: person.mary
+            state: home
+    actions:
+      - action: light.turn_on
+        target:
+          entity_id: light.living_wall_dimmer_switch
+        data:
+          brightness_pct: 60
+      - action: light.turn_on
+        target:
+          entity_id: light.kit_cans_wall_dimmer_switch
+        data:
+          brightness_pct: 80
+      - action: light.turn_on
+        target:
+          entity_id: light.wall_dimmer_switch_under_cab
+        data:
+          brightness_pct: 100
+
+  - id: main_living_everyone_leaves
+    alias: "Main Living: Everyone Leaves Delayed Off"
+    description: >
+      Both Scott + Mary not_home → wait 15 min → if still both away, turn
+      off main living lights and set house_empty_extended for welcome-home.
+      Quick returns (<15 min) cancel the off via the post-delay re-check.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id:
+          - person.scott
+          - person.mary
+        to: not_home
+    conditions:
+      - condition: state
+        entity_id: person.scott
+        state: not_home
+      - condition: state
+        entity_id: person.mary
+        state: not_home
+    actions:
+      - delay: "00:15:00"
+      - if:
+          - condition: state
+            entity_id: person.scott
+            state: not_home
+          - condition: state
+            entity_id: person.mary
+            state: not_home
+        then:
+          - action: light.turn_off
+            target:
+              entity_id:
+                - light.living_wall_dimmer_switch
+                - light.kit_cans_wall_dimmer_switch
+                - light.wall_dimmer_switch_under_cab
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.house_empty_extended
+
+  - id: main_living_welcome_home
+    alias: "Main Living: Welcome Home"
+    description: >
+      First arrival to empty house (house_empty_extended=on). Flag is
+      cleared unconditionally on any return. Lights come on only if
+      lux<9000 OR past sunset-1h.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id:
+          - person.scott
+          - person.mary
+        to: home
+    conditions:
+      - condition: state
+        entity_id: input_boolean.vacation
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.house_empty_extended
+        state: "on"
+    actions:
+      # Always clear the flag — even if lights don't end up coming on
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.house_empty_extended
+      # Only turn on lights if it's actually dark or near-dark
+      - if:
+          - condition: or
+            conditions:
+              - condition: numeric_state
+                entity_id: sensor.st_00184974_illuminance
+                below: 9000
+              - condition: sun
+                after: sunset
+                after_offset: "-01:00:00"
+        then:
+          - action: light.turn_on
+            target:
+              entity_id: light.living_wall_dimmer_switch
+            data:
+              brightness_pct: 60
+          - action: light.turn_on
+            target:
+              entity_id: light.kit_cans_wall_dimmer_switch
+            data:
+              brightness_pct: 80
+          - action: light.turn_on
+            target:
+              entity_id: light.wall_dimmer_switch_under_cab
+            data:
+              brightness_pct: 100
