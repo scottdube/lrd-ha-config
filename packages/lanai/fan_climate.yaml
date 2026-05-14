@@ -1,0 +1,179 @@
+# Lanai fan climate control
+#
+# Drives both lanai ceiling fan banks (left + right) based on outdoor air temp
+# with hysteresis. Active 09:00-23:00 in normal mode. In vacation mode the
+# temp logic is disabled and a single daily exercise window (12:00-13:00 at MED)
+# runs to move air for mildew prevention and to keep the motors exercised.
+#
+# Hysteresis bands (prevents flapping near thresholds):
+#   <77°F        → OFF
+#   77–79°F      → dead band (no change)
+#   79–82°F      → MED (66%)
+#   82–84°F      → dead band (no change)
+#   ≥84°F        → HIGH (100%)
+#
+# Speed mapping (per Jasco 500S in-wall fan controller + fan.lanai_fan_right
+# percentage_step=33.33, preset_modes=[]):
+#   LOW=33, MED=66, HIGH=100
+#
+# Vacation behavior implements ADR-012's cross-cutting input_boolean.vacation.
+# This is the second consumer (after the pool blueprint).
+#
+# Entity references:
+#   sensor.outdoor_air_temp                          — template, packages/environment/outdoor_temp.yaml
+#   fan.in_wall_fan_speed_control_500s_left          — Lanai Fan Left (Jasco 500S)
+#   fan.lanai_fan_right                              — Lanai Fan Right
+#   input_boolean.vacation                           — packages/pool/pool_modes.yaml
+#
+# Future: rename fan.in_wall_fan_speed_control_500s_left → fan.lanai_fan_left
+# for consistency. Requires grep across automations + scripts before rename.
+
+automation:
+  - id: lanai_fan_climate
+    alias: "Lanai: Fan Climate Control"
+    description: >
+      Outdoor-temp-driven lanai fan speed (77/79 OFF↔MED, 82/84 MED↔HIGH).
+      Active 09:00–23:00 in normal mode. Vacation mode: single 12:00–13:00
+      MED exercise window per day, temp logic disabled.
+    mode: single
+    variables:
+      lanai_fans:
+        - fan.in_wall_fan_speed_control_500s_left
+        - fan.lanai_fan_right
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.outdoor_air_temp
+        above: 84
+        id: temp_high
+      - trigger: numeric_state
+        entity_id: sensor.outdoor_air_temp
+        below: 82
+        id: temp_med_from_high
+      - trigger: numeric_state
+        entity_id: sensor.outdoor_air_temp
+        above: 79
+        id: temp_med_from_off
+      - trigger: numeric_state
+        entity_id: sensor.outdoor_air_temp
+        below: 77
+        id: temp_off
+      - trigger: time
+        at: "09:00:00"
+        id: wake
+      - trigger: time
+        at: "23:00:00"
+        id: sleep
+      - trigger: time
+        at: "12:00:00"
+        id: vac_exercise_start
+      - trigger: time
+        at: "13:00:00"
+        id: vac_exercise_stop
+      - trigger: state
+        entity_id: input_boolean.vacation
+        id: vacation_changed
+    conditions: []
+    actions:
+      - choose:
+          # 1) Sleep window starts → OFF unconditionally
+          - conditions:
+              - condition: trigger
+                id: sleep
+            sequence:
+              - action: fan.turn_off
+                target:
+                  entity_id: "{{ lanai_fans }}"
+
+          # 2) Vacation just turned ON → OFF (cancel whatever was running)
+          - conditions:
+              - condition: trigger
+                id: vacation_changed
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "on"
+            sequence:
+              - action: fan.turn_off
+                target:
+                  entity_id: "{{ lanai_fans }}"
+
+          # 3) Vacation exercise window START (12:00) — only if vacation on
+          - conditions:
+              - condition: trigger
+                id: vac_exercise_start
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "on"
+            sequence:
+              - action: fan.turn_on
+                target:
+                  entity_id: "{{ lanai_fans }}"
+                data:
+                  percentage: 66
+
+          # 4) Vacation exercise window STOP (13:00) — only if vacation on
+          - conditions:
+              - condition: trigger
+                id: vac_exercise_stop
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "on"
+            sequence:
+              - action: fan.turn_off
+                target:
+                  entity_id: "{{ lanai_fans }}"
+
+          # 5) Outside active window in normal mode → force OFF
+          #    (covers wake/temp triggers that fire wrong-side of the schedule)
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "off"
+              - or:
+                  - condition: time
+                    before: "09:00:00"
+                  - condition: time
+                    after: "23:00:00"
+            sequence:
+              - action: fan.turn_off
+                target:
+                  entity_id: "{{ lanai_fans }}"
+
+          # 6) Normal mode, in active window → apply temp tiers
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "off"
+              - condition: time
+                after: "09:00:00"
+                before: "23:00:00"
+            sequence:
+              - choose:
+                  - conditions:
+                      - condition: numeric_state
+                        entity_id: sensor.outdoor_air_temp
+                        above: 84
+                    sequence:
+                      - action: fan.turn_on
+                        target:
+                          entity_id: "{{ lanai_fans }}"
+                        data:
+                          percentage: 100
+                  - conditions:
+                      - condition: numeric_state
+                        entity_id: sensor.outdoor_air_temp
+                        above: 79
+                    sequence:
+                      - action: fan.turn_on
+                        target:
+                          entity_id: "{{ lanai_fans }}"
+                        data:
+                          percentage: 66
+                  - conditions:
+                      - condition: numeric_state
+                        entity_id: sensor.outdoor_air_temp
+                        below: 77
+                    sequence:
+                      - action: fan.turn_off
+                        target:
+                          entity_id: "{{ lanai_fans }}"
+                # Dead bands (77–79, 82–84): no branch matches, fans hold current state

@@ -1,0 +1,44 @@
+# Outdoor air temperature — cross-cutting template sensor with local→cloud fallback.
+#
+# Provides a single canonical entity for any automation that needs current
+# outdoor air temperature, prioritizing the WeatherFlow LOCAL integration
+# (sub-minute UDP updates, no cloud dependency) and falling back to the cloud
+# integration if the local sensor is unavailable.
+#
+# Pattern mirrors ADR-013 (water temp cascading fallback).
+#
+# Consumers:
+#   - automation.lanai_fan_climate (packages/lanai/fan_climate.yaml)
+#   - candidate future: pool blueprint (currently reads weather.lake_ridge_dr
+#     attribute directly), door automations, lighting
+#
+# Related:
+#   - integrations/weatherflow.md
+#   - docs/decisions/013-water-temp-fallback.md (pattern precedent)
+
+template:
+  - sensor:
+      - name: "Outdoor Air Temp"
+        unique_id: outdoor_air_temp
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: >
+          {% set local = states('sensor.st_00184974_temperature') %}
+          {% set cloud = states('sensor.lake_ridge_dr_temperature') %}
+          {% if local not in ['unavailable', 'unknown', 'none'] %}
+            {{ local }}
+          {% elif cloud not in ['unavailable', 'unknown', 'none'] %}
+            {{ cloud }}
+          {% endif %}
+        attributes:
+          source: >
+            {% set local = states('sensor.st_00184974_temperature') %}
+            {% set cloud = states('sensor.lake_ridge_dr_temperature') %}
+            {% if local not in ['unavailable', 'unknown', 'none'] %}
+              local
+            {% elif cloud not in ['unavailable', 'unknown', 'none'] %}
+              cloud
+            {% else %}
+              none
+            {% endif %}
