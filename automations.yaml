@@ -203,6 +203,7 @@
           - light.wall_dimmer_switch_kitche_4
           - light.wall_dimmer_switch_2
           - light.smart_plug_dimmer_2
+          - light.garage_cans
       data: {}
       action: light.turn_off
     - metadata: {}
