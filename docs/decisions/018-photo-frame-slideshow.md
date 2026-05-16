@@ -1,10 +1,11 @@
 # ADR-018: Living room Fire TV photo-frame slideshow
 
-**Status:** Accepted (deployed pending first-run verification)
-**Date:** 2026-05-16
+**Status:** Revised 2026-05-16 — original 4-automation + helper design simplified to script-as-primitive + 2 thin time triggers. See "Revision 2026-05-16" section at the end of this document for the current design. The original sections below are preserved for history.
+
+**Date:** 2026-05-16 (original) / Revised 2026-05-16
 **Decider:** Scott
 **Implementation:** `packages/photo-frame/photo_frame.yaml`
-**Upstream source of truth:** `scottdube/photo-frame` repo at `ha/photo-frame-automations.yaml`
+**Upstream source of truth:** `scottdube/photo-frame` repo at `ha/photo-frame-automations.yaml` *(drifted from this implementation as of 2026-05-16 evening — upstream retains the original 4-automation + helper structure; reconcile when ready)*
 
 ## Context
 
@@ -76,3 +77,59 @@ Low. Remove the `packages/photo-frame/` directory, restart HA, delete the helper
   - Per-TV library selection on the hub (Family / Kids / etc.) — needs the library/bucket model on the photo-frame hub, which doesn't exist yet.
   - Context-sensitive library switching (visitor presence → their album) — depends on per-TV libraries + HA presence triggers.
   - Motion-based wake — alternative to schedule-only wake; would replace or augment the 09:00 trigger with a lanai/living-room occupancy sensor.
+
+---
+
+## Revision 2026-05-16
+
+### Why the change
+
+The original design assumed a real-world scenario where the Fire TV would sit on `com.amazon.tv.launcher` for 10+ continuous minutes — long enough that an automatic relaunch into FKB was useful, but recent enough to a manual exit that a 2 h cooldown was needed to keep the slideshow from fighting the user. After deploying the design and walking the empirical test plan, that scenario turned out to be too thin to justify the machinery:
+
+- In practice the living room TV is either showing something (an app foreground, FKB, Netflix) or off. The launcher-idle state is a *transient* state someone passes through while navigating, not a *steady* state the device sits in.
+- Most Fire TVs auto-sleep after 20 min of inactivity by default. The launcher-idle window self-terminates well before the slideshow relaunch math even matters in many cases.
+- The state-attribute `for: "00:10:00"` trigger is fragile against Amazon's screensaver / ad-rotation behavior — `current_app` can flip mid-window to a non-launcher app id, resetting the timer, even if the user isn't actively using the TV.
+
+The original design's action chain (power-on + ADB launch) was empirically verified to work. The trigger/condition machinery around it was solving a problem that wasn't really there.
+
+### Revised decision
+
+Strip the package to three primitives:
+
+| Primitive | Role |
+|---|---|
+| **`script.photo_frame_start`** | Reusable action: power on Fire TV, wait 10 s for boot, ADB-launch FKB. Callable from automations, dashboards, Alexa routines (via HA Cloud Smart Home), or any HA service call. |
+| **`automation.photo_frame_morning_wake`** | One-line wrapper. At 09:00 daily, call `script.photo_frame_start`. Same effect as the original morning wake but now the action lives in a reusable place. |
+| **`automation.photo_frame_end_of_day_shutdown`** | At **23:00** (moved from 21:00 per Scott's call — gives the slideshow a longer evening run while you're around), power Fire TV off only if FKB is foreground. Foreground-gate preserved from original. |
+
+Removed: `automation.photo_frame_track_user_exit`, `automation.photo_frame_relaunch_after_idle`, `input_datetime.fire_tv_living_room_last_exit`. No external references existed; clean removal.
+
+### Why script-as-primitive
+
+The same action sequence is needed from at least three eventual entry points:
+
+1. The 09:00 schedule (handled by the morning-wake automation).
+2. An on-demand HA dashboard button (a Lovelace tile firing `script.photo_frame_start`).
+3. Voice via an Echo device, routed through HA Cloud's Alexa Smart Home skill. `script.photo_frame_start` exposed to Alexa with friendly name "Photo Frame" → "Alexa, turn on photo frame" works from any Echo in the house.
+
+The Fire TV remote's mic button is NOT a viable entry point: Fire TV's Alexa is content-search-biased, routes "open Fully Kiosk Browser" to Prime Video catalog search instead of the installed app. Confirmed empirically 2026-05-16.
+
+A script as the reusable primitive means each entry point is a one-call invocation rather than a copy-paste of the action sequence.
+
+### Time-window simplification
+
+Original window: 09:00–21:00. Revised: 09:00 wake, 23:00 shutdown. The 21:00 → 23:00 move is Scott's preference for "while there" — the slideshow is welcome later in the evening when winding down. There is no longer an active "relaunch window" because relaunch is gone, so the 09:00–21:00 range was structurally meaningless under the new design.
+
+### Consequences
+
+Positive: dramatically simpler. Three entities (script + 2 automations) instead of five (helper + 4 automations). No state-attribute `for:` trigger to debug against Amazon's idle quirks. Same wake + shutdown behavior; on-demand starts via dashboard / Echo cover the cases the relaunch automation was attempting to.
+
+Negative / open: no automatic recovery if the slideshow gets exited mid-day and the user doesn't manually restart it. Acceptable given that the original behavior (auto-relaunch under conditions) was either rarely useful or actively unwanted in most exit scenarios.
+
+Reversal cost: very low. The script's action body is exactly the original wake action — reinstating the relaunch automation later would just call the script with a different trigger + conditions.
+
+### Migration notes
+
+- `input_datetime.fire_tv_living_room_last_exit` registry entry: YAML-defined helpers disappear on the next HA restart after removal from YAML. A full `ha core restart` (not just `automation.reload`) is needed for clean entity-registry cleanup. Reload alone leaves the old entity behind as orphaned.
+- `automation.photo_frame_end_of_window_shutdown` → renamed `automation.photo_frame_end_of_day_shutdown`. Entity ID change. No external references to update in this repo (verified via grep).
+- Upstream `scottdube/photo-frame` `ha/photo-frame-automations.yaml` is now drifted from the deployed implementation. Propagate this simplification upstream when ready, or accept the drift and treat this file as the live source of truth.
