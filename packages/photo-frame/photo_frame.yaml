@@ -63,7 +63,8 @@ input_datetime:
     has_time: true
 
 automation:
-  - alias: "Photo Frame - track user exit from slideshow"
+  - id: photo_frame_track_user_exit
+    alias: "Photo Frame - track user exit from slideshow"
     trigger:
       - platform: state
         entity_id: media_player.fire_tv_192_168_11_82
@@ -75,7 +76,8 @@ automation:
           entity_id: input_datetime.fire_tv_living_room_last_exit
         data:
           datetime: "{{ now() }}"
-  - alias: "Photo Frame - morning wake and start slideshow"
+  - id: photo_frame_morning_wake
+    alias: "Photo Frame - morning wake and start slideshow"
     trigger:
       - platform: time
         at: "09:00:00"
@@ -89,7 +91,8 @@ automation:
           entity_id: media_player.fire_tv_192_168_11_82
         data:
           command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
-  - alias: "Photo Frame - relaunch slideshow after idle"
+  - id: photo_frame_relaunch_after_idle
+    alias: "Photo Frame - relaunch slideshow after idle"
     trigger:
       - platform: state
         entity_id: media_player.fire_tv_192_168_11_82
@@ -114,7 +117,8 @@ automation:
           entity_id: media_player.fire_tv_192_168_11_82
         data:
           command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
-  - alias: "Photo Frame - end of window shutdown"
+  - id: photo_frame_end_of_window_shutdown
+    alias: "Photo Frame - end of window shutdown"
     trigger:
       - platform: time
         at: "21:00:00"
