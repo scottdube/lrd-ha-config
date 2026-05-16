@@ -109,8 +109,8 @@ Removed: `automation.photo_frame_track_user_exit`, `automation.photo_frame_relau
 The same action sequence is needed from at least three eventual entry points:
 
 1. The 09:00 schedule (handled by the morning-wake automation).
-2. An on-demand HA dashboard button (a Lovelace tile firing `script.photo_frame_start`).
-3. Voice via an Echo device, routed through HA Cloud's Alexa Smart Home skill. `script.photo_frame_start` exposed to Alexa with friendly name "Photo Frame" → "Alexa, turn on photo frame" works from any Echo in the house.
+2. An on-demand HA dashboard button (a Lovelace tile firing `script.photo_frame_start`). **Deployed 2026-05-16** on the LRD-Test dashboard in the living room area. Interim placement; will migrate during the planned dashboard revamp.
+3. Voice via an Echo device, routed through HA Cloud's Alexa Smart Home skill. `script.photo_frame_start` exposed to Alexa with friendly name "Photo Frame" → "Alexa, turn on photo frame" works from any Echo in the house. Not yet deployed; defer unless the dashboard button proves insufficient.
 
 The Fire TV remote's mic button is NOT a viable entry point: Fire TV's Alexa is content-search-biased, routes "open Fully Kiosk Browser" to Prime Video catalog search instead of the installed app. Confirmed empirically 2026-05-16.
 
@@ -133,3 +133,33 @@ Reversal cost: very low. The script's action body is exactly the original wake a
 - `input_datetime.fire_tv_living_room_last_exit` registry entry: YAML-defined helpers disappear on the next HA restart after removal from YAML. A full `ha core restart` (not just `automation.reload`) is needed for clean entity-registry cleanup. Reload alone leaves the old entity behind as orphaned.
 - `automation.photo_frame_end_of_window_shutdown` → renamed `automation.photo_frame_end_of_day_shutdown`. Entity ID change. No external references to update in this repo (verified via grep).
 - Upstream `scottdube/photo-frame` `ha/photo-frame-automations.yaml` is now drifted from the deployed implementation. Propagate this simplification upstream when ready, or accept the drift and treat this file as the live source of truth.
+
+### Dashboard button YAML (preserved for future re-add)
+
+Dashboards are in storage mode (no Lovelace YAML in `lrd-ha-config`), so the button itself isn't version-controlled. If the LRD-Test dashboard ever loses the card, re-add via Edit Dashboard → "+ Add Card" → "Manual" with one of:
+
+Built-in button card:
+
+```yaml
+type: button
+entity: script.photo_frame_start
+name: Photo Frame
+icon: mdi:image-frame
+show_state: false
+tap_action:
+  action: perform-action
+  perform_action: script.photo_frame_start
+```
+
+Mushroom template card (depends on `lovelace-mushroom` HACS being present):
+
+```yaml
+type: custom:mushroom-template-card
+primary: Photo Frame
+secondary: Tap to start
+icon: mdi:image-frame
+icon_color: indigo
+tap_action:
+  action: perform-action
+  perform_action: script.photo_frame_start
+```
