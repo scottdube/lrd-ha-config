@@ -1,0 +1,129 @@
+# Living room Fire TV photo-frame slideshow
+#
+# Turns the living room Fire TV into a Fully Kiosk Browser (FKB) slideshow
+# during the day, with a user-friendly escape: pressing Home on the remote
+# exits FKB to the Fire TV launcher and suppresses automatic re-launch for
+# 2 hours so the TV stays available for normal viewing.
+#
+# Behavior:
+#   09:00 daily         → power Fire TV on, launch FKB (slideshow starts)
+#   09:00-21:00         → if launcher is foreground >=10 min AND >=2 h since
+#                         user exited FKB, relaunch FKB
+#   user presses Home   → FKB exits, last_exit timestamp recorded, no auto
+#                         re-launch for 2 h
+#   21:00 daily         → if FKB still foreground, power Fire TV off
+#                         (otherwise leave alone -- don't kill a show)
+#
+# Entity references:
+#   media_player.fire_tv_192_168_11_82
+#     ADB-over-TCP Fire TV (Android Debug Bridge integration), IoT-VLAN
+#     at 192.168.11.82
+#   input_datetime.fire_tv_living_room_last_exit
+#     last time user exited FKB to the Fire TV launcher; drives the 2 h
+#     cooldown on auto-relaunch
+#
+# Slideshow source: http://192.168.50.10:8000/slideshow
+#   Mac Mini at LRD on the LRD-Servers VLAN, port 8000. UDM Pro firewall
+#   rule allows IoT VLAN -> 192.168.50.10:8000.
+#
+# Related projects / sources of truth:
+#   scottdube/photo-frame    canonical YAML at ha/photo-frame-automations.yaml
+#                            (this file is a copy of that source)
+#   scottdube/network-docs   firewall rule (IoT -> 192.168.50.10:8000)
+#
+# Prerequisite (verify before relying on the 10-min relaunch behavior):
+#   FKB must NOT be set as the Fire TV's home launcher. With FKB
+#   foreground, pressing Home on the remote should land on
+#   com.amazon.tv.launcher, not relaunch FKB. If FKB ever grabbed the
+#   launcher role, unset it before this package will work as designed.
+#
+# Notes worth knowing later:
+#   - YAML uses the older `service:` keyword (still accepted by HA);
+#     other packages in this repo use the newer `action:` form.
+#     Preserved here to match the canonical source in
+#     scottdube/photo-frame. Modernize together if/when desired.
+#   - androidtv.adb_command is the current documented action on the
+#     Android Debug Bridge integration (HA docs 2026.3.x).
+#     Known quirk (GitHub home-assistant/core #125579): if the Fire TV
+#     drops off the network entirely when "off", the service can vanish
+#     until the device returns. Fire TVs typically stay on the network
+#     when off, so this should not affect normal operation -- but if
+#     the 21:00 turn-off ever leaves the device unreachable for the
+#     09:00 turn-on, that's the failure mode to check for.
+#   - FKB launch component `de.ozerov.fully/de.ozerov.fully.MainActivity`
+#     is the standard package/activity per Fully Kiosk community docs.
+#     If `am start` errors after deploy, run via ADB on the device:
+#       adb shell dumpsys package de.ozerov.fully | grep -A1 -E "Activity|filter"
+#     to confirm the actual activity name.
+
+input_datetime:
+  fire_tv_living_room_last_exit:
+    name: Living room Fire TV last user exit from FKB
+    has_date: true
+    has_time: true
+
+automation:
+  - alias: "Photo Frame - track user exit from slideshow"
+    trigger:
+      - platform: state
+        entity_id: media_player.fire_tv_192_168_11_82
+        attribute: current_app
+        from: "de.ozerov.fully"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.fire_tv_living_room_last_exit
+        data:
+          datetime: "{{ now() }}"
+  - alias: "Photo Frame - morning wake and start slideshow"
+    trigger:
+      - platform: time
+        at: "09:00:00"
+    action:
+      - service: media_player.turn_on
+        target:
+          entity_id: media_player.fire_tv_192_168_11_82
+      - delay: "00:00:10"
+      - service: androidtv.adb_command
+        target:
+          entity_id: media_player.fire_tv_192_168_11_82
+        data:
+          command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
+  - alias: "Photo Frame - relaunch slideshow after idle"
+    trigger:
+      - platform: state
+        entity_id: media_player.fire_tv_192_168_11_82
+        attribute: current_app
+        to: "com.amazon.tv.launcher"
+        for: "00:10:00"
+    condition:
+      - condition: time
+        after: "09:00:00"
+        before: "21:00:00"
+      - condition: template
+        value_template: >
+          {% set last_exit = states('input_datetime.fire_tv_living_room_last_exit') %}
+          {% if last_exit in ['unknown', 'unavailable', 'None', ''] %}
+            true
+          {% else %}
+            {{ (now() - as_datetime(last_exit)).total_seconds() > 7200 }}
+          {% endif %}
+    action:
+      - service: androidtv.adb_command
+        target:
+          entity_id: media_player.fire_tv_192_168_11_82
+        data:
+          command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
+  - alias: "Photo Frame - end of window shutdown"
+    trigger:
+      - platform: time
+        at: "21:00:00"
+    condition:
+      - condition: state
+        entity_id: media_player.fire_tv_192_168_11_82
+        attribute: current_app
+        state: "de.ozerov.fully"
+    action:
+      - service: media_player.turn_off
+        target:
+          entity_id: media_player.fire_tv_192_168_11_82
