@@ -1,4 +1,23 @@
-# Living room Fire TV photo-frame slideshow (simplified design)
+# Photo-frame slideshow package (multi-TV)
+#
+# Two display clients, same FKB-renders-slideshow pattern:
+#
+#   media_player.fire_tv_192_168_11_82      Living room Fire TV
+#                                           Production. Scheduled
+#                                           morning wake + evening
+#                                           shutdown. Dashboard
+#                                           button on LRD-Test.
+#
+#   media_player.android_tv_192_168_11_108  Bedroom Hisense Google TV
+#                                           Dev/test surface. No
+#                                           schedule wired. Dashboard
+#                                           button only -- used when
+#                                           the living room TV is in
+#                                           active use and Scott wants
+#                                           to verify slideshow.html
+#                                           changes on a second
+#                                           platform (Chrome on Google
+#                                           TV vs Silk on Fire TV).
 #
 # Original design (see ADR-018 original section) tracked launcher-idle
 # state and auto-relaunched FKB after 10 min idle outside a 2 h
@@ -8,37 +27,49 @@
 # that didn't really happen, and the launcher-idle trigger is fragile
 # against Amazon's screensaver/rotation behavior anyway.
 #
-# Simplified to script-as-primitive + two thin time triggers:
+# Simplified to script-as-primitive + two thin time triggers (living
+# room only); bedroom mirrors the start script but no time triggers:
 #
-#   script.photo_frame_start  Reusable action sequence: power on
-#                             Fire TV, wait 10 s, ADB-launch FKB.
-#                             Callable from automations, scripts,
-#                             dashboards, Alexa routines (via HA
-#                             Cloud), or any HA service call.
+#   script.photo_frame_start          Reusable action sequence:
+#                                     power on living room Fire TV,
+#                                     wait 10 s, ADB-launch FKB.
+#                                     Callable from automations,
+#                                     scripts, dashboards, Alexa
+#                                     routines (via HA Cloud), or
+#                                     any HA service call.
 #
-#   09:00 daily               Morning wake automation calls
-#                             script.photo_frame_start -- starts the
-#                             slideshow if no one's around to do it
-#                             manually.
+#   script.photo_frame_start_bedroom  Same action chain targeting
+#                                     bedroom Google TV. Same FKB
+#                                     activity name (verified working
+#                                     on both Fire TV and Google TV).
+#                                     Manual invocation only.
 #
-#   23:00 daily               Evening shutdown powers the Fire TV
-#                             off ONLY if FKB is still foreground.
-#                             If a show is playing past 23:00, the
-#                             condition fails and HA does nothing.
+#   09:00 daily                       Morning wake automation calls
+#                                     script.photo_frame_start (living
+#                                     room) -- starts the slideshow if
+#                                     no one's around to do it
+#                                     manually. No bedroom equivalent.
+#
+#   23:00 daily                       Evening shutdown powers the
+#                                     living room Fire TV off ONLY if
+#                                     FKB is still foreground. If a
+#                                     show is playing past 23:00, the
+#                                     condition fails and HA does
+#                                     nothing. No bedroom equivalent.
+#
+# If bedroom is ever promoted to a production slideshow surface,
+# adding parallel morning_wake + end_of_day_shutdown automations is a
+# 5-minute copy with the entity ID swapped. Don't preemptively add
+# the schedule.
 #
 # Entry points for ad-hoc starts:
-#   - Dashboard button on HA Companion -> script.photo_frame_start
+#   - Dashboard button on HA Companion -> the appropriate start script
 #   - Alexa (Echo device, NOT the Fire TV remote's mic):
-#       expose script.photo_frame_start with friendly name "Photo
-#       Frame", then "Alexa, turn on photo frame"
+#       expose the start script(s) with friendly name "Photo Frame
+#       [Room]", then "Alexa, turn on photo frame [room]"
 #   - The Fire TV remote's mic button is unreliable here -- Alexa on
 #     Fire TV is content-search-biased and routes "open Fully Kiosk"
 #     to Prime Video catalog search instead of the installed app.
-#
-# Entity references:
-#   media_player.fire_tv_192_168_11_82
-#     ADB-over-TCP Fire TV (Android Debug Bridge integration), IoT
-#     VLAN at 192.168.11.82
 #
 # Slideshow source: http://192.168.50.10:8000/slideshow
 #   Mac Mini at LRD on the LRD-Servers VLAN, port 8000. UDM Pro
@@ -47,10 +78,11 @@
 # Related projects / sources of truth:
 #   scottdube/photo-frame    canonical YAML at
 #                            ha/photo-frame-automations.yaml.
-#                            *Drifted* from this file -- this file
-#                            represents the simplified design; the
-#                            upstream still has the original 4-automation
-#                            + helper structure. Reconcile when ready.
+#                            Bedroom script added there alongside
+#                            this addition (per 2026-05-16 hand-off);
+#                            the original 4-automation + helper
+#                            structure upstream remains drifted vs
+#                            this file's simplified design.
 #   scottdube/network-docs   firewall rule (IoT -> 192.168.50.10:8000)
 #
 # Notes worth knowing later:
@@ -61,20 +93,24 @@
 #     Android Debug Bridge integration (HA docs 2026.3.x). Known
 #     quirk (GitHub home-assistant/core #125579): the service can
 #     vanish if the integration's only device is unreachable at HA
-#     start. Fire TVs typically stay on the network when off so this
-#     shouldn't bite, but watch for it on the first 09:00 cold-start.
+#     start. With two devices on the integration the all-unreachable
+#     failure surface is slightly smaller than with one. Watch for it
+#     on the first 09:00 cold-start after a HA restart.
 #   - The FKB launch component
 #     `de.ozerov.fully/de.ozerov.fully.MainActivity` is standard per
-#     Fully Kiosk community docs. If `am start` errors after deploy:
+#     Fully Kiosk community docs and confirmed working on both Fire
+#     TV (Silk) and Hisense Google TV (Chrome) installs. If `am start`
+#     errors after deploy:
 #       adb shell dumpsys package de.ozerov.fully | grep -A1 -E "Activity|filter"
+#   - Generalize the start script when a 3rd TV is added. Refactor
+#     `photo_frame_start` into a script that takes a target
+#     parameter (HA scripts support `fields`). Living room +
+#     bedroom can stay duplicated for two TVs -- the lift isn't
+#     worth it yet.
 
 script:
   photo_frame_start:
-    alias: "Photo Frame: Start slideshow"
-    description: >
-      Power on the living room Fire TV (if off) and launch Fully Kiosk
-      Browser to display the slideshow. Reusable from automations,
-      dashboards, Alexa routines, or any HA service call.
+    alias: Start Photo Frame slideshow (living room Fire TV)
     sequence:
       - service: media_player.turn_on
         target:
@@ -83,6 +119,25 @@ script:
       - service: androidtv.adb_command
         target:
           entity_id: media_player.fire_tv_192_168_11_82
+        data:
+          command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
+
+  photo_frame_start_bedroom:
+    alias: Start Photo Frame slideshow (bedroom Google TV)
+    description: >
+      Powers on the bedroom Hisense Google TV (no-op if already on),
+      waits for it to settle, then launches Fully Kiosk Browser via
+      ADB. Used as a dev/test surface when the living room TV is in
+      active use; no scheduled automation wired to this script
+      (manual dashboard button only).
+    sequence:
+      - service: media_player.turn_on
+        target:
+          entity_id: media_player.android_tv_192_168_11_108
+      - delay: "00:00:10"
+      - service: androidtv.adb_command
+        target:
+          entity_id: media_player.android_tv_192_168_11_108
         data:
           command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
 

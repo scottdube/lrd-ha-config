@@ -105,6 +105,19 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 
 ---
 
+## TVs / display clients (photo-frame slideshow)
+
+| Device | Location | IP | Entity | FKB | Role |
+|---|---|---|---|---|---|
+| Amazon Fire TV | Living room | `192.168.11.82` (IoT VLAN) | `media_player.fire_tv_192_168_11_82` | Installed (Silk-based) | **Production.** Scheduled 09:00 wake + 23:00 foreground-gated shutdown. Dashboard button on LRD-Test. |
+| Hisense Google TV | Bedroom | `192.168.11.108` (IoT VLAN) | `media_player.android_tv_192_168_11_108` | Installed via `adb install` (Chrome-based) | **Dev/test surface.** Manual-only — no automation wired. Used to verify `slideshow.html` changes on a second platform without interrupting the living room. Dashboard button pending (Mushroom card YAML in ADR-018). |
+
+Both integrated via the **Android Debug Bridge (`androidtv`)** integration over IoT VLAN ADB-over-TCP. FKB launch component `de.ozerov.fully/de.ozerov.fully.MainActivity` is identical and confirmed working on both. Both render `http://192.168.50.10:8000/slideshow` from the LRD Mac Mini; the UDM Pro firewall rule for IoT → 192.168.50.10:8000 is the load-bearing cross-VLAN piece. Reference: ADR-018, `packages/photo-frame/photo_frame.yaml`.
+
+Known HA quirk: `androidtv.adb_command` service can vanish from HA if the integration's only device is unreachable at HA startup ([home-assistant/core #125579](https://github.com/home-assistant/core/issues/125579)). With two devices on the integration the all-unreachable failure surface is slightly smaller than with one, but watch for it on first 09:00 cold-start after HA restart.
+
+---
+
 ## WeatherFlow
 
 | Device | MAC | Notes |

@@ -1,11 +1,11 @@
-# ADR-018: Living room Fire TV photo-frame slideshow
+# ADR-018: Photo-frame slideshow (multi-TV)
 
-**Status:** Revised 2026-05-16 — original 4-automation + helper design simplified to script-as-primitive + 2 thin time triggers. See "Revision 2026-05-16" section at the end of this document for the current design. The original sections below are preserved for history.
+**Status:** Extended 2026-05-16 (same day, third revision) — bedroom Hisense Google TV added as a dev/test surface alongside the living room Fire TV. See "Addition 2026-05-16: bedroom Google TV (dev/test surface)" at the end. Prior: Revised 2026-05-16 — original 4-automation + helper design simplified to script-as-primitive + 2 thin time triggers (see "Revision 2026-05-16" section). The original sections below are preserved for history.
 
-**Date:** 2026-05-16 (original) / Revised 2026-05-16
+**Date:** 2026-05-16 (original) / Revised 2026-05-16 / Extended 2026-05-16 (bedroom added)
 **Decider:** Scott
 **Implementation:** `packages/photo-frame/photo_frame.yaml`
-**Upstream source of truth:** `scottdube/photo-frame` repo at `ha/photo-frame-automations.yaml` *(drifted from this implementation as of 2026-05-16 evening — upstream retains the original 4-automation + helper structure; reconcile when ready)*
+**Upstream source of truth:** `scottdube/photo-frame` repo at `ha/photo-frame-automations.yaml` *(bedroom script propagated upstream same day per 2026-05-16 hand-off; the upstream's original 4-automation + helper structure for the living room remains drifted vs. this file's simplified design)*
 
 ## Context
 
@@ -163,3 +163,77 @@ tap_action:
   action: perform-action
   perform_action: script.photo_frame_start
 ```
+
+---
+
+## Addition 2026-05-16: bedroom Google TV (dev/test surface)
+
+### Why
+
+A second TV — Hisense Google TV in the bedroom, HA entity `media_player.android_tv_192_168_11_108` — came online with FKB installed (via `adb install`) and verified rendering against the same `http://192.168.50.10:8000/slideshow` URL the living room TV uses. The bedroom TV is intentionally a **dev/test surface**, not a second production slideshow:
+
+- Slideshow development (changes to `slideshow.html`, new transition behaviors, new library views) needs verification on a second platform — Chrome on Google TV vs Silk on Fire TV — to catch platform-specific rendering issues before they hit the living room.
+- The bedroom TV is also useful when the living room TV is monopolized for normal viewing (Mary watching a show) and Scott still wants to exercise the slideshow stack.
+- The bedroom isn't meant to be an always-on family slideshow space, so the morning-wake / end-of-day-shutdown pattern doesn't apply.
+
+### Decision
+
+Add **only** a sibling start script — `script.photo_frame_start_bedroom` — targeting the bedroom entity. Same action chain as `script.photo_frame_start` with the entity ID swapped: `media_player.turn_on`, 10 s delay, `androidtv.adb_command "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"`. The FKB activity name is identical on both Fire TV and Google TV — empirically verified.
+
+**Not added (intentional):**
+
+- No `photo_frame_morning_wake_bedroom` automation. Bedroom is manual-start-only.
+- No `photo_frame_end_of_day_shutdown_bedroom` automation. Same reason.
+- No script generalization (single script with a `fields:` target parameter). With two TVs the duplication is trivial; the generalization lift isn't justified yet. **Revisit when a third TV lands** — see open follow-ups.
+
+For symmetry, the original `photo_frame_start` script's alias was updated to `Start Photo Frame slideshow (living room Fire TV)` so the two scripts are unambiguous in the HA Services dropdown. The service name remains `script.photo_frame_start` so existing dashboard button and morning-wake automation references don't break.
+
+### Bedroom dashboard button (storage-mode dashboard, manual re-add YAML)
+
+Dashboards are in storage mode (no Lovelace YAML in this repo), same situation as the living room button. Preserved here for future re-add. Place adjacent to the living room button on the LRD-Test dashboard.
+
+Mushroom template card (matches the living room button's style):
+
+```yaml
+type: custom:mushroom-template-card
+primary: Start bedroom slideshow
+secondary: Hisense Google TV
+icon: mdi:image-multiple
+icon_color: blue
+tap_action:
+  action: perform-action
+  perform_action: script.photo_frame_start_bedroom
+```
+
+Built-in button card alternative (no HACS dependency):
+
+```yaml
+type: button
+entity: script.photo_frame_start_bedroom
+name: Bedroom Photo Frame
+icon: mdi:image-multiple
+show_state: false
+tap_action:
+  action: perform-action
+  perform_action: script.photo_frame_start_bedroom
+```
+
+### Verification after deploy
+
+1. `script.reload` service call (or HA restart) so the new script is picked up.
+2. Developer Tools → Services → confirm `script.photo_frame_start_bedroom` is selectable.
+3. Tap the new dashboard button on LRD-Test → bedroom TV should power on (or stay on if already on), wait ~10 s, launch FKB; photos cycle.
+
+### Consequences
+
+Positive: trivially small change (~12 lines of YAML); same proven action chain; symmetric naming; second platform now exercised, which reduces the risk of slideshow regressions reaching the production living room TV unnoticed.
+
+Negative / open: a third TV would push duplication past the worthwhile threshold. The follow-up below tracks when generalization becomes the right move.
+
+Reversal cost: trivially low. Delete the script block and the dashboard button.
+
+### Open follow-ups (specific to this addition)
+
+- **Generalize the start script when a 3rd TV is added.** Refactor `photo_frame_start` into a single script that takes a target entity parameter (HA scripts support `fields`). Living room + bedroom can stay duplicated for two TVs.
+- **If bedroom becomes a production slideshow surface** (i.e. an always-on family display, not a dev/test surface), copy the living room's `photo_frame_morning_wake` + `photo_frame_end_of_day_shutdown` automations with the entity ID swapped. ~5 min of work — don't preemptively add the schedule.
+- **Per-TV library selection** (e.g. living room shows "Family", bedroom shows "Travel" when manually started) is blocked on the photo-frame hub's library/bucket model. Hub-side roadmap item; nothing to do on the HA side until the `?library=` query parameter exists on the hub.
