@@ -14,6 +14,18 @@
 # within ~2 min so Scott can intervene before salt cell stress or
 # stagnation become problems.
 #
+# Implementation note: uses the LEGACY `binary_sensor: - platform: template`
+# syntax rather than the modern `template:` integration. Reason: the main
+# configuration.yaml resolves `template:` via `!include config/templates.yaml`,
+# and HA's package merge silently drops a `template:` contribution from a
+# package when the main `template:` key is already populated by an include
+# (observed 2026-05-17: file parsed, automation registered, but the modern
+# `template:` binary_sensor never made it into the entity registry; no
+# log warning was emitted). The legacy `binary_sensor: - platform: template`
+# path goes under the `binary_sensor:` top-level key, which doesn't collide.
+# If config/templates.yaml is ever migrated into packages, this can move
+# back to the modern `template:` block.
+#
 # Related ADRs:
 #   - docs/decisions/019-omnilogic-recovery-playbook.md (this watcher
 #     is the proactive detection layer specified in section "Decision /
@@ -30,23 +42,18 @@
 #   - 2 min trigger duration matches the 120s priming/spin-up skip in
 #     auditor.py (PUMP_ON_NO_POWER_SKIP_SEC). Keep them in sync.
 
-template:
-  - binary_sensor:
-      - name: "Pool Pump On But No Power"
+binary_sensor:
+  - platform: template
+    sensors:
+      pool_pump_on_no_power:
+        friendly_name: "Pool Pump On But No Power"
         unique_id: pool_pump_on_no_power
         device_class: problem
-        # ON when:
-        #   pump_state = on  AND
-        #   power sensor is numeric (not unavailable/unknown)  AND
-        #   power < 50 W
-        # The for: 2m on the trigger absorbs Priming (90% speed reported
-        # with possibly lagging power telemetry) and controller spin-up,
-        # so we don't false-positive on a fresh PUMP START.
-        state: >
+        value_template: >
           {% set pump = states('switch.omnilogic_pool_filter_pump') %}
           {% set power = states('sensor.omnilogic_pool_filter_pump_power') | float(none) %}
           {{ pump == 'on' and power is not none and power < 50 }}
-        availability: >
+        availability_template: >
           {{ states('switch.omnilogic_pool_filter_pump') not in ['unknown', 'unavailable']
              and states('sensor.omnilogic_pool_filter_pump_power') not in ['unknown', 'unavailable'] }}
 
