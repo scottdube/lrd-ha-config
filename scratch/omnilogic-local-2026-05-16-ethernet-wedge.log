@@ -1,0 +1,83 @@
+s6-rc: info: service s6rc-oneshot-runner: starting
+s6-rc: info: service s6rc-oneshot-runner successfully started
+s6-rc: info: service fix-attrs: starting
+s6-rc: info: service fix-attrs successfully started
+s6-rc: info: service legacy-cont-init: starting
+s6-rc: info: service legacy-cont-init successfully started
+s6-rc: info: service legacy-services: starting
+services-up: info: copying legacy longrun home-assistant (no readiness notification)
+s6-rc: info: service legacy-services successfully started
+2026-05-16 21:52:52.861 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration midea_ac_lan which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.861 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration omnilogic which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.862 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration cafe which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.862 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration hacs which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.863 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration keymaster which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.863 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration battery_notes which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.863 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration alexa_media which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.863 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration ha_kia_hyundai which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.864 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration omnilogic_local which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.864 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration ha_carrier which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:52.864 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration flightradar24 which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-05-16 21:52:54.137 WARNING (MainThread) [homeassistant.components.hassio] Found incompatible HTTP option 'server_host'. Watchdog feature disabled
+2026-05-16 21:52:59.568 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.182 seconds (success: True)
+2026-05-16 21:53:01.115 WARNING (MainThread) [weatherflow4py.ws] Unrecognized WS Message: {"status":{"status_code":0,"status_message":"SUCCESS"},"device_id":429918,"type":"obs_st","summary":{"pressure_trend":"rising","strike_count_1h":200,"strike_count_3h":682,"precip_total_1h":6.048862,"strike_last_dist":1,"strike_last_epoch":1778982715,"precip_accum_local_yesterday":0.0,"precip_accum_local_yesterday_final":0.0,"precip_analysis_type_yesterday":0,"feels_like":25.2,"heat_index":25.2,"wind_chill":25.2,"dew_point":23.8,"wet_bulb_temperature":24.2,"wet_bulb_globe_temperature":24.5,"air_density":1.18526,"delta_t":1.0,"precip_minutes_local_day":1,"precip_minutes_local_yesterday":0},"obs":[[1778982775,0.8,2.5,4.0,296,6,1015.1,25.2,92,1,0.0,0,1.226302,2,2,4,2.63,1,7.275164,1.226302,7.275164,0]]}
+2026-05-16 21:53:01.265 WARNING (MainThread) [weatherflow4py.ws] Unrecognized WS Message: {"status":{"status_code":0,"status_message":"SUCCESS"},"device_id":180068,"type":"obs_st","summary":{"pressure_trend":"steady","strike_count_1h":0,"strike_count_3h":0,"precip_total_1h":0.0,"strike_last_dist":42,"strike_last_epoch":1776625235,"precip_accum_local_yesterday":6.82085,"precip_accum_local_yesterday_final":6.82085,"precip_analysis_type_yesterday":1,"feels_like":18.3,"heat_index":18.3,"wind_chill":18.3,"dew_point":10.6,"wet_bulb_temperature":13.9,"wet_bulb_globe_temperature":15.2,"air_density":1.20459,"delta_t":4.4,"precip_minutes_local_day":0,"precip_minutes_local_yesterday":239},"obs":[[1778982778,0.0,0.0,0.0,0,3,1007.8,18.3,61,1,0.0,0,0.0,0,0,0,2.68,1,0.0,0.0,0.0,0]]}
+2026-05-16 21:53:05.752 WARNING (MainThread) [aioesphomeapi.reconnect_logic] Can't connect to ESPHome API for voice-garage @ 192.168.11.229: Error connecting to [AddrInfo(family=<AddressFamily.AF_INET: 2>, type=<SocketKind.SOCK_STREAM: 1>, proto=6, sockaddr=IPv4Sockaddr(address='192.168.11.229', port=6053))]: [Errno 113] Connect call failed ('192.168.11.229', 6053) (SocketAPIError)
+2026-05-16 21:53:05.753 WARNING (MainThread) [aioesphomeapi.reconnect_logic] Can't connect to ESPHome API for pool-water-temp-external @ 192.168.11.111: Error connecting to [AddrInfo(family=<AddressFamily.AF_INET: 2>, type=<SocketKind.SOCK_STREAM: 1>, proto=6, sockaddr=IPv4Sockaddr(address='192.168.11.111', port=6053))]: [Errno 113] Connect call failed ('192.168.11.111', 6053) (SocketAPIError)
+2026-05-16 21:53:32.411 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.347 seconds (success: True)
+2026-05-16 21:54:02.400 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.337 seconds (success: True)
+2026-05-16 21:54:32.412 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.347 seconds (success: True)
+2026-05-16 21:55:02.416 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.353 seconds (success: True)
+2026-05-16 21:55:32.377 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.314 seconds (success: True)
+2026-05-16 21:56:02.445 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.382 seconds (success: True)
+2026-05-16 21:56:32.430 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.366 seconds (success: True)
+2026-05-16 21:57:02.442 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.378 seconds (success: True)
+2026-05-16 21:57:32.406 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.343 seconds (success: True)
+2026-05-16 21:58:02.425 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.362 seconds (success: True)
+2026-05-16 21:58:32.367 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.304 seconds (success: True)
+2026-05-16 21:59:02.485 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.421 seconds (success: True)
+2026-05-16 21:59:32.436 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.373 seconds (success: True)
+2026-05-16 22:00:00.073 WARNING (MainThread) [homeassistant.helpers.service] Referenced entities switch.omnilogic_pool_light are missing or not currently available
+2026-05-16 22:00:02.544 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.480 seconds (success: True)
+2026-05-16 22:00:32.415 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.351 seconds (success: True)
+2026-05-16 22:01:02.454 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.391 seconds (success: True)
+2026-05-16 22:01:32.398 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.334 seconds (success: True)
+2026-05-16 22:02:02.422 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.359 seconds (success: True)
+2026-05-16 22:02:32.435 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.372 seconds (success: True)
+2026-05-16 22:03:02.408 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.344 seconds (success: True)
+2026-05-16 22:03:32.455 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.391 seconds (success: True)
+2026-05-16 22:03:57.076 ERROR (MainThread) [homeassistant.core] Error running job: <Job listen logging_changed HassJobType.Callback <bound method ESPHomeManager._async_handle_logging_changed of <homeassistant.components.esphome.manager.ESPHomeManager object at 0x7f95ab643e40>>>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/core.py", line 1540, in async_fire_internal
+    self._hass.async_run_hass_job(job, event)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/core.py", line 902, in async_run_hass_job
+    hassjob.target(*args)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/components/esphome/manager.py", line 904, in _async_handle_logging_changed
+    self._async_subscribe_logs(new_log_level)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/components/esphome/manager.py", line 541, in _async_subscribe_logs
+    self._cancel_subscribe_logs = self.cli.subscribe_logs(
+                                  ~~~~~~~~~~~~~~~~~~~~~~~^
+        self._async_on_log, self._log_level
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.14/site-packages/aioesphomeapi/client.py", line 461, in subscribe_logs
+    return self._get_connection().send_message_callback_response(
+           ~~~~~~~~~~~~~~~~~~~~^^
+  File "aioesphomeapi/client_base.py", line 389, in aioesphomeapi.client_base.APIClientBase._get_connection
+  File "aioesphomeapi/client_base.py", line 391, in aioesphomeapi.client_base.APIClientBase._get_connection
+aioesphomeapi.core.APIConnectionError: Not connected to voice-garage @ 192.168.11.229!
+2026-05-16 22:04:02.432 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.367 seconds (success: True)
+2026-05-16 22:04:32.435 DEBUG (MainThread) [custom_components.omnilogic.common] Finished fetching Omnilogic data in 0.371 seconds (success: True)
+2026-05-16 22:04:33.769 DEBUG (MainThread) [pyomnilogic_local.api.protocol] no ACK for message ID 15635, will retry
+2026-05-16 22:04:33.769 DEBUG (MainThread) [pyomnilogic_local.api.protocol] transmitting message ID: 15636, type: GET_TELEMETRY (attempt 3/6)
+2026-05-16 22:04:37.771 DEBUG (MainThread) [pyomnilogic_local.api.protocol] no ACK for message ID 15636, will retry
+2026-05-16 22:04:37.771 DEBUG (MainThread) [pyomnilogic_local.api.protocol] transmitting message ID: 15637, type: GET_TELEMETRY (attempt 4/6)
+2026-05-16 22:04:41.773 DEBUG (MainThread) [pyomnilogic_local.api.protocol] no ACK for message ID 15637, will retry
+2026-05-16 22:04:41.773 DEBUG (MainThread) [pyomnilogic_local.api.protocol] transmitting message ID: 15638, type: GET_TELEMETRY (attempt 5/6)
+2026-05-16 22:04:45.775 DEBUG (MainThread) [pyomnilogic_local.api.protocol] no ACK for message ID 15638, will retry
+2026-05-16 22:04:45.775 DEBUG (MainThread) [pyomnilogic_local.api.protocol] transmitting message ID: 15639, type: GET_TELEMETRY (attempt 6/6)
+2026-05-16 22:04:49.777 DEBUG (MainThread) [pyomnilogic_local.api.protocol] connection lost: None
