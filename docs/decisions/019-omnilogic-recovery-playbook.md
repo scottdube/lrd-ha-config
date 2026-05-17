@@ -79,7 +79,7 @@ When HA reports anomalous pool state, do the following in order:
 Two layers, both implemented as part of this ADR:
 
 - **Retrospective (auditor):** new P5 assertion in `pool/scripts/auditor.py` — flags any pump-on run >5 min where `local_filter_power < 50 W`. Surfaces class-2 incidents in the nightly audit pass.
-- **Proactive (HA):** new package `packages/pool/pool_health_watcher.yaml` — template binary sensor `pool_pump_on_no_power` + automation that fires `notify.scott_and_ha` within ~2 min of the condition holding. Gated by `input_boolean.pool_integration_recovering` (ADR-016) to suppress false positives during the post-recovery reconciliation window.
+- **Proactive (HA):** new package `packages/pool/pool_health_watcher.yaml` — single automation `automation.pool_alert_on_pump_on_but_no_power` with an inline `platform: template` trigger (`for: 2m`) that fires `notify.scott_and_ha` when pump_state=on AND power<50W for sustained period. Gated by `input_boolean.pool_integration_recovering` (ADR-016) to suppress false positives during the post-recovery reconciliation window. **Implementation history (2026-05-17):** two prior attempts using separate template binary_sensor entities both failed silently — modern `template: - binary_sensor:` was dropped by HA's package merge (collides with `template: !include config/templates.yaml` in main config), and legacy `binary_sensor: - platform: template` parsed without error but never registered an entity (consistent with deprecation/restriction of the legacy platform in HA 2026.x with silent-fail shim). The template-trigger-inside-automation pattern sidesteps both by not touching the `template:` or `binary_sensor:` top-level keys at all.
 
 Neither detection layer distinguishes between class 1 and class 2 on its own — both observe "pump_on with no power." The triage step (check OmniLogic UI) is what disambiguates them. This is intentional: the alert is "something is wrong, go look," and the human-in-the-loop interpretation is the diagnostic.
 
@@ -105,7 +105,7 @@ Neither detection layer distinguishes between class 1 and class 2 on its own —
 
 - 2026-05-17 incident: post-cycle observation confirmed `sensor.omnilogic_pool_filter_pump_power` left 0 W and `local_water_temp` left `unknown` within the expected window. Live state log timestamps captured in `docs/current-state.md` Pool automation in-flight section.
 - P5 assertion: validated against the 2026-05-17 daily slice — should FAIL on the 08:00:01-08:44:05 window (43 min of pump_on with power=0).
-- Watcher: bench-validate by forcing the binary sensor on (template editor → publish `pool_pump_on_no_power` true via dev tools state override) and confirm the automation fires within 2 min and routes through `notify.scott_and_ha` to both mobile and bell.
+- Watcher: bench-validate by temporarily editing `value_template` to a constant `true`, restart HA, confirm the automation fires within 2 min and routes through `notify.scott_and_ha` to both mobile and bell, then revert. (The template trigger has no separate state-publishable entity, so the trigger expression itself is what needs to be forced for the test.)
 
 ---
 

@@ -88,7 +88,7 @@ Two distinct failure modes have been observed within a 22-hour window. Both are 
 
 **Detection layers:**
 
-- **Proactive:** `binary_sensor.pool_pump_on_no_power` (template) + `automation.pool_alert_on_pump_on_but_no_power` — fires `notify.scott_and_ha` within ~2 min when pump_state=on AND power<50W. See `packages/pool/pool_health_watcher.yaml`.
+- **Proactive:** `automation.pool_alert_on_pump_on_but_no_power` with an inline `platform: template` trigger (`for: 2m`) — fires `notify.scott_and_ha` within ~2 min when pump_state=on AND power<50W. See `packages/pool/pool_health_watcher.yaml`. No separate binary_sensor entity (see ADR-019 implementation history for why — two prior binary_sensor approaches both failed silently against HA 2026.4.x package + template-platform constraints).
 - **Retrospective:** auditor assertion P5 (`pump_on_actually_drawing_power`) in `pool/scripts/auditor.py` — same logic, runs nightly on the daily slice.
 
 Neither layer distinguishes the two classes on its own — the alert is "go look," and the OmniLogic UI alarms panel is the diagnostic.
