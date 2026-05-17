@@ -14,17 +14,23 @@
 # within ~2 min so Scott can intervene before salt cell stress or
 # stagnation become problems.
 #
-# Implementation note: uses the LEGACY `binary_sensor: - platform: template`
-# syntax rather than the modern `template:` integration. Reason: the main
-# configuration.yaml resolves `template:` via `!include config/templates.yaml`,
-# and HA's package merge silently drops a `template:` contribution from a
-# package when the main `template:` key is already populated by an include
-# (observed 2026-05-17: file parsed, automation registered, but the modern
-# `template:` binary_sensor never made it into the entity registry; no
-# log warning was emitted). The legacy `binary_sensor: - platform: template`
-# path goes under the `binary_sensor:` top-level key, which doesn't collide.
-# If config/templates.yaml is ever migrated into packages, this can move
-# back to the modern `template:` block.
+# Implementation note: this watcher uses a template-platform AUTOMATION
+# TRIGGER rather than a standalone template binary_sensor. Two prior
+# attempts in this same package both failed silently:
+#   1. Modern `template: - binary_sensor:` block — dropped by HA's
+#      package merge because configuration.yaml resolves `template:` via
+#      `!include config/templates.yaml`; package's template: list never
+#      merged with the include's resolved value. No log warning.
+#   2. Legacy `binary_sensor: - platform: template` — file parsed,
+#      no errors, but the entity never appeared in the state registry.
+#      Consistent with the legacy template platform being deprecated /
+#      restricted in HA 2026.x with a silent-fail compatibility shim.
+# A template platform trigger inside the automation itself sidesteps
+# both issues — it doesn't register a separate entity and doesn't touch
+# the `template:` or `binary_sensor:` top-level keys. Functionally
+# equivalent to the binary_sensor + state trigger pattern: the template
+# is re-evaluated whenever any referenced entity changes; the `for:`
+# duration absorbs the priming/spin-up window before firing.
 #
 # Related ADRs:
 #   - docs/decisions/019-omnilogic-recovery-playbook.md (this watcher
@@ -39,23 +45,8 @@
 #
 # Tuning notes (must stay aligned with auditor.py constants):
 #   - 50 W power threshold matches PUMP_ON_POWER_MIN_W in auditor.py
-#   - 2 min trigger duration matches the 120s priming/spin-up skip in
-#     auditor.py (PUMP_ON_NO_POWER_SKIP_SEC). Keep them in sync.
-
-binary_sensor:
-  - platform: template
-    sensors:
-      pool_pump_on_no_power:
-        friendly_name: "Pool Pump On But No Power"
-        unique_id: pool_pump_on_no_power
-        device_class: problem
-        value_template: >
-          {% set pump = states('switch.omnilogic_pool_filter_pump') %}
-          {% set power = states('sensor.omnilogic_pool_filter_pump_power') | float(none) %}
-          {{ pump == 'on' and power is not none and power < 50 }}
-        availability_template: >
-          {{ states('switch.omnilogic_pool_filter_pump') not in ['unknown', 'unavailable']
-             and states('sensor.omnilogic_pool_filter_pump_power') not in ['unknown', 'unavailable'] }}
+#   - 2 min trigger `for:` duration matches the 120s priming/spin-up
+#     skip in auditor.py (PUMP_ON_NO_POWER_SKIP_SEC). Keep them in sync.
 
 automation:
   - alias: "Pool: Alert on pump-on but no power"
@@ -71,10 +62,11 @@ automation:
       quiet during tech service work.
     mode: single
     trigger:
-      - platform: state
-        entity_id: binary_sensor.pool_pump_on_no_power
-        from: "off"
-        to: "on"
+      - platform: template
+        value_template: >
+          {% set pump = states('switch.omnilogic_pool_filter_pump') %}
+          {% set power = states('sensor.omnilogic_pool_filter_pump_power') | float(none) %}
+          {{ pump == 'on' and power is not none and power < 50 }}
         for: "00:02:00"
     condition:
       - condition: state
