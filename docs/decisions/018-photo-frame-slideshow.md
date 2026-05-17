@@ -186,7 +186,12 @@ Add **only** a sibling start script — `script.photo_frame_start_bedroom` — t
 - No `photo_frame_end_of_day_shutdown_bedroom` automation. Same reason.
 - No script generalization (single script with a `fields:` target parameter). With two TVs the duplication is trivial; the generalization lift isn't justified yet. **Revisit when a third TV lands** — see open follow-ups.
 
-For symmetry, the original `photo_frame_start` script's alias was updated to `Start Photo Frame slideshow (living room Fire TV)` so the two scripts are unambiguous in the HA Services dropdown. The service name remains `script.photo_frame_start` so existing dashboard button and morning-wake automation references don't break.
+For symmetry and to match what was already in use on the live HA instance, both scripts use the short `Photo Frame: <Room>` alias pattern:
+
+- `script.photo_frame_start` → alias `Photo Frame: Living Room`
+- `script.photo_frame_start_bedroom` → alias `Photo Frame: Bedroom`
+
+Service names are unchanged so existing dashboard button and morning-wake automation references don't break. Both scripts also carry parallel `description:` blocks in the YAML so the package file is the source of truth for their UI metadata (previously the deployed living-room script had a friendlier alias and a description that lived only on the NUC and never made it back to git — that drift is now closed).
 
 ### Bedroom dashboard button (storage-mode dashboard, manual re-add YAML)
 

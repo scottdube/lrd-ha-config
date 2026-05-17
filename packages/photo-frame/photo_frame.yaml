@@ -110,7 +110,13 @@
 
 script:
   photo_frame_start:
-    alias: Start Photo Frame slideshow (living room Fire TV)
+    alias: "Photo Frame: Living Room"
+    description: >
+      Powers on the living room Fire TV (no-op if already on), waits
+      for it to settle, then launches Fully Kiosk Browser via ADB.
+      Production photo-frame surface: called by the 09:00 morning
+      wake automation, the 23:00 foreground-gated shutdown's
+      counterpart, and the LRD-Test dashboard button.
     sequence:
       - service: media_player.turn_on
         target:
@@ -123,7 +129,7 @@ script:
           command: "am start -n de.ozerov.fully/de.ozerov.fully.MainActivity"
 
   photo_frame_start_bedroom:
-    alias: Start Photo Frame slideshow (bedroom Google TV)
+    alias: "Photo Frame: Bedroom"
     description: >
       Powers on the bedroom Hisense Google TV (no-op if already on),
       waits for it to settle, then launches Fully Kiosk Browser via
