@@ -1,0 +1,65 @@
+# Living Room TV (Universal media_player wrapping the Fire TV stick)
+#
+# Inherits all transport controls (play/pause/prev/next/source/power)
+# from media_player.fire_tv_192_168_11_82; overlays volume_up,
+# volume_down, and volume_mute as ADB keyevents that the Fire TV
+# forwards to the TV via HDMI-CEC.
+#
+# Why: the Fire TV stick itself reports no volume capability in its
+# supported_features bitmask (audio lives on the TV, not the stick),
+# so any card that respects the bitmask -- including the Mushroom
+# Media card -- hides volume controls when pointed at the raw
+# Fire TV entity. CEC keyevents from the stick work because the TV
+# obeys CEC volume from the Fire TV the same way it obeys the Fire
+# TV remote's volume buttons. The universal platform auto-computes
+# supported_features from declared commands, so volume_up / down /
+# mute now show up as supported on this entity, and the card
+# renders + / - / mute.
+#
+# Prerequisite: HDMI-CEC must be ON in the living room TV's
+# settings AND the Fire TV remote's physical volume buttons must
+# already control TV volume. If the remote's volume keys don't
+# work, this package won't either -- enable CEC in the TV menu
+# first (vendor-specific naming: Anynet+, BRAVIA Sync, Simplink,
+# CEC, etc.). Cheap pre-flight check: in Developer Tools ->
+# Services run `androidtv.adb_command` against the Fire TV with
+# `command: "input keyevent 25"` (KEYCODE_VOLUME_DOWN) and watch
+# whether the TV volume actually drops.
+#
+# Volume slider: not supported. Fire TV has no "set TV volume to
+# 40%" CEC command; only relative up / down / mute. Mushroom Media
+# card will render + / - buttons and a mute button, no slider.
+#
+# Entity created: media_player.living_room_tv
+# Service names unchanged on the underlying Fire TV entity, so
+# nothing already pointing at `media_player.fire_tv_192_168_11_82`
+# breaks. To get volume controls in any card, swap that card's
+# entity to `media_player.living_room_tv`.
+#
+# Keep the bedroom Hisense Google TV card on its own entity
+# (media_player.android_tv_192_168_11_108) -- separate device,
+# separate volume path; not wrapped here because bedroom is a
+# dev/test surface and doesn't get used for normal TV viewing.
+
+media_player:
+  - platform: universal
+    name: Living Room TV
+    unique_id: living_room_tv_universal
+    children:
+      - media_player.fire_tv_192_168_11_82
+    commands:
+      volume_up:
+        service: androidtv.adb_command
+        data:
+          entity_id: media_player.fire_tv_192_168_11_82
+          command: "input keyevent 24"
+      volume_down:
+        service: androidtv.adb_command
+        data:
+          entity_id: media_player.fire_tv_192_168_11_82
+          command: "input keyevent 25"
+      volume_mute:
+        service: androidtv.adb_command
+        data:
+          entity_id: media_player.fire_tv_192_168_11_82
+          command: "input keyevent 164"
