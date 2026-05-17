@@ -38,6 +38,7 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 ### Resolved
 - **WiFi packet loss to controller (~30-40% per ping test).** Resolved 2026-04-30 by temporary ethernet run (zero errors over 7 hours). Permanent in-wall Cat 6 run completed by Shepard Electric on 2026-05-16. Soffit-dangling temp cable retired.
 - **Local API wedge from ethernet disturbance (2026-05-16, ~11:00 EDT).** Controller's local UDP listener stopped ACKing `GET_TELEMETRY` packets after the Cat 6 was disconnected at ~11:19 EDT during the in-wall run. Cloud channel and ICMP unaffected throughout (controller's outbound TCP stack recovered cleanly; only the inbound UDP listener got stuck). HA restart bought ~12 min of working state before re-wedging — log shows clean polling from 21:53 to 22:04:33, then 6 retries with no ACK, then graceful UDP teardown ("connection lost: None"). Resolved by power-cycling the controller via the pool sub-panel breaker at the main service panel. Plausible mechanism: controller firmware's UDP protocol state machine doesn't recover from an L1 link interruption (inferred from single incident; not vendor-confirmed). Diagnostic log: `scratch/omnilogic-local-2026-05-16-ethernet-wedge.log`.
+- **MSP↔peripheral comm-loss to VSP and OPLMP (2026-05-17, ~08:00 EDT).** OmniLogic UI displayed `MSP_DEV_COMM_LOSS,Comm Loss Device:VSP HUA:10-01-15-49-9a` and `MSP_DEV_COMM_LOSS,Comm Loss Device:OPLMP HUA:a1-44-15-1b-56`. From HA's perspective the integration was healthy — toggle commands round-tripped cleanly through `unavailable → off → on`, `local_filter_state_enum` transitioned `Off → Priming → On`, `local_filter_speed` updated to 55. But `sensor.omnilogic_pool_filter_pump_power` stayed at 0 W and `local_water_temp` stayed `unknown` because no physical equipment was actually responding. Failure was at the proprietary 4-wire Hayward bus between the MSP and the two specific peripheral devices, not at any layer HA can see. Resolved by power-cycling the controller via the pool sub-panel breaker (same physical action as the 2026-05-16 wedge, but for a different reason — HUA re-handshake on boot per Hayward TSG-OL150c). Plausible triggers: surge damage from the prior day's thunderstorm, comm-module stress from the 22:12 breaker cycle, age-related comm-board degradation; not disambiguated by this incident. Watch-item: if `MSP_DEV_COMM_LOSS` recurs within 30 days, schedule VSP/OPLMP comm-board replacement rather than continuing to power-cycle through it. Full reasoning in ADR-019.
 - **GitHub issue #173.** Resolved by maintainer in newer integration releases.
 
 ---
@@ -76,13 +77,32 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 
 ---
 
+## Failure-mode triage
+
+Two distinct failure modes have been observed within a 22-hour window. Both are fixed by a controller power-cycle, but they have different symptoms and different operational implications. **Check the OmniLogic web UI alarms panel first** — that's the cheap probe that disambiguates them. Full reasoning in ADR-019.
+
+| Symptom in HA | Symptom in OmniLogic UI | Class | Severity | Recovery |
+|---|---|---|---|---|
+| Sensors stale, integration logs `Failed to update data`, eventually entities go `unavailable` | Usually clean (no alarms) | Integration↔MSP wedge | Read-side stale | Try integration reload first. If no recovery in ~60 sec, breaker-cycle. |
+| State changes ack cleanly in HA but `local_filter_power = 0` with pump claimed on; `local_water_temp` stays `unknown` despite pump claimed on | `MSP_DEV_COMM_LOSS,Comm Loss Device:<device> HUA:<address>` alarm(s) | MSP↔peripheral comm-loss | Write-side dead (chlorinator may dose into dead leg — worst for salt cell) | Breaker-cycle directly (HUA re-handshake on boot). Do NOT reload integration first — integration is healthy. |
+
+**Detection layers:**
+
+- **Proactive:** `binary_sensor.pool_pump_on_no_power` (template) + `automation.pool_alert_on_pump_on_but_no_power` — fires `notify.scott_and_ha` within ~2 min when pump_state=on AND power<50W. See `packages/pool/pool_health_watcher.yaml`.
+- **Retrospective:** auditor assertion P5 (`pump_on_actually_drawing_power`) in `pool/scripts/auditor.py` — same logic, runs nightly on the daily slice.
+
+Neither layer distinguishes the two classes on its own — the alert is "go look," and the OmniLogic UI alarms panel is the diagnostic.
+
+---
+
 ## Useful commands
 
 When the integration goes weird, in order of escalation:
 
+0. **Check the OmniLogic web UI alarms panel FIRST** — if `MSP_DEV_COMM_LOSS` alarms are present, this is a class-2 failure (see Failure-mode triage). Skip directly to step 6; reloading the integration won't help and the integration may already report healthy.
 1. **Reload integration** — Settings → Devices & Services → OmniLogic Local → Reload
 2. **Restart HA** — handles deeper state issues
 3. **Audit registry** — Settings → Devices & Services → entities, filter `omnilogic`, look for `unavailable`
 4. **Check controller link** — UniFi → Client Devices → confirm controller is on ethernet, check switch port for errors
 5. **Diagnostic dump** — for new issues, integration → ⋮ menu → Download diagnostics
-6. **Power-cycle the controller** — if reload, restart, and link checks all pass but local UDP is still silent (cloud + ping still working), the controller's UDP listener is wedged. Kill the pool sub-panel breaker at the main service panel for ~30 seconds, then restore. UDP listener takes 60–120 seconds to recover after the display lights up. Required after any ethernet disturbance (see Setup quirks).
+6. **Power-cycle the controller** — if reload, restart, and link checks all pass but local UDP is still silent (cloud + ping still working), the controller's UDP listener is wedged. Also the recovery for `MSP_DEV_COMM_LOSS` alarms (HUA re-handshake on boot). Kill the pool sub-panel breaker at the main service panel for ~30 seconds, then restore. UDP listener takes 60–120 seconds to recover after the display lights up. Required after any ethernet disturbance (see Setup quirks).

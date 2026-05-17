@@ -1,0 +1,93 @@
+# Pool health watcher — equipment-vs-state cross-check
+#
+# Detects the failure mode observed 2026-05-17 08:00 EDT: OmniLogic Local
+# integration reports filter_state=on at speed 55, but
+# sensor.omnilogic_pool_filter_pump_power stays at 0 W indefinitely.
+# Indicates the controller acked the command but the equipment side isn't
+# actually drawing power — either a VFD/relay wedge, telemetry-feedback
+# wedge, or (the canonical case so far) a MSP_DEV_COMM_LOSS to the VSP
+# peripheral on the Hayward control bus.
+#
+# Paired auditor assertion: P5 (pump_on_actually_drawing_power) in
+# pool/scripts/auditor.py — same logic, retrospective, runs nightly on
+# the daily slice. This watcher is the proactive sibling that pages
+# within ~2 min so Scott can intervene before salt cell stress or
+# stagnation become problems.
+#
+# Related ADRs:
+#   - docs/decisions/019-omnilogic-recovery-playbook.md (this watcher
+#     is the proactive detection layer specified in section "Decision /
+#     3. Detection")
+#   - docs/decisions/016-integration-recovery-debounce.md (supplies
+#     input_boolean.pool_integration_recovering, the gate boolean that
+#     suppresses false positives during the 5-min post-recovery window)
+#   - docs/decisions/011-pool-service-mode.md (supplies
+#     input_boolean.pool_service_lockout, gates so the watcher doesn't
+#     fire when the tech has the pump intentionally off via the panel)
+#
+# Tuning notes (must stay aligned with auditor.py constants):
+#   - 50 W power threshold matches PUMP_ON_POWER_MIN_W in auditor.py
+#   - 2 min trigger duration matches the 120s priming/spin-up skip in
+#     auditor.py (PUMP_ON_NO_POWER_SKIP_SEC). Keep them in sync.
+
+template:
+  - binary_sensor:
+      - name: "Pool Pump On But No Power"
+        unique_id: pool_pump_on_no_power
+        device_class: problem
+        # ON when:
+        #   pump_state = on  AND
+        #   power sensor is numeric (not unavailable/unknown)  AND
+        #   power < 50 W
+        # The for: 2m on the trigger absorbs Priming (90% speed reported
+        # with possibly lagging power telemetry) and controller spin-up,
+        # so we don't false-positive on a fresh PUMP START.
+        state: >
+          {% set pump = states('switch.omnilogic_pool_filter_pump') %}
+          {% set power = states('sensor.omnilogic_pool_filter_pump_power') | float(none) %}
+          {{ pump == 'on' and power is not none and power < 50 }}
+        availability: >
+          {{ states('switch.omnilogic_pool_filter_pump') not in ['unknown', 'unavailable']
+             and states('sensor.omnilogic_pool_filter_pump_power') not in ['unknown', 'unavailable'] }}
+
+automation:
+  - alias: "Pool: Alert on pump-on but no power"
+    id: pool_alert_on_pump_on_but_no_power
+    description: >
+      Fires when the integration reports the pump is running at a non-zero
+      speed but power telemetry stays at 0 W (or below 50 W) for 2+ minutes.
+      Sustained mismatch indicates an OmniLogic wedge — see ADR-019 for the
+      two failure modes and the triage flow.
+      Gated by input_boolean.pool_integration_recovering (ADR-016) so the
+      5-min post-recovery reconciliation window doesn't false-positive, and
+      by input_boolean.pool_service_lockout (ADR-011) so the watcher stays
+      quiet during tech service work.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.pool_pump_on_no_power
+        from: "off"
+        to: "on"
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_integration_recovering
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: pump-on / no-power mismatch"
+          message: >
+            Pool filter pump reports ON at
+            {{ states('number.omnilogic_pool_filter_pump_speed') }}%
+            but power = {{ states('sensor.omnilogic_pool_filter_pump_power') }} W.
+            Likely OmniLogic wedge (ADR-019). Check OmniLogic UI alarms
+            panel for MSP_DEV_COMM_LOSS; recovery is a controller power-cycle
+            via the pool sub-panel breaker.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_pump_no_power

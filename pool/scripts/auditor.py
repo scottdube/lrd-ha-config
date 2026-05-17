@@ -42,7 +42,7 @@ OUT_DEFAULT = "/config/pool/audit/"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
 NOTIFY_TARGET = "scott_and_ha"
-AUDITOR_VERSION = "1.1.0"
+AUDITOR_VERSION = "1.2.0"
 
 WATERFALL_START_DEFAULT = time(8, 0)
 WATERFALL_END_DEFAULT = time(20, 0)
@@ -60,6 +60,23 @@ HEATER_TEMP_DELTA_MIN_F = 0.3
 HEATER_TEMP_WINDOW_MIN = 60
 INTEGRATION_FAIL_PCT_MAX = 3.0
 MIDNIGHT_BURST_END = time(1, 30)
+
+# P5 (pump_on_actually_drawing_power) — detects MSP↔peripheral comm-loss
+# per ADR-019. Threshold + skip window are empirical:
+#   - 50 W floor: well below any real pump speed setting (normal 55% draws
+#     a few hundred W per cube law), well above the 0 W measured during
+#     2026-05-17 wedge. Tune downward if logger v2 captures pump power
+#     during very-low-speed running that legitimately reads < 50 W.
+#   - 120 sec skip window: covers Priming (90% speed reported but power
+#     telemetry can lag) and the controller spin-up window after PUMP
+#     START. The 2026-05-17 incident's Priming→On transition completed at
+#     +2m10s with power still 0 — outside this window, so the assertion
+#     would have caught it.
+#   - 5 min sustained-run threshold: avoids tripping on a single sample
+#     glitch from the integration's power sensor.
+PUMP_ON_NO_POWER_FAIL_MIN = 5
+PUMP_ON_POWER_MIN_W = 50
+PUMP_ON_NO_POWER_SKIP_SEC = 120
 
 
 @dataclass
@@ -448,6 +465,95 @@ def assert_p4(rows, cols) -> Result:
     return r
 
 
+def assert_p5(rows, cols) -> Result:
+    """Pump-on but no power draw — see ADR-019.
+
+    Fires for both classes of OmniLogic wedge:
+      - integration↔controller wedge where state is stale and power is also
+        stale at 0 (rare; usually integration goes unavailable first)
+      - MSP↔peripheral comm-loss where commands ack but the VSP isn't
+        actually running (2026-05-17 incident)
+
+    Skips the first PUMP_ON_NO_POWER_SKIP_SEC of each pump-on run to absorb
+    Priming + controller spin-up latency. Coalesces consecutive
+    sub-threshold rows into runs; FAILs only if any run reaches the
+    sustained threshold.
+    """
+    r = Result("P5", "pump_on_actually_drawing_power", status="PASS",
+               expected=f"when local_filter_state=on for >{PUMP_ON_NO_POWER_FAIL_MIN} consecutive min "
+                        f"(after a {PUMP_ON_NO_POWER_SKIP_SEC}s priming/spin-up skip), "
+                        f"local_filter_power must be >={PUMP_ON_POWER_MIN_W} W; "
+                        f"zero power with state=on indicates an OmniLogic wedge",
+               severity="high")
+    needed = ["local_filter_state", "local_filter_power"]
+    if any(c not in cols for c in needed):
+        r.status = "SKIP"; r.reason = "required columns missing"; return r
+    violations = []
+    run_start = None
+    for a, b in zip(rows, rows[1:]):
+        ta, tb = parse_ts(a["timestamp"]), parse_ts(b["timestamp"])
+        if not (ta and tb):
+            continue
+        if pump_on(a) is not True:
+            run_start = None
+            continue
+        if run_start is None:
+            run_start = ta
+        # Skip priming + spin-up window
+        if (ta - run_start).total_seconds() < PUMP_ON_NO_POWER_SKIP_SEC:
+            continue
+        p = to_float(a.get("local_filter_power"))
+        if p is None:
+            continue
+        # Treat unavailable/unknown power separately — that's an integration
+        # data gap, not the same as "pump claims on but reads 0 W"
+        raw = (a.get("local_filter_power") or "").lower()
+        if raw in ("unavailable", "unknown", ""):
+            continue
+        if p < PUMP_ON_POWER_MIN_W:
+            dur = (tb - ta).total_seconds() / 60.0
+            violations.append({"timestamp": a["timestamp"],
+                               "local_filter_state": a.get("local_filter_state"),
+                               "local_filter_speed": a.get("local_filter_speed"),
+                               "local_filter_power": a.get("local_filter_power"),
+                               "duration_min": round(dur, 2)})
+    # Coalesce consecutive violations into runs; FAIL if any run accumulates
+    # >= PUMP_ON_NO_POWER_FAIL_MIN.
+    failing_runs = []
+    cur_run_min = 0.0
+    cur_run_start = None
+    prev_ts = None
+    for v in violations:
+        vts = parse_ts(v["timestamp"])
+        if cur_run_start is None:
+            cur_run_start = v["timestamp"]
+            cur_run_min = v["duration_min"]
+        else:
+            # Treat a gap > 2 min between consecutive sub-threshold rows
+            # as a break in the run (avoids merging across pump cycles).
+            gap = (vts - prev_ts).total_seconds() / 60.0 if prev_ts else 0
+            if gap > 2:
+                cur_run_start = v["timestamp"]
+                cur_run_min = v["duration_min"]
+            else:
+                cur_run_min += v["duration_min"]
+        if cur_run_min >= PUMP_ON_NO_POWER_FAIL_MIN:
+            failing_runs.append({"started": cur_run_start,
+                                 "duration_min_so_far": round(cur_run_min, 2)})
+            cur_run_start = None
+            cur_run_min = 0.0
+        prev_ts = vts
+    if failing_runs:
+        r.status = "FAIL"
+        r.observed = (f"{len(failing_runs)} pump-on run(s) with power <{PUMP_ON_POWER_MIN_W} W "
+                      f"for >={PUMP_ON_NO_POWER_FAIL_MIN} min — check OmniLogic UI for "
+                      f"MSP_DEV_COMM_LOSS alarms (ADR-019)")
+        r.violating_rows = (failing_runs + violations)[:10]
+    else:
+        r.observed = "all pump-on intervals showed expected power draw"
+    return r
+
+
 def assert_h1(rows, cols, swim) -> Result:
     r = Result("H1", "heater_state_matches_swim_day", status="PASS",
                expected="heater on iff swimming_day; allow 1 mismatch in first 10 min",
@@ -582,6 +688,7 @@ def run_audit(rows: list[dict], cols: list[str]) -> dict:
         assert_p2(rows, cols, swim),
         assert_p3(rows, cols),
         assert_p4(rows, cols),
+        assert_p5(rows, cols),
         assert_h1(rows, cols, swim),
         assert_h2(rows, cols),
         assert_h3(rows, cols),
