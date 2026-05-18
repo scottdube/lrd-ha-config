@@ -113,6 +113,13 @@ Setup:
 
 The integration's config entry lives in `.storage/core.config_entries` (not version-controlled). If `.storage` is ever rebuilt, repeat these steps to restore the entity; the watcher automation in `packages/pool/pool_health_watcher.yaml` will start working again as soon as the entity exists.
 
+**Diagnostic entities (packet loss, jitter, RTT average/min/max)** are disabled by default. Enable them in Settings → Devices & Services → Ping → click the device → enable in the entity list. Once enabled, they're referenced by:
+
+- `automation.pool_alert_on_controller_network_degrading` (watcher on packet loss >10%) — see `packages/pool/pool_health_watcher.yaml`
+- "Pool Controller Network Health" dashboard card — see `pool/docs/dashboard-cards.md` for paste-ready Mushroom YAML
+
+Note that diagnostic entity IDs use the host IP (`sensor.192_168_11_19_packet_loss` etc.) rather than the device name. If the controller IP ever changes, all references in the watcher YAML and the dashboard card YAML need to be updated.
+
 ---
 
 ## Useful commands
