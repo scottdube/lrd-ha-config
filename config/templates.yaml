@@ -72,8 +72,8 @@
       device_class: power
       state_class: measurement
       state: >
-        {{ (states('sensor.emporiavue_panel_a_circuit_9_air_1_condenser_power') | float(0)
-            + states('sensor.emporiavue_panel_b_circuit_9_air_1_handler_power') | float(0)) }}
+        {{ (states('sensor.emporia_vue_panel_a_circuit_9_air_1_condenser_power') | float(0)
+            + states('sensor.emporia_vue_panel_b_circuit_9_air_1_handler_power') | float(0)) }}
 
     - name: "Air #1 Total Daily Energy"
       unique_id: air_1_total_daily_energy
@@ -81,8 +81,8 @@
       device_class: energy
       state_class: total_increasing
       state: >
-        {{ (states('sensor.emporiavue_panel_a_circuit_9_air_1_condenser_daily_energy') | float(0)
-            + states('sensor.emporiavue_panel_b_circuit_9_air_1_handler_daily_energy') | float(0)) }}
+        {{ (states('sensor.emporia_vue_panel_a_circuit_9_air_1_condenser_daily_energy') | float(0)
+            + states('sensor.emporia_vue_panel_b_circuit_9_air_1_handler_daily_energy') | float(0)) }}
 
     - name: "Air #2 Total Power"
       unique_id: air_2_total_power
@@ -90,8 +90,8 @@
       device_class: power
       state_class: measurement
       state: >
-        {{ (states('sensor.emporiavue_panel_b_circuit_10_air_2_condenser_power') | float(0)
-            + states('sensor.emporiavue_panel_a_circuit_5_air_2_handler_power') | float(0)) }}
+        {{ (states('sensor.emporia_vue_panel_b_circuit_10_air_2_condenser_power') | float(0)
+            + states('sensor.emporia_vue_panel_a_circuit_5_air_2_handler_power') | float(0)) }}
 
     - name: "Air #2 Total Daily Energy"
       unique_id: air_2_total_daily_energy
@@ -99,8 +99,8 @@
       device_class: energy
       state_class: total_increasing
       state: >
-        {{ (states('sensor.emporiavue_panel_b_circuit_10_air_2_condenser_daily_energy') | float(0)
-            + states('sensor.emporiavue_panel_a_circuit_5_air_2_handler_daily_energy') | float(0)) }}
+        {{ (states('sensor.emporia_vue_panel_b_circuit_10_air_2_condenser_daily_energy') | float(0)
+            + states('sensor.emporia_vue_panel_a_circuit_5_air_2_handler_daily_energy') | float(0)) }}
 
     - name: Pool Rain Status
       unique_id: pool_rain_status

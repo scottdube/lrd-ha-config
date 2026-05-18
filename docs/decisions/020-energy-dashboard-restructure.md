@@ -75,3 +75,11 @@ Group membership for HVAC and Always-on is auditable inline in `packages/energy/
 - `energy/README.md`: sub-project structure, install context
 - `integrations/emporia-vue-3.md`: Vue 3 ESPHome configuration details
 - `docs/current-state.md`: open threads on energy cross-validation
+
+## Update 2026-05-18 evening — Carrier "broken integration" was our typo
+
+The first writeup attributed `sensor.air_1_total_daily_energy` and `sensor.air_2_total_daily_energy` reading 0 to a Carrier-integration regression. Wrong — these are template sensors in `config/templates.yaml` that sum `condenser + handler` per Carrier Infinity system, and the four templates referenced `sensor.emporiavue_panel_…` (no underscore) instead of the actual `sensor.emporia_vue_panel_…`. The summed entities never existed, so the templates always evaluated to `0 + 0 = 0`. The fix is a single replace-all in `config/templates.yaml`. After reload, `air_1_total_power` / `air_1_total_daily_energy` and the Air 2 pair report combined system load — these are the entities the Detail tab's HVAC chart and "Major loads" glance now use (replacing the per-circuit condenser-only entities, which under-counted by ~10-20% depending on handler load).
+
+The OmniLogic energy cross-val was also a paper tiger — the `151732…` entities only exist in historical LTS (integration renamed them); the live `sensor.omnilogic_pool_filter_pump_power` reads correctly and matches Vue pool subpanel to ~1.4% at idle filter speeds. Only the Midea garage mini split cross-val remains permanently unavailable, and that's a model-level integration limit, not a config bug.
+
+Net effect: Vue is no longer load-bearing-alone. The cross-checks are operational everywhere the hardware allows.
