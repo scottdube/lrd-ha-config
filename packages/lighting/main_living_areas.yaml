@@ -3,8 +3,8 @@
 # Targets: living room cans, kitchen cans, under-cabinet lights.
 #
 # Phases:
-#   - Cycling (09:00 → sunset-1h): lux below 9000 (5 min) → ON; lux above
-#     12000 (5 min) → OFF. Full-track behavior (option a, no manual override
+#   - Cycling (09:00 → sunset-1h): lux below 10000 (5 min) → ON; lux above
+#     13000 (5 min) → OFF. Full-track behavior (option a, no manual override
 #     tracking). 09:00 wake re-evaluates current lux.
 #   - Dusk hold (at sunset-1h): lights ON, latched. Bedtime automation
 #     handles OFF.
@@ -17,7 +17,7 @@
 #   - Everyone leaves: 15-min delayed off + set house_empty_extended flag.
 #     Returns within 15 min cancel the off.
 #   - Welcome home: first arrival to empty house (house_empty_extended=on)
-#     → turn on lights if lux<9000 OR past sunset-1h. Flag cleared on any
+#     → turn on lights if lux<10000 OR past sunset-1h. Flag cleared on any
 #     return (whether or not lights actually came on).
 #
 # Sister entity light.wall_dimmer_switch_kitche_4 (Kitchen 4 Cans) is NOT
@@ -44,18 +44,18 @@ automation:
     alias: "Main Living: Lux Cycling"
     description: >
       Daytime lux-driven cycling for main living areas (09:00 → sunset-1h).
-      <9000 lux for 5 min → lights ON. >12000 lux for 5 min → lights OFF.
+      <10000 lux for 5 min → lights ON. >13000 lux for 5 min → lights OFF.
       09:00 wake re-evaluates current lux. No manual override tracking.
     mode: single
     triggers:
       - trigger: numeric_state
         entity_id: sensor.st_00184974_illuminance
-        below: 9000
+        below: 10000
         for: "00:05:00"
         id: lux_low
       - trigger: numeric_state
         entity_id: sensor.st_00184974_illuminance
-        above: 12000
+        above: 13000
         for: "00:05:00"
         id: lux_high
       - trigger: time
@@ -89,7 +89,7 @@ automation:
                 target:
                   entity_id: light.living_wall_dimmer_switch
                 data:
-                  brightness_pct: 60
+                  brightness_pct: 40
               - action: light.turn_on
                 target:
                   entity_id: light.kit_cans_wall_dimmer_switch
@@ -122,13 +122,13 @@ automation:
                   - conditions:
                       - condition: numeric_state
                         entity_id: sensor.st_00184974_illuminance
-                        below: 9000
+                        below: 10000
                     sequence:
                       - action: light.turn_on
                         target:
                           entity_id: light.living_wall_dimmer_switch
                         data:
-                          brightness_pct: 60
+                          brightness_pct: 40
                       - action: light.turn_on
                         target:
                           entity_id: light.kit_cans_wall_dimmer_switch
@@ -142,7 +142,7 @@ automation:
                   - conditions:
                       - condition: numeric_state
                         entity_id: sensor.st_00184974_illuminance
-                        above: 12000
+                        above: 13000
                     sequence:
                       - action: light.turn_off
                         target:
@@ -150,7 +150,7 @@ automation:
                             - light.living_wall_dimmer_switch
                             - light.kit_cans_wall_dimmer_switch
                             - light.wall_dimmer_switch_under_cab
-                  # 9000-12000 dead band at 09:00 → no action
+                  # 10000-13000 dead band at 09:00 → no action
 
   - id: main_living_dusk_hold
     alias: "Main Living: Dusk Hold"
@@ -236,7 +236,7 @@ automation:
     description: >
       First arrival to empty house (house_empty_extended=on). Flag is
       cleared unconditionally on any return. Lights come on only if
-      lux<9000 OR past sunset-1h.
+      lux<10000 OR past sunset-1h.
     mode: single
     triggers:
       - trigger: state
@@ -262,7 +262,7 @@ automation:
             conditions:
               - condition: numeric_state
                 entity_id: sensor.st_00184974_illuminance
-                below: 9000
+                below: 10000
               - condition: sun
                 after: sunset
                 after_offset: "-01:00:00"
@@ -271,7 +271,7 @@ automation:
             target:
               entity_id: light.living_wall_dimmer_switch
             data:
-              brightness_pct: 60
+              brightness_pct: 40
           - action: light.turn_on
             target:
               entity_id: light.kit_cans_wall_dimmer_switch
