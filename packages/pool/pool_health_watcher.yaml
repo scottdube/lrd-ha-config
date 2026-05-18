@@ -136,11 +136,17 @@ automation:
       pool_integration_recovering boolean isn't relevant.
       If the controller is also unreachable at the network layer, the
       class-3 watcher will fire too (separate notification tag).
+      Trigger note (2026-05-18): originally used a state trigger with
+      `to: "unavailable"`. Validated empirically against the 2026-05-17
+      overnight outage that the state trigger did NOT fire across 10
+      hours of unavailable state — HA's state trigger semantics around
+      `to: "unavailable"` are not reliable. Switched to template trigger
+      below, which re-evaluates on every state change and treats the
+      `for:` duration as continuous truthy-result hold time.
     mode: single
     trigger:
-      - platform: state
-        entity_id: switch.omnilogic_pool_filter_pump
-        to: "unavailable"
+      - platform: template
+        value_template: "{{ states('switch.omnilogic_pool_filter_pump') == 'unavailable' }}"
         for: "00:10:00"
     action:
       - service: notify.scott_and_ha
