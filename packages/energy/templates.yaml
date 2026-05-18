@@ -1,0 +1,148 @@
+# Energy analysis template sensors
+#
+# Aggregations that the Energy dashboard's UI grouping can't express:
+#   - Whole-home power and daily energy (Panel A + Panel B)
+#   - HVAC subtotal (Air 1 + Air 2 condensers + handlers + garage mini split)
+#   - Always-on / baseload subtotal (network rack, recirc pump, refrigerator,
+#     family-room + master-bed lanai standby — circuits with non-trivial 2-5 AM draw
+#     that aren't tied to occupant activity)
+#
+# See ADR-020 for the rationale and the source data behind which circuits land in
+# each subtotal.
+#
+# Important: ESPHome's total_daily_energy sensors report in Wh and reset at
+# midnight. HA's long-term statistics treat them as total_increasing and compute
+# the per-hour delta correctly. The kWh template sensors below mirror that
+# behavior — they sum the underlying Wh values and divide by 1000.
+
+template:
+  - sensor:
+      # ---------- Power (W, measurement) ----------
+      - name: "Whole Home Power"
+        unique_id: whole_home_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set a = states('sensor.emporia_vue_panel_a_total_power') | float(0) %}
+          {% set b = states('sensor.emporia_vue_panel_b_total_power') | float(0) %}
+          {{ (a + b) | round(0) }}
+        availability: >
+          {{ has_value('sensor.emporia_vue_panel_a_total_power')
+             and has_value('sensor.emporia_vue_panel_b_total_power') }}
+
+      - name: "HVAC Power"
+        unique_id: hvac_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set ids = [
+            'sensor.emporia_vue_panel_a_circuit_5_air_2_handler_power',
+            'sensor.emporia_vue_panel_a_circuit_9_air_1_condenser_power',
+            'sensor.emporia_vue_panel_a_circuit_10_garage_mini_split_power',
+            'sensor.emporia_vue_panel_b_circuit_9_air_1_handler_power',
+            'sensor.emporia_vue_panel_b_circuit_10_air_2_condenser_power',
+          ] %}
+          {{ ids | map('states') | map('float', 0) | sum | round(0) }}
+
+      - name: "Pool Subpanel Power"
+        unique_id: pool_subpanel_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.emporia_vue_panel_a_circuit_1_pool_subpanel_power') | float(0) | round(0) }}"
+
+      - name: "Always On Power"
+        unique_id: always_on_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        # Circuits that draw continuously regardless of occupant activity.
+        # Refrigerator is here despite cycling — its long-term average is essentially always-on.
+        state: >
+          {% set ids = [
+            'sensor.emporia_vue_panel_a_circuit_2_refrigerator_power',
+            'sensor.emporia_vue_panel_a_circuit_14_network_rack_power',
+            'sensor.emporia_vue_panel_b_circuit_4_family_rm_lanai_power',
+            'sensor.emporia_vue_panel_b_circuit_5_master_bed_lanai_power',
+            'sensor.emporia_vue_panel_b_circuit_15_garage_gfi_panel_wall_power',
+            'sensor.hot_water_recirc_pump_power',
+          ] %}
+          {{ ids | map('states') | map('float', 0) | sum | round(0) }}
+
+      # ---------- Daily energy (kWh, total_increasing — reset at midnight) ----------
+      - name: "Whole Home Daily Energy"
+        unique_id: whole_home_daily_energy
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {% set a = states('sensor.emporia_vue_panel_a_total_daily_energy') | float(0) %}
+          {% set b = states('sensor.emporia_vue_panel_b_total_daily_energy') | float(0) %}
+          {{ ((a + b) / 1000.0) | round(3) }}
+
+      - name: "HVAC Daily Energy"
+        unique_id: hvac_daily_energy
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {% set ids = [
+            'sensor.emporia_vue_panel_a_circuit_5_air_2_handler_daily_energy',
+            'sensor.emporia_vue_panel_a_circuit_9_air_1_condenser_daily_energy',
+            'sensor.emporia_vue_panel_a_circuit_10_garage_mini_split_daily_energy',
+            'sensor.emporia_vue_panel_b_circuit_9_air_1_handler_daily_energy',
+            'sensor.emporia_vue_panel_b_circuit_10_air_2_condenser_daily_energy',
+          ] %}
+          {{ ((ids | map('states') | map('float', 0) | sum) / 1000.0) | round(3) }}
+
+      - name: "Always On Daily Energy"
+        unique_id: always_on_daily_energy
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {% set ids = [
+            'sensor.emporia_vue_panel_a_circuit_2_refrigerator_daily_energy',
+            'sensor.emporia_vue_panel_a_circuit_14_network_rack_daily_energy',
+            'sensor.emporia_vue_panel_b_circuit_4_family_rm_lanai_daily_energy',
+            'sensor.emporia_vue_panel_b_circuit_5_master_bed_lanai_daily_energy',
+            'sensor.emporia_vue_panel_b_circuit_15_garage_gfi_panel_wall_daily_energy',
+          ] %}
+          {{ ((ids | map('states') | map('float', 0) | sum) / 1000.0) | round(3) }}
+
+      - name: "Pool Subpanel Daily Energy kWh"
+        unique_id: pool_subpanel_daily_energy_kwh
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        # ESPHome reports Wh; provide a kWh mirror so the Energy dashboard +
+        # cost columns line up with the rest of the templates.
+        state: "{{ (states('sensor.emporia_vue_panel_a_circuit_1_pool_subpanel_daily_energy') | float(0) / 1000.0) | round(3) }}"
+
+  # ---------- Trigger-based baseload (W, captured once per night) ----------
+  # Samples the Whole Home Power at 03:30 local — deep enough into the night
+  # that occupant activity is unlikely, late enough that the dryer/dishwasher
+  # have ended their cycles. Holds the value for 24h until the next sample.
+  - trigger:
+      - platform: time
+        at: "03:30:00"
+    sensor:
+      - name: "Whole Home Baseload"
+        unique_id: whole_home_baseload
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.whole_home_power') | float(0) | round(0) }}"
+        attributes:
+          captured_at: "{{ now().isoformat() }}"
+
+      - name: "Always On Baseload"
+        unique_id: always_on_baseload
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.always_on_power') | float(0) | round(0) }}"
+        attributes:
+          captured_at: "{{ now().isoformat() }}"

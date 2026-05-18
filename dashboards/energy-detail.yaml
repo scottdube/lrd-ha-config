@@ -1,0 +1,172 @@
+# Energy Detail dashboard — Lovelace YAML
+#
+# Not loaded automatically. To enable: Settings → Dashboards → Add Dashboard →
+# Start with an empty dashboard → save → then in dashboard edit mode use
+# "Raw configuration editor" and paste the contents below. Or convert HA to
+# yaml-mode dashboards and reference this file from configuration.yaml.
+#
+# This dashboard complements (does not replace) the built-in Energy dashboard.
+# It is meant for the "is anything weird right now?" / "what's the trend?"
+# questions that the built-in dashboard does not answer well at 30+ circuits.
+
+title: Energy Detail
+icon: mdi:lightning-bolt
+views:
+  - title: Live
+    icon: mdi:gauge
+    cards:
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            name: Whole Home
+            entity: sensor.whole_home_power
+            unit: W
+            min: 0
+            max: 20000
+            severity:
+              green: 0
+              yellow: 8000
+              red: 14000
+          - type: gauge
+            name: HVAC
+            entity: sensor.hvac_power
+            unit: W
+            min: 0
+            max: 12000
+            severity:
+              green: 0
+              yellow: 6000
+              red: 9000
+          - type: gauge
+            name: Pool Subpanel
+            entity: sensor.pool_subpanel_power
+            unit: W
+            min: 0
+            max: 5000
+            severity:
+              green: 0
+              yellow: 2000
+              red: 4000
+
+      - type: glance
+        title: Major loads (live W)
+        columns: 4
+        entities:
+          - entity: sensor.emporia_vue_panel_a_circuit_9_air_1_condenser_power
+            name: Air 1 Cond
+          - entity: sensor.emporia_vue_panel_b_circuit_10_air_2_condenser_power
+            name: Air 2 Cond
+          - entity: sensor.emporia_vue_panel_a_circuit_10_garage_mini_split_power
+            name: Garage MS
+          - entity: sensor.emporia_vue_panel_a_circuit_3_water_heater_power
+            name: Water Htr
+          - entity: sensor.emporia_vue_panel_a_circuit_14_network_rack_power
+            name: Network
+          - entity: sensor.hot_water_recirc_pump_power
+            name: Recirc
+          - entity: sensor.emporia_vue_panel_a_circuit_2_refrigerator_power
+            name: Fridge
+          - entity: sensor.always_on_power
+            name: Always On
+
+      - type: entities
+        title: Today so far (kWh)
+        entities:
+          - entity: sensor.whole_home_daily_energy
+            name: Whole home
+          - entity: sensor.hvac_daily_energy
+            name: HVAC
+          - entity: sensor.pool_subpanel_daily_energy_kwh
+            name: Pool subpanel
+          - entity: sensor.always_on_daily_energy
+            name: Always-on
+          - entity: sensor.emporia_vue_panel_a_circuit_3_water_heater_daily_energy
+            name: Water heater
+          - entity: sensor.emporia_vue_panel_b_circuit_1_dryer_daily_energy
+            name: Dryer
+
+  - title: Trends
+    icon: mdi:chart-line
+    cards:
+      - type: statistics-graph
+        title: Daily total — whole home (last 14 days)
+        chart_type: bar
+        period: day
+        days_to_show: 14
+        stat_types:
+          - change
+        entities:
+          - sensor.emporia_vue_panel_a_total_daily_energy
+          - sensor.emporia_vue_panel_b_total_daily_energy
+
+      - type: statistics-graph
+        title: HVAC daily (last 14 days)
+        chart_type: bar
+        period: day
+        days_to_show: 14
+        stat_types:
+          - change
+        entities:
+          - sensor.emporia_vue_panel_a_circuit_9_air_1_condenser_daily_energy
+          - sensor.emporia_vue_panel_b_circuit_10_air_2_condenser_daily_energy
+          - sensor.emporia_vue_panel_a_circuit_10_garage_mini_split_daily_energy
+
+      - type: statistics-graph
+        title: Pool subpanel daily (last 14 days)
+        chart_type: bar
+        period: day
+        days_to_show: 14
+        stat_types:
+          - change
+        entities:
+          - sensor.emporia_vue_panel_a_circuit_1_pool_subpanel_daily_energy
+
+      - type: statistics-graph
+        title: Baseload trend (Whole Home Baseload sample at 03:30)
+        chart_type: line
+        period: day
+        days_to_show: 30
+        stat_types:
+          - mean
+        entities:
+          - sensor.whole_home_baseload
+          - sensor.always_on_baseload
+
+  - title: Calibration
+    icon: mdi:scale-balance
+    cards:
+      - type: entities
+        title: Unmonitored (lower = better calibration)
+        entities:
+          - entity: sensor.emporia_vue_panel_a_unmonitored_power
+            name: Panel A unmonitored (W)
+          - entity: sensor.emporia_vue_panel_b_unmonitored_power
+            name: Panel B unmonitored (W)
+          - entity: sensor.emporia_vue_panel_a_unmonitored_daily_energy
+            name: Panel A unmonitored (today, Wh)
+          - entity: sensor.emporia_vue_panel_b_unmonitored_daily_energy
+            name: Panel B unmonitored (today, Wh)
+          - entity: sensor.emporia_vue_panel_a_l1_voltage
+            name: Panel A L1 voltage
+          - entity: sensor.emporia_vue_panel_a_l2_voltage
+            name: Panel A L2 voltage
+          - entity: sensor.emporia_vue_panel_b_l1_voltage
+            name: Panel B L1 voltage
+          - entity: sensor.emporia_vue_panel_b_l2_voltage
+            name: Panel B L2 voltage
+
+      - type: entities
+        title: Cross-validation sources (FLAG — currently broken)
+        entities:
+          - entity: sensor.air_1_total_daily_energy
+            name: Carrier Air 1 total (broken — reads 0)
+          - entity: sensor.air_2_total_daily_energy
+            name: Carrier Air 2 total (broken — reads 0)
+          - entity: sensor.garage_ms_energy_total
+            name: Midea garage MS total (broken — reads 0)
+          - entity: sensor.garage_ms_power_realtime
+            name: Midea garage MS power (broken — reads 0)
+          - entity: sensor.151732605885732_total_energy_consumption
+            name: OmniLogic total (no LTS data)
+          - entity: sensor.omnilogic_pool_filter_pump_power
+            name: OmniLogic filter pump (works)
