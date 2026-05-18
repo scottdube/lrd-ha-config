@@ -163,6 +163,42 @@ automation:
               interruption-level: time-sensitive
             tag: pool_integration_wedge
 
+  - alias: "Pool: Alert on controller network degrading"
+    id: pool_alert_on_controller_network_degrading
+    description: >
+      Class 3a (early warning) — fires when ping packet loss to the
+      OmniLogic controller stays elevated (>10%) for 5+ min. Catches
+      degrading cable/network conditions BEFORE the binary_sensor
+      goes off (which requires sustained 100% loss). Complementary
+      to pool_alert_on_omnilogic_controller_unreachable.
+      Entity ID note: HA's ping integration names diagnostic sensors
+      after the host IP (`sensor.192_168_11_19_packet_loss`) rather
+      than the device name. Ugly but functional. If the controller IP
+      ever changes (DHCP reassignment, network reorg), this entity ID
+      will be regenerated and this watcher will silently stop firing
+      until the entity_id is updated to match. DHCP reservation is in
+      place per integrations/omnilogic.md, so IP should be stable.
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.192_168_11_19_packet_loss
+        above: 10
+        for: "00:05:00"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: controller network degrading"
+          message: >
+            Ping packet loss to the OmniLogic controller is
+            {{ states('sensor.192_168_11_19_packet_loss') }}% over the
+            last 5+ min. Cable or network is degrading — investigate
+            before it goes fully unreachable. Re-crimp may have failed,
+            or in-wall cable damage may be developing.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_controller_degrading
+
   - alias: "Pool: Alert on OmniLogic controller unreachable"
     id: pool_alert_on_omnilogic_controller_unreachable
     description: >

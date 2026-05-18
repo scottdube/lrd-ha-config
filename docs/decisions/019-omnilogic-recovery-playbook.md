@@ -10,7 +10,7 @@
 
 ## Context
 
-Three distinct OmniLogic failure modes observed within 24 hours, prompting the three-class taxonomy this ADR defines:
+Three distinct OmniLogic failure modes observed within 24 hours, prompting the three-class taxonomy this ADR defines. Note (added 2026-05-18): a sweep of Hayward's own alarm-notification emails (`from:no-reply@haywardomnilogic.com`) revealed the VSP comm-loss is a **6-week intermittent trend**, not a fresh failure — class-2 events on Apr 7 (VSP only, minutes) and May 1 (VSP only, ~12 min, with No Water Flow co-alarm) predate any of the recent cable work. The May 16-17 and May 17-18 dual-device 10.5-hour overnight events are an escalation of an existing trend, not a new failure mode. The recent in-wall Cat 6 work + breaker cycles likely accelerated an already-failing comm board — they didn't cause it.
 
 | Date | Symptom in HA | Symptom in OmniLogic UI | ICMP to controller | Resolution | Class |
 |---|---|---|---|---|---|
@@ -71,12 +71,32 @@ When HA reports anomalous pool state, do the following in order:
 
 ### 2. Recovery procedure for classes 1 and 2
 
-1. Kill the equipment breakers at the main service panel: pool sub-panel breaker. (For class 2 specifically, Hayward recommends killing both the MSP and equipment-power breakers separately — but the pool sub-panel kills both simultaneously, which is operationally simpler and has worked multiple times now.)
+**Two procedures, pick based on board health (updated 2026-05-18):**
+
+**Preferred — staged power-cycle at the equipment-pad breakers:**
+
+1. At the pool sub-panel at the equipment pad, kill BOTH the controller breaker and the pump (equipment) breaker.
+2. Restore the **controller breaker FIRST**.
+3. Wait 20–30 seconds for the controller display to come up and reach the home screen.
+4. **Then** restore the pump/equipment breaker.
+
+This sequence lets the MSP finish booting and stabilize its bus before the equipment loads ask it to re-handshake their HUAs. Empirically more reliable than the simultaneous procedure when comm boards are degraded — observed 2026-05-17 evening and 2026-05-18 morning: simultaneous failed to clear the alarms, sequenced succeeded.
+
+**Acceptable — simultaneous pool-sub-panel breaker at the indoor main service panel:**
+
+1. Kill the pool sub-panel breaker at the main service panel.
 2. Wait 30 seconds.
-3. Restore the pool sub-panel breaker.
-4. Wait for the controller display to light up and reach the home screen (~30-60 sec).
-5. Verify in OmniLogic UI: alarms should auto-clear if HUA re-handshake succeeded.
-6. Verify in HA: integration entities should leave `unavailable` within ~60-120 sec; `local_filter_power` should jump to its expected range when next pump-on cycle fires.
+3. Restore.
+4. Wait for display to come up (~30–60 sec).
+
+Works when comm boards are healthy. Doesn't require equipment-pad access (useful at night, in storms, etc.). Becomes unreliable once boards are degraded — last reliable use 2026-05-17 morning; subsequent attempts have not cleared the alarms.
+
+**Verify after either procedure:**
+
+- OmniLogic UI: alarms should auto-clear if HUA re-handshake succeeded.
+- HA: integration entities should leave `unavailable` within ~60-120 sec; `local_filter_power` should jump to its expected range when next pump-on cycle fires.
+
+**Why the staged procedure works better on degraded boards (inferred):** per Hayward TSG-OL150c, HUA can be "lost" on breaker trips — the boards must re-register on boot. A simultaneous power restore brings equipment power up at the same instant as MSP power, so the equipment side starts trying to handshake with an MSP that hasn't finished its own boot/bus initialization. Healthy boards retry until the MSP is ready; degraded boards apparently don't retry reliably. The 20-30 sec staged delay gives the MSP time to be ready when the equipment first talks to it.
 
 ### 3. Recovery procedure for class 3 (physical/network)
 
@@ -103,6 +123,7 @@ Two layers, both implemented as part of this ADR:
   - **Class 2 — MSP↔peripheral comm-loss.** `automation.pool_alert_on_pump_on_but_no_power` — inline `platform: template` trigger (`for: 2m`) on pump_state=on AND power<50W. Gated by `input_boolean.pool_integration_recovering` (ADR-016) to suppress false positives during the post-recovery reconciliation window, and `input_boolean.pool_service_lockout` (ADR-011) to stay quiet during tech service work.
   - **Class 3 — physical/network.** `automation.pool_alert_on_omnilogic_controller_unreachable` — state trigger on `binary_sensor.pool_controller_reachable` going `off` for 5+ min. The ping binary_sensor is set up via HA UI (Settings → Devices & Services → Add Integration → Ping (ICMP), host `192.168.11.19`, name `Pool Controller Reachable`, count 3, scan_interval 30) because the ping YAML configuration was deprecated in HA 2023.12 — `binary_sensor: - platform: ping` now triggers HA Repair warnings. The UI-created entity lives in `.storage` (not git), but the referencing automation is in git and the setup procedure is documented in `integrations/omnilogic.md`.
   - All three automations use distinct iOS notification tags so they collapse into separate threads — at-a-glance you know which layer is broken. Class-3 fires first when the controller goes off the network entirely; class-1 follows ~5 min later (integration times out); seeing both together is the canonical class-3 signature.
+- **Independent vendor channel — Hayward's own alarm emails.** Hayward's OmniLogic system emails `scott@dubecars.com` from `no-reply@haywardomnilogic.com` on alarm fired AND alarm cleared events, with exact timestamps, device names, and HUA addresses. This is OUT-of-band — doesn't depend on HA, the integration, the LRD network, or anything in our stack. Independent of class-1/2/3 detection above. Useful for two reasons: (a) audit trail when presenting to Hayward dealer / service tech (their own system documents the events, can't be argued with), (b) catches events HA can miss if HA is down or the integration is wedged. Gmail filter: `from:no-reply@haywardomnilogic.com`. Discovered 2026-05-18 — was passively accumulating in inbox; the 6-week VSP comm-loss trend was reconstructed from these emails after the fact.
   - **Implementation history for class 2 (2026-05-17):** two prior attempts using separate template binary_sensor entities both failed silently — modern `template: - binary_sensor:` was dropped by HA's package merge (collides with `template: !include config/templates.yaml` in main config), and legacy `binary_sensor: - platform: template` parsed without error but never registered an entity (consistent with deprecation/restriction of the legacy platform in HA 2026.x with silent-fail shim). The template-trigger-inside-automation pattern sidesteps both by not touching the `template:` or `binary_sensor:` top-level keys at all.
 
 ### 6. Documentation
@@ -120,6 +141,100 @@ Two layers, both implemented as part of this ADR:
 **Not addressed:** dealer service-mode access. If HUA re-handshake fails after a power-cycle (the device is permanently lost from the MSP), the recovery path is dealer / installer-mode re-add. Scott does not currently have the installer code. If class 2 recurs and breaker-cycle stops resolving it, dealer call becomes the next step. Procuring the installer code defensively is out of scope.
 
 **Watch-item:** if class-2 incidents recur within a 30-day window, the VSP or OPLMP comm board is the most likely failing component and replacement should be scheduled rather than continuing to power-cycle through it. Comm boards that fail intermittently typically fail permanently within weeks of the first incident.
+
+---
+
+## Addendum 2026-05-18: firmware-version diagnostic + multi-issue synthesis
+
+### Controller firmware versions (captured 2026-05-18 from System Info screen)
+
+| Component | HUA | Version |
+|---|---|---|
+| MSP | 06-44-15-01-ab | R.5.2.0-b28706 |
+| VSP | 10-01-15-49-9a | R.1.0.17 |
+| Heater | 20-01-70-3a-03 | R.1.1.3 |
+| OPLMP | a1-44-15-1b-56 | R.4.0.1 |
+
+MSP ID: 324825. Photo: `pool-controller-firmware-2026-05-18.jpg` (workspace).
+
+**MSP is on 5.2.0** — the Hayward-recommended version after the April 2026 5.3.0 revert advisory (community evidence on Trouble Free Pool). This rules out the "5.3.0 firmware bug → revert to 5.2.0" remediation path; Scott was never on 5.3.0. Whatever's causing the class-2 alarms is present in 5.2.0 itself or in one of the peripheral firmwares.
+
+**VSP firmware R.1.0.17** is a low version number — worth checking if newer VSP firmware exists that addresses comm-board reset behavior. If a VSP firmware update is available and clears the alarms, that's the cheapest fix path before any hardware replacement.
+
+### T&D Pool Construction professional opinion (Billy Blackburn, 2026-05-18)
+
+Billy's diagnosis via text exchange:
+
+> "The issue is the pump is not resetting if you turn the breaker off in the garage for 5mins then back in it should correct the issue. Hayward is working on an update to fix it but until that comes out, this is how you will have to clear it."
+
+Follow-up:
+
+> "No it's been an ongoing thing for a few months now. It takes the pump 3 to 5 minutes to completely deenergize to allow for it to reset."
+
+Four takeaways:
+
+1. **Field prevalence — widespread, not site-specific.** Billy is seeing this across his customer base for "a few months." That rules out site-specific causes (failing comm board on a single unit, marginal cable, surge damage, etc.) and points to a firmware-level behavior change affecting the whole VSP field population.
+
+2. **Mechanism — VFD DC-bus capacitor discharge time.** Pool VSPs are variable-frequency drives with large DC-bus capacitors that retain high-voltage charge for minutes after breaker-off. While charged, the VSP's MCU is partially alive on residual rails — it never cleanly cold-boots. If the breaker comes back on before caps fully discharge (~3-5 min per Billy, consistent with standard industrial-drive electronics), the MCU comes up from an indeterminate state and the HUA handshake with MSP doesn't reliably re-establish. The "MSP_DEV_COMM_LOSS" alarms are the downstream effect of this incomplete cold-boot.
+
+3. **5-minute breaker-off duration is the operative recovery procedure** — adds a third tier to the recovery hierarchy:
+    - **Tier 1 — simultaneous indoor breaker (~30 sec):** works when boards / firmware happy; fastest. Fails reliably with degraded state.
+    - **Tier 2 — extended indoor breaker (5+ minutes):** allows full VSP cap discharge before re-power. Per Billy, the canonical workaround as of 2026-05.
+    - **Tier 3 — staged equipment-pad sequence (controller-first, 20-30 sec gap, then pump):** as in the original ADR-019. Useful when even tier 2 doesn't clear.
+
+4. **A Hayward firmware update is in the pipeline.** Scott is already on the latest stable MSP (5.2.0), so the pending fix would have to be a 5.2.1 patch, a future 5.4.x, or targeted at the VSP firmware level (currently R.1.0.17 — low version number suggests room for newer revs). Open question for the next dealer conversation: "what version is Hayward targeting for the fix, and what's the rollout timeline?"
+
+### Multi-issue synthesis (revised after Billy's 2026-05-18 explanation)
+
+Walking through the events of 2026-04-30 through 2026-05-18, the picture simplifies to **two root causes** plus their downstream effects:
+
+| # | Issue | Layer | Trigger | Notes |
+|---|---|---|---|---|
+| **A** | Marginal RJ45 termination at controller | Physical / cable | Shepard's 2026-05-16 in-wall Cat 6 pass left an imperfect crimp; thermal cycling progressively loosened it | Site-specific. Independent of D. Re-crimp eliminates. |
+| **D** | VSP DC-bus cap discharge requires ~3-5 min for clean cold-boot | VSP firmware behavior | Any breaker cycle shorter than full discharge time | Field-wide per Billy. Hayward firmware update pending. Workaround: 5-min breaker-off. |
+
+**Downstream effects (not separate root causes, just symptoms of A and D interacting):**
+
+- **B (UDP listener wedge after L1 disturbance):** caused by A's link flapping. Cleared by any controller power-cycle. Surfaces as class-1 alarms.
+- **C (HUA loss / `MSP_DEV_COMM_LOSS` on VSP and OPLMP after breaker cycle):** caused by D's incomplete reset when breaker cycle was too short. Surfaces as class-2 alarms. Cleared by 5-min breaker-off OR staged equipment-pad cycle.
+
+**Cascade dynamics:**
+
+- **A flaps the link → B (UDP wedge)** → user does breaker cycle to recover B
+- **breaker cycle (if quick) hits D's bug → C (HUA loss)** → user does another breaker cycle to clear C
+- **second cycle, if also quick, also hits D → C persists**
+- **eventually: longer cycle (5+ min) satisfies D → C clears, system recovers**
+- **A still latent** → next thermal cycle repeats the loop
+
+**Implication: A and D are independent. Fix either one to break the loop:**
+
+- **Fix A (re-crimp the RJ45):** cable stops flapping → B doesn't fire → no breaker cycles needed → D's bug never activates. Site-specific fix, completely under Scott's control.
+- **Fix D (wait for Hayward firmware update OR always use 5-min recovery):** even if cable flaps, D no longer breaks the recovery. Field-wide fix, depends on Hayward release timeline.
+
+Best path is to fix both — RJ45 re-crimp this week (eliminates the trigger), and update to Hayward's patched firmware whenever it ships (eliminates the underlying bug).
+
+**Status as of 2026-05-18 13:30 EDT:** RJ45 reseated 2026-05-17 evening; held for 6 min then failed; recovery via staged power-cycle 2026-05-18 ~09:04 EDT cleared all alarms. Pool currently running cleanly (power=691W at 09:30 EDT). System under observation; re-crimp scheduled for this week.
+
+### Pre-departure (2026-05-30) plan
+
+Scott departs 2026-05-30. 12 days for diagnostic and fix runway. With the cascade now understood as A + D (not a hardware-degradation problem), the plan tightens:
+
+| Priority | Action | Why | Owner |
+|---|---|---|---|
+| HIGH | Re-crimp RJ45 at controller this week | Removes A — the only site-specific trigger. Independent of Hayward's firmware timeline. | Scott or Shepard |
+| HIGH | Identify local emergency contact who can run 5-min breaker cycle | Insurance against D firing while Scott is away. If D fires, the 5-min cycle clears it. | Scott (neighbor or T&D) |
+| MEDIUM | T&D VIP weekly service during absence | Eyes on the pool. Can do the 5-min cycle proactively if alarms appear in their inbox. | Scott to schedule with Billy/Dianne |
+| MEDIUM | 3-4 clean days post-crimp as observation window | Class-1 watcher (template-trigger after 2026-05-18 patch) will fire if A wasn't actually fixed. | Scott + HA automation |
+| LOWER | Ask Billy/T&D about VSP firmware update path | If newer VSP firmware (above R.1.0.17) exists that addresses D, that's the cheapest pre-departure fix. | Scott to ask Billy |
+| DROP | Pre-emptive VSP/OPLMP comm-board replacement | No longer indicated. Field-wide firmware behavior, not site-specific hardware failure. | — |
+
+**Decision tree for departure go/no-go:**
+
+- **If RJ45 is re-crimped and 7+ days clean** → low-risk departure. T&D weekly service is sufficient backup.
+- **If alarms recur post-crimp** → escalate to T&D for diagnosis (could be RJ45 still bad, or D fired on its own without an L1 trigger). May still be firmware-only; not necessarily hardware.
+- **If Hayward ships the firmware fix before May 30** → update and re-test. Highest confidence path.
+
+**HA automation re-enable decision (day of departure):** depends on confidence. If 7+ clean days, re-enable for remote visibility. If still unstable, keep disabled, rely on T&D weekly service + 5-min cycle for recovery.
 
 ---
 
