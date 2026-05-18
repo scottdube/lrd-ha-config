@@ -10,12 +10,13 @@
 
 ## Context
 
-Two distinct OmniLogic failure incidents occurred within a 22-hour window:
+Three distinct OmniLogic failure modes observed within 24 hours, prompting the three-class taxonomy this ADR defines:
 
-| Date | Symptom in HA | Symptom in OmniLogic UI | Resolution |
-|---|---|---|---|
-| 2026-05-16 ~11:00 EDT | Local integration stopped ACKing `GET_TELEMETRY`; entities went stale then unavailable | None (no alarms) | Power-cycle controller via pool sub-panel breaker |
-| 2026-05-17 ~08:00 EDT | HA state-change commands acked cleanly through integration (off→Priming→On at 55%) but `sensor.omnilogic_pool_filter_pump_power` stayed at 0 W; `local_water_temp` stayed `unknown` | `MSP_DEV_COMM_LOSS` alarms for `VSP` (HUA `10-01-15-49-9a`) and `OPLMP` (HUA `a1-44-15-1b-56`) | Power-cycle controller via pool sub-panel breaker (HUA re-handshake on boot per Hayward TSG-OL150c) |
+| Date | Symptom in HA | Symptom in OmniLogic UI | ICMP to controller | Resolution | Class |
+|---|---|---|---|---|---|
+| 2026-05-16 ~11:00 EDT | Local integration stopped ACKing `GET_TELEMETRY`; entities went stale then unavailable | None (no alarms) | ✓ Reachable | Power-cycle controller via pool sub-panel breaker | 1 — integration↔MSP UDP wedge |
+| 2026-05-17 ~08:00 EDT | HA state-change commands acked cleanly through integration (off→Priming→On at 55%) but `sensor.omnilogic_pool_filter_pump_power` stayed at 0 W; `local_water_temp` stayed `unknown` | `MSP_DEV_COMM_LOSS` alarms for `VSP` (HUA `10-01-15-49-9a`) and `OPLMP` (HUA `a1-44-15-1b-56`) | ✓ Reachable | Power-cycle controller via pool sub-panel breaker (HUA re-handshake on boot per Hayward TSG-OL150c) | 2 — MSP↔peripheral comm-loss |
+| 2026-05-17 ~19:00–20:50 EDT | All entities `unavailable` for 1h50m, brief recovery, then off again | None visible (couldn't reach UI either) | ✗ Unreachable from both HA (cross-VLAN) and Scott's MacBook (same VLAN as controller) | Reseat RJ45 connector at controller end (in-wall pass had been completed by Shepard 5-16; connector worked loose under thermal cycling) | 3 — physical/network |
 
 The 2026-05-16 incident was traced to a deliberate L1 disturbance (electrician disconnecting the Cat 6 during the in-wall run). The 2026-05-17 incident had no known trigger — it appeared sometime between 22:20 on 5-16 and 08:00 on 5-17. One plausible inference: the 22:12 breaker cycle on 5-16 induced it (power-cycling under load can stress comm modules), but this is unconfirmed and could equally be coincidence with the prior thunderstorm or independent age-related degradation of the VSP / OPLMP comm boards.
 
@@ -60,30 +61,51 @@ Three operational reasons not to collapse them into one rule:
 
 When HA reports anomalous pool state, do the following in order:
 
-1. **Check the OmniLogic web UI** (`hayward.com` / OmniLogic app) for active alarms.
-2. **If `MSP_DEV_COMM_LOSS` alarms are present** → class 2 (peripheral comm-loss). Skip to recovery step 3 below.
-3. **If no alarms but HA sensors are stale or unavailable** → class 1 (integration wedge). Try integration reload first (Settings → Devices & Services → OmniLogic Local → Reload). If reload doesn't restore polling within ~60 sec, escalate to power-cycle.
-4. **If no alarms and HA reports look healthy but you observe physical equipment is not doing what HA says** → unknown class. Cross-check `sensor.omnilogic_pool_filter_pump_power` (should be >50 W if pump claims to be running) and `local_water_temp` (should leave `unknown` within 90 sec of real pump-on). If those are wrong, treat as class 2 and check OmniLogic UI more carefully — alarms can sometimes lag the actual failure.
+1. **Ping the controller from a workstation on the IoT VLAN** (or check the `binary_sensor.pool_controller_reachable` state in HA): `ping -c 3 192.168.11.19`.
+   - **If unreachable** → class 3 (physical/network). Skip to recovery step 4 below; do not breaker-cycle blindly.
+   - **If reachable** → continue to step 2.
+2. **Check the OmniLogic web UI** (`hayward.com` / OmniLogic app) for active alarms.
+   - **If `MSP_DEV_COMM_LOSS` alarms are present** → class 2 (peripheral comm-loss). Skip to recovery step 3 below.
+   - **If no alarms but HA sensors are stale or unavailable** → class 1 (integration wedge). Try integration reload first (Settings → Devices & Services → OmniLogic Local → Reload). If reload doesn't restore polling within ~60 sec, escalate to power-cycle.
+3. **If no alarms and HA reports look healthy but physical equipment isn't doing what HA says** → cross-check `sensor.omnilogic_pool_filter_pump_power` (should be >50 W if pump claims to be running) and `local_water_temp` (should leave `unknown` within 90 sec of real pump-on). If those are wrong, treat as class 2 and check OmniLogic UI more carefully — alarms can sometimes lag the actual failure.
 
-### 2. Recovery procedure (both classes)
+### 2. Recovery procedure for classes 1 and 2
 
-1. Kill the equipment breakers at the main service panel: pool sub-panel breaker. (For class 2 specifically, Hayward recommends killing both the MSP and equipment-power breakers separately — but the pool sub-panel kills both simultaneously, which is operationally simpler and has worked twice now.)
+1. Kill the equipment breakers at the main service panel: pool sub-panel breaker. (For class 2 specifically, Hayward recommends killing both the MSP and equipment-power breakers separately — but the pool sub-panel kills both simultaneously, which is operationally simpler and has worked multiple times now.)
 2. Wait 30 seconds.
 3. Restore the pool sub-panel breaker.
 4. Wait for the controller display to light up and reach the home screen (~30-60 sec).
 5. Verify in OmniLogic UI: alarms should auto-clear if HUA re-handshake succeeded.
 6. Verify in HA: integration entities should leave `unavailable` within ~60-120 sec; `local_filter_power` should jump to its expected range when next pump-on cycle fires.
 
-### 3. Detection
+### 3. Recovery procedure for class 3 (physical/network)
+
+Breaker-cycling does NOT help class 3 — the controller is already alive (or already powerless); the failure is the connection between it and the network. Physical triage in this order:
+
+1. **Look at the OmniLogic display at the equipment pad.**
+   - **Dark / unlit** → power issue. Check the pool sub-panel breaker (could be tripped). If the breaker is fine, the controller's internal PSU may be failing — dealer call.
+   - **Lit and showing the home screen** → controller is alive, network side is the failure. Move to step 2.
+2. **Reseat the Cat 6 / RJ45 at the controller.** First diagnostic and often the immediate fix. Observed 2026-05-17 evening: the in-wall pass completed by Shepard on 5-16 left a marginal connector that worked loose under thermal cycling and disconnected entirely 48 hours later. Reseating restored the link.
+3. **If reseat brings it back, do NOT consider this fixed.** A marginal connector that just "reseat-worked" will fail again on a timeframe of days. Permanent fix: re-crimp the RJ45 at the controller end (5-min DIY job if you have a crimper, or call Shepard back).
+4. **Check the UniFi switch port** the controller connects to: Devices → switch → port stats. Look for recent link-down events, flap counts, error counters.
+
+### 4. Standing watch-item: controller-end RJ45 reliability
+
+The 2026-05-17 escalation (three incidents in 24h with arguably progressively-worse symptoms) plausibly traces to the single root cause of a marginal RJ45 connection at the controller end. Until the connector is re-crimped (not just reseated), expect recurrence. If recurrence happens after a confirmed re-crimp, the next escalation is to check the in-wall cable run itself for damage and/or the switch port hardware.
+
+### 5. Detection
 
 Two layers, both implemented as part of this ADR:
 
 - **Retrospective (auditor):** new P5 assertion in `pool/scripts/auditor.py` — flags any pump-on run >5 min where `local_filter_power < 50 W`. Surfaces class-2 incidents in the nightly audit pass.
-- **Proactive (HA):** new package `packages/pool/pool_health_watcher.yaml` — single automation `automation.pool_alert_on_pump_on_but_no_power` with an inline `platform: template` trigger (`for: 2m`) that fires `notify.scott_and_ha` when pump_state=on AND power<50W for sustained period. Gated by `input_boolean.pool_integration_recovering` (ADR-016) to suppress false positives during the post-recovery reconciliation window. **Implementation history (2026-05-17):** two prior attempts using separate template binary_sensor entities both failed silently — modern `template: - binary_sensor:` was dropped by HA's package merge (collides with `template: !include config/templates.yaml` in main config), and legacy `binary_sensor: - platform: template` parsed without error but never registered an entity (consistent with deprecation/restriction of the legacy platform in HA 2026.x with silent-fail shim). The template-trigger-inside-automation pattern sidesteps both by not touching the `template:` or `binary_sensor:` top-level keys at all.
+- **Proactive (HA), three layers in `packages/pool/pool_health_watcher.yaml`** — extended 2026-05-17 evening after a third incident the same day revealed two more failure classes the original single-layer design didn't catch:
+  - **Class 1 — integration↔MSP wedge.** `automation.pool_alert_on_omnilogic_integration_wedge` — state trigger on `switch.omnilogic_pool_filter_pump` going `unavailable` for 10+ min. No recovery-debounce gate because by definition this fires BEFORE recovery, so ADR-016's boolean isn't relevant.
+  - **Class 2 — MSP↔peripheral comm-loss.** `automation.pool_alert_on_pump_on_but_no_power` — inline `platform: template` trigger (`for: 2m`) on pump_state=on AND power<50W. Gated by `input_boolean.pool_integration_recovering` (ADR-016) to suppress false positives during the post-recovery reconciliation window, and `input_boolean.pool_service_lockout` (ADR-011) to stay quiet during tech service work.
+  - **Class 3 — physical/network.** `automation.pool_alert_on_omnilogic_controller_unreachable` — state trigger on `binary_sensor.pool_controller_reachable` going `off` for 5+ min. The ping binary_sensor is set up via HA UI (Settings → Devices & Services → Add Integration → Ping (ICMP), host `192.168.11.19`, name `Pool Controller Reachable`, count 3, scan_interval 30) because the ping YAML configuration was deprecated in HA 2023.12 — `binary_sensor: - platform: ping` now triggers HA Repair warnings. The UI-created entity lives in `.storage` (not git), but the referencing automation is in git and the setup procedure is documented in `integrations/omnilogic.md`.
+  - All three automations use distinct iOS notification tags so they collapse into separate threads — at-a-glance you know which layer is broken. Class-3 fires first when the controller goes off the network entirely; class-1 follows ~5 min later (integration times out); seeing both together is the canonical class-3 signature.
+  - **Implementation history for class 2 (2026-05-17):** two prior attempts using separate template binary_sensor entities both failed silently — modern `template: - binary_sensor:` was dropped by HA's package merge (collides with `template: !include config/templates.yaml` in main config), and legacy `binary_sensor: - platform: template` parsed without error but never registered an entity (consistent with deprecation/restriction of the legacy platform in HA 2026.x with silent-fail shim). The template-trigger-inside-automation pattern sidesteps both by not touching the `template:` or `binary_sensor:` top-level keys at all.
 
-Neither detection layer distinguishes between class 1 and class 2 on its own — both observe "pump_on with no power." The triage step (check OmniLogic UI) is what disambiguates them. This is intentional: the alert is "something is wrong, go look," and the human-in-the-loop interpretation is the diagnostic.
-
-### 4. Documentation
+### 6. Documentation
 
 `integrations/omnilogic.md` carries the operational table + triage rule for in-the-moment reference. ADRs (016, 017, this one) carry the reasoning. `docs/current-state.md` carries the incident log.
 

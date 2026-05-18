@@ -1,22 +1,40 @@
-# Pool health watcher — equipment-vs-state cross-check
+# Pool health watcher — three-layer proactive detection
 #
-# Detects the failure mode observed 2026-05-17 08:00 EDT: OmniLogic Local
-# integration reports filter_state=on at speed 55, but
-# sensor.omnilogic_pool_filter_pump_power stays at 0 W indefinitely.
-# Indicates the controller acked the command but the equipment side isn't
-# actually drawing power — either a VFD/relay wedge, telemetry-feedback
-# wedge, or (the canonical case so far) a MSP_DEV_COMM_LOSS to the VSP
-# peripheral on the Hayward control bus.
+# Extended 2026-05-17 (evening) after a third OmniLogic incident in 24h
+# revealed gaps in the initial single-layer design. Now covers all three
+# failure modes per ADR-019:
+#
+#   Class 1: integration↔MSP wedge — entities go unavailable as a group,
+#            no OmniLogic UI alarms. Triggered by network L1 disturbance
+#            (cable swap, switch reboot) or autonomous controller wedge.
+#   Class 2: MSP↔peripheral comm-loss — integration looks healthy,
+#            commands ack, but local_filter_power stays at 0 W with
+#            state=on. MSP_DEV_COMM_LOSS alarms in OmniLogic UI.
+#   Class 3: physical / network — controller off the network entirely.
+#            Both ICMP and integration fail. Causes: controller power
+#            loss, breaker trip, RJ45 disconnect, Cat 6 cable fault,
+#            switch port issue.
+#
+# Each class has its own dedicated detection automation with semantics
+# specific to its symptom signature. Notification tags are distinct so
+# iOS collapses them into separate threads — at-a-glance, you know
+# which layer is broken.
+#
+# Detection summary:
+#   - automation.pool_alert_on_pump_on_but_no_power  → class 2 (template
+#     trigger on pump_state=on AND power<50W for 2m)
+#   - automation.pool_alert_on_omnilogic_integration_wedge → class 1
+#     (state trigger on pump entity unavailable for 10m)
+#   - automation.pool_alert_on_omnilogic_controller_unreachable → class 3
+#     (state trigger on ping binary_sensor off for 5m)
 #
 # Paired auditor assertion: P5 (pump_on_actually_drawing_power) in
-# pool/scripts/auditor.py — same logic, retrospective, runs nightly on
-# the daily slice. This watcher is the proactive sibling that pages
-# within ~2 min so Scott can intervene before salt cell stress or
-# stagnation become problems.
+# pool/scripts/auditor.py — same logic as class-2 watcher, retrospective,
+# runs nightly on the daily slice.
 #
-# Implementation note: this watcher uses a template-platform AUTOMATION
-# TRIGGER rather than a standalone template binary_sensor. Two prior
-# attempts in this same package both failed silently:
+# Implementation note (class-2 watcher only): uses a template-platform
+# AUTOMATION TRIGGER rather than a standalone template binary_sensor.
+# Two prior attempts in this same package both failed silently:
 #   1. Modern `template: - binary_sensor:` block — dropped by HA's
 #      package merge because configuration.yaml resolves `template:` via
 #      `!include config/templates.yaml`; package's template: list never
@@ -27,39 +45,51 @@
 #      restricted in HA 2026.x with a silent-fail compatibility shim.
 # A template platform trigger inside the automation itself sidesteps
 # both issues — it doesn't register a separate entity and doesn't touch
-# the `template:` or `binary_sensor:` top-level keys. Functionally
-# equivalent to the binary_sensor + state trigger pattern: the template
-# is re-evaluated whenever any referenced entity changes; the `for:`
-# duration absorbs the priming/spin-up window before firing.
+# the `template:` or `binary_sensor:` top-level keys.
+#
+# Implementation note (class-3 watcher): references the ping
+# binary_sensor `binary_sensor.pool_controller_reachable`, which is set
+# up via the HA UI (Settings → Devices & Services → Add Integration →
+# Ping (ICMP), host 192.168.11.19, name "Pool Controller Reachable",
+# count 3, scan_interval 30). The ping integration's YAML configuration
+# was deprecated in HA 2023.12, and `binary_sensor: - platform: ping`
+# now triggers an HA Repair notification asking for migration. The UI
+# path stores the config entry in .storage/core.config_entries (not in
+# git), so the entity definition is not version-controlled — but it's
+# referenced from this version-controlled automation, and the UI setup
+# is documented in integrations/omnilogic.md so the knowledge isn't
+# lost if .storage ever needs to be rebuilt.
 #
 # Related ADRs:
-#   - docs/decisions/019-omnilogic-recovery-playbook.md (this watcher
-#     is the proactive detection layer specified in section "Decision /
-#     3. Detection")
+#   - docs/decisions/019-omnilogic-recovery-playbook.md
 #   - docs/decisions/016-integration-recovery-debounce.md (supplies
-#     input_boolean.pool_integration_recovering, the gate boolean that
-#     suppresses false positives during the 5-min post-recovery window)
+#     input_boolean.pool_integration_recovering, gates the class-2
+#     watcher to suppress false positives during 5-min post-recovery)
 #   - docs/decisions/011-pool-service-mode.md (supplies
-#     input_boolean.pool_service_lockout, gates so the watcher doesn't
-#     fire when the tech has the pump intentionally off via the panel)
+#     input_boolean.pool_service_lockout, gates the class-2 watcher
+#     during tech service work)
 #
-# Tuning notes (must stay aligned with auditor.py constants):
+# Tuning notes (class-2 thresholds must stay aligned with auditor.py):
 #   - 50 W power threshold matches PUMP_ON_POWER_MIN_W in auditor.py
-#   - 2 min trigger `for:` duration matches the 120s priming/spin-up
-#     skip in auditor.py (PUMP_ON_NO_POWER_SKIP_SEC). Keep them in sync.
+#   - 2 min trigger `for:` duration matches PUMP_ON_NO_POWER_SKIP_SEC.
+#   - 10 min unavailable threshold (class 1) absorbs HA restarts and
+#     integration reloads without false-positive.
+#   - 5 min ping-off threshold (class 3) catches sustained outages
+#     while tolerating single missed ping cycles.
 
 automation:
   - alias: "Pool: Alert on pump-on but no power"
     id: pool_alert_on_pump_on_but_no_power
     description: >
-      Fires when the integration reports the pump is running at a non-zero
-      speed but power telemetry stays at 0 W (or below 50 W) for 2+ minutes.
-      Sustained mismatch indicates an OmniLogic wedge — see ADR-019 for the
-      two failure modes and the triage flow.
-      Gated by input_boolean.pool_integration_recovering (ADR-016) so the
-      5-min post-recovery reconciliation window doesn't false-positive, and
-      by input_boolean.pool_service_lockout (ADR-011) so the watcher stays
-      quiet during tech service work.
+      Class 2 (MSP↔peripheral comm-loss) — fires when the integration
+      reports the pump is running at a non-zero speed but power
+      telemetry stays at 0 W (or below 50 W) for 2+ minutes. Sustained
+      mismatch indicates an OmniLogic wedge — see ADR-019 for the
+      three failure modes and the triage flow.
+      Gated by input_boolean.pool_integration_recovering (ADR-016) so
+      the 5-min post-recovery reconciliation window doesn't
+      false-positive, and by input_boolean.pool_service_lockout
+      (ADR-011) so the watcher stays quiet during tech service work.
     mode: single
     trigger:
       - platform: template
@@ -78,15 +108,86 @@ automation:
     action:
       - service: notify.scott_and_ha
         data:
-          title: "Pool: pump-on / no-power mismatch"
+          title: "Pool: pump-on / no-power mismatch (class 2)"
           message: >
             Pool filter pump reports ON at
             {{ states('number.omnilogic_pool_filter_pump_speed') }}%
             but power = {{ states('sensor.omnilogic_pool_filter_pump_power') }} W.
-            Likely OmniLogic wedge (ADR-019). Check OmniLogic UI alarms
-            panel for MSP_DEV_COMM_LOSS; recovery is a controller power-cycle
-            via the pool sub-panel breaker.
+            Likely class-2 MSP↔peripheral comm-loss (ADR-019). Check
+            OmniLogic UI alarms panel for MSP_DEV_COMM_LOSS; recovery is
+            a controller power-cycle via the pool sub-panel breaker.
           data:
             push:
               interruption-level: time-sensitive
             tag: pool_pump_no_power
+
+  - alias: "Pool: Alert on OmniLogic integration wedge"
+    id: pool_alert_on_omnilogic_integration_wedge
+    description: >
+      Class 1 (integration↔MSP wedge) — fires when
+      switch.omnilogic_pool_filter_pump has been unavailable for 10+
+      min. All OmniLogic Local entities share the integration's
+      coordinator and go unavailable as a group, so the pump entity is
+      a faithful proxy for the integration's overall state.
+      10-min threshold absorbs HA restarts (entities flap briefly),
+      integration reloads, and transient network blips without
+      false-positive. Does NOT have a recovery-debounce gate — by
+      definition this fires BEFORE any recovery, so the ADR-016
+      pool_integration_recovering boolean isn't relevant.
+      If the controller is also unreachable at the network layer, the
+      class-3 watcher will fire too (separate notification tag).
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: switch.omnilogic_pool_filter_pump
+        to: "unavailable"
+        for: "00:10:00"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: OmniLogic integration wedge (class 1)"
+          message: >
+            switch.omnilogic_pool_filter_pump has been unavailable for
+            10+ min. Triage per ADR-019: check if controller is
+            pingable. If pingable, UDP listener is wedged — breaker
+            cycle. If not pingable, see the controller-unreachable
+            alert (likely already fired) and triage physical/network.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_integration_wedge
+
+  - alias: "Pool: Alert on OmniLogic controller unreachable"
+    id: pool_alert_on_omnilogic_controller_unreachable
+    description: >
+      Class 3 (physical/network) — fires when
+      binary_sensor.pool_controller_reachable (UI-configured ping at
+      192.168.11.19, see header for setup) has been off for 5+ min.
+      Catches controller power loss, breaker trips, Cat 6 disconnects,
+      switch port failures.
+      5-min threshold is short enough to surface real outages quickly
+      while tolerating single missed ping cycles. When this fires, the
+      class-1 wedge alert will also fire ~5 min later (because the
+      integration will time out and entities will go unavailable);
+      seeing both together is the canonical class-3 signature.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.pool_controller_reachable
+        to: "off"
+        for: "00:05:00"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: OmniLogic controller unreachable (class 3)"
+          message: >
+            binary_sensor.pool_controller_reachable has been off for
+            5+ min — controller is off the network. Physical triage
+            (ADR-019): check OmniLogic display (lit vs dark), pool
+            sub-panel breaker, RJ45 at controller end (reseated
+            2026-05-17 evening after the in-wall pass — recurrence
+            indicates re-crimp needed, not just reseat).
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_controller_unreachable

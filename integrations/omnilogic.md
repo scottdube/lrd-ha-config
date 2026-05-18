@@ -79,19 +79,36 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 
 ## Failure-mode triage
 
-Two distinct failure modes have been observed within a 22-hour window. Both are fixed by a controller power-cycle, but they have different symptoms and different operational implications. **Check the OmniLogic web UI alarms panel first** — that's the cheap probe that disambiguates them. Full reasoning in ADR-019.
+Three distinct failure modes have been observed within a 24-hour window. Classes 1 and 2 are fixed by a controller power-cycle; class 3 requires physical intervention. **Triage step 1: ping the controller (`ping -c 3 192.168.11.19`).** That disambiguates class 3 from 1/2. Then check the OmniLogic UI alarms panel to disambiguate class 1 from class 2. Full reasoning in ADR-019.
 
-| Symptom in HA | Symptom in OmniLogic UI | Class | Severity | Recovery |
-|---|---|---|---|---|
-| Sensors stale, integration logs `Failed to update data`, eventually entities go `unavailable` | Usually clean (no alarms) | Integration↔MSP wedge | Read-side stale | Try integration reload first. If no recovery in ~60 sec, breaker-cycle. |
-| State changes ack cleanly in HA but `local_filter_power = 0` with pump claimed on; `local_water_temp` stays `unknown` despite pump claimed on | `MSP_DEV_COMM_LOSS,Comm Loss Device:<device> HUA:<address>` alarm(s) | MSP↔peripheral comm-loss | Write-side dead (chlorinator may dose into dead leg — worst for salt cell) | Breaker-cycle directly (HUA re-handshake on boot). Do NOT reload integration first — integration is healthy. |
+| ICMP | Symptom in HA | Symptom in OmniLogic UI | Class | Severity | Recovery |
+|---|---|---|---|---|---|
+| ✓ Reachable | Sensors stale, integration logs `Failed to update data`, eventually entities go `unavailable` | Usually clean (no alarms) | 1 — Integration↔MSP wedge | Read-side stale | Try integration reload first. If no recovery in ~60 sec, breaker-cycle. |
+| ✓ Reachable | State changes ack cleanly in HA but `local_filter_power = 0` with pump claimed on; `local_water_temp` stays `unknown` despite pump claimed on | `MSP_DEV_COMM_LOSS,Comm Loss Device:<device> HUA:<address>` alarm(s) | 2 — MSP↔peripheral comm-loss | Write-side dead (chlorinator may dose into dead leg — worst for salt cell) | Breaker-cycle directly (HUA re-handshake on boot). Do NOT reload integration first — integration is healthy. |
+| ✗ Unreachable | All entities `unavailable` simultaneously; ICMP fails from both HA and any workstation on the IoT VLAN | Likely inaccessible (UI may not load either) | 3 — Physical/network | Controller off the network entirely | Physical triage at equipment pad. Display lit = network-side (reseat RJ45 at controller, check switch port). Display dark = power-side (check pool sub-panel breaker, then controller PSU). |
 
-**Detection layers:**
+**Detection layers (all three implemented in `packages/pool/pool_health_watcher.yaml`):**
 
-- **Proactive:** `automation.pool_alert_on_pump_on_but_no_power` with an inline `platform: template` trigger (`for: 2m`) — fires `notify.scott_and_ha` within ~2 min when pump_state=on AND power<50W. See `packages/pool/pool_health_watcher.yaml`. No separate binary_sensor entity (see ADR-019 implementation history for why — two prior binary_sensor approaches both failed silently against HA 2026.4.x package + template-platform constraints).
-- **Retrospective:** auditor assertion P5 (`pump_on_actually_drawing_power`) in `pool/scripts/auditor.py` — same logic, runs nightly on the daily slice.
+- **Proactive class 1:** `automation.pool_alert_on_omnilogic_integration_wedge` — state trigger on `switch.omnilogic_pool_filter_pump` going `unavailable` for 10+ min. Tag: `pool_integration_wedge`.
+- **Proactive class 2:** `automation.pool_alert_on_pump_on_but_no_power` — inline `platform: template` trigger (`for: 2m`) on pump_state=on AND power<50W. Gated by `pool_integration_recovering` (ADR-016) + `pool_service_lockout` (ADR-011). Tag: `pool_pump_no_power`.
+- **Proactive class 3:** `automation.pool_alert_on_omnilogic_controller_unreachable` — state trigger on `binary_sensor.pool_controller_reachable` going `off` for 5+ min. Tag: `pool_controller_unreachable`.
+- **Retrospective (class 2):** auditor assertion P5 (`pump_on_actually_drawing_power`) in `pool/scripts/auditor.py` — same logic as proactive class 2, runs nightly on the daily slice.
 
-Neither layer distinguishes the two classes on its own — the alert is "go look," and the OmniLogic UI alarms panel is the diagnostic.
+All three proactive automations route through `notify.scott_and_ha` with distinct iOS notification tags so they collapse into separate threads.
+
+### Ping binary_sensor setup (`binary_sensor.pool_controller_reachable`)
+
+The class-3 watcher references this entity, which is configured via the HA UI rather than YAML because the ping integration's YAML configuration was deprecated in HA 2023.12 (triggers HA Repair warnings on modern versions).
+
+Setup:
+1. Settings → Devices & Services → Add Integration
+2. Search "Ping (ICMP)" and select it
+3. Host: `192.168.11.19`
+4. Name: `Pool Controller Reachable` (this exact name — HA's slugifier produces `binary_sensor.pool_controller_reachable`)
+5. Count: 3
+6. Scan interval: 30 (seconds)
+
+The integration's config entry lives in `.storage/core.config_entries` (not version-controlled). If `.storage` is ever rebuilt, repeat these steps to restore the entity; the watcher automation in `packages/pool/pool_health_watcher.yaml` will start working again as soon as the entity exists.
 
 ---
 
