@@ -1,0 +1,248 @@
+# Degree-day normalization
+#
+# Heating/cooling degree days (HDD/CDD) let us compare energy usage across days
+# with different weather. Concept:
+#   CDD_base = max(0, daily_mean_temp - base_temp)
+#   HDD_base = max(0, base_temp - daily_mean_temp)
+# Standard US convention uses base 65°F. Florida-tuned alternative is 72°F
+# (closer to when AC actually engages here). We track both.
+#
+# Daily mean temp uses the NOAA convention: (daily_high + daily_low) / 2.
+# Highs/lows come from the statistics platform on the Tempest continuous
+# temperature reading (rolling 24h window — acceptable approximation to
+# calendar-day max/min for trend-tracking purposes).
+#
+# At 23:59:30 each night a trigger captures the just-completed day's high/low/
+# CDD/HDD and the energy subtotals from the energy package — this is the
+# "Last Day" snapshot, suitable for daily comparison and rolling averages.
+#
+# Rolling 7d / 30d means of yesterday's ratios are added via the statistics
+# platform — these are the "are we doing better or worse than usual?" metric.
+#
+# Caveats:
+# - Pure ratio (kWh/CDD) is sensitive to baseload (network rack, fridge, etc.
+#   that don't scale with weather). On cool days the ratio looks worse than on
+#   hot days even when the house is operating identically. HVAC-only ratio is
+#   cleaner; whole-home ratio mirrors the utility-bill mental model.
+# - 5/12 Vue startup artifact (Panel B first-day 79.56 kWh single-hour) will
+#   contaminate any rolling mean that includes that date. Statistics platform
+#   doesn't filter, so values before 2026-05-14 should be ignored.
+
+sensor:
+  # Continuous high/low/mean from Tempest's outdoor temp
+  - platform: statistics
+    name: "Outdoor High 24h"
+    unique_id: outdoor_high_24h
+    entity_id: sensor.lake_ridge_dr_temperature
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+    sampling_size: 2880   # ~10s update × 24h
+    precision: 1
+
+  - platform: statistics
+    name: "Outdoor Low 24h"
+    unique_id: outdoor_low_24h
+    entity_id: sensor.lake_ridge_dr_temperature
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+    sampling_size: 2880
+    precision: 1
+
+  # 7d / 30d rolling means of the daily-snapshot ratios
+  - platform: statistics
+    name: "HVAC kWh per CDD-65 — 7d"
+    unique_id: hvac_kwh_per_cdd_65_7d
+    entity_id: sensor.last_day_hvac_kwh_per_cdd_65
+    state_characteristic: mean
+    max_age: { days: 7 }
+    sampling_size: 14
+    precision: 2
+
+  - platform: statistics
+    name: "HVAC kWh per CDD-65 — 30d"
+    unique_id: hvac_kwh_per_cdd_65_30d
+    entity_id: sensor.last_day_hvac_kwh_per_cdd_65
+    state_characteristic: mean
+    max_age: { days: 30 }
+    sampling_size: 60
+    precision: 2
+
+  - platform: statistics
+    name: "Whole Home kWh per CDD-65 — 7d"
+    unique_id: whole_home_kwh_per_cdd_65_7d
+    entity_id: sensor.last_day_whole_home_kwh_per_cdd_65
+    state_characteristic: mean
+    max_age: { days: 7 }
+    sampling_size: 14
+    precision: 2
+
+  - platform: statistics
+    name: "Whole Home kWh per CDD-65 — 30d"
+    unique_id: whole_home_kwh_per_cdd_65_30d
+    entity_id: sensor.last_day_whole_home_kwh_per_cdd_65
+    state_characteristic: mean
+    max_age: { days: 30 }
+    sampling_size: 60
+    precision: 2
+
+  - platform: statistics
+    name: "HVAC kWh per CDD-72 — 7d"
+    unique_id: hvac_kwh_per_cdd_72_7d
+    entity_id: sensor.last_day_hvac_kwh_per_cdd_72
+    state_characteristic: mean
+    max_age: { days: 7 }
+    sampling_size: 14
+    precision: 2
+
+  - platform: statistics
+    name: "Whole Home kWh per CDD-72 — 7d"
+    unique_id: whole_home_kwh_per_cdd_72_7d
+    entity_id: sensor.last_day_whole_home_kwh_per_cdd_72
+    state_characteristic: mean
+    max_age: { days: 7 }
+    sampling_size: 14
+    precision: 2
+
+template:
+  - sensor:
+      # Continuous (running 24h) mean / CDD / HDD
+      - name: "Outdoor Mean 24h"
+        unique_id: outdoor_mean_24h
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: >
+          {% set high = states('sensor.outdoor_high_24h') | float(0) %}
+          {% set low  = states('sensor.outdoor_low_24h')  | float(0) %}
+          {{ ((high + low) / 2) | round(1) }}
+        availability: "{{ has_value('sensor.outdoor_high_24h') and has_value('sensor.outdoor_low_24h') }}"
+
+      - name: "CDD 65 Running"
+        unique_id: cdd_65_running
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: >
+          {% set m = states('sensor.outdoor_mean_24h') | float(0) %}
+          {{ [0, m - 65] | max | round(1) }}
+
+      - name: "CDD 72 Running"
+        unique_id: cdd_72_running
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: >
+          {% set m = states('sensor.outdoor_mean_24h') | float(0) %}
+          {{ [0, m - 72] | max | round(1) }}
+
+      - name: "HDD 65 Running"
+        unique_id: hdd_65_running
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: >
+          {% set m = states('sensor.outdoor_mean_24h') | float(0) %}
+          {{ [0, 65 - m] | max | round(1) }}
+
+      - name: "HDD 72 Running"
+        unique_id: hdd_72_running
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: >
+          {% set m = states('sensor.outdoor_mean_24h') | float(0) %}
+          {{ [0, 72 - m] | max | round(1) }}
+
+  # Nightly snapshot — captures last full day's values just before HVAC/Whole-Home
+  # daily sensors reset at midnight.
+  - trigger:
+      - platform: time
+        at: "23:59:30"
+    sensor:
+      - name: "Last Day Outdoor High"
+        unique_id: last_day_outdoor_high
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: "{{ states('sensor.outdoor_high_24h') | float(0) | round(1) }}"
+
+      - name: "Last Day Outdoor Low"
+        unique_id: last_day_outdoor_low
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: "{{ states('sensor.outdoor_low_24h') | float(0) | round(1) }}"
+
+      - name: "Last Day Outdoor Mean"
+        unique_id: last_day_outdoor_mean
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: "{{ states('sensor.outdoor_mean_24h') | float(0) | round(1) }}"
+
+      - name: "Last Day CDD 65"
+        unique_id: last_day_cdd_65
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: "{{ states('sensor.cdd_65_running') | float(0) | round(1) }}"
+
+      - name: "Last Day CDD 72"
+        unique_id: last_day_cdd_72
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: "{{ states('sensor.cdd_72_running') | float(0) | round(1) }}"
+
+      - name: "Last Day HDD 65"
+        unique_id: last_day_hdd_65
+        unit_of_measurement: "°F·d"
+        state_class: measurement
+        state: "{{ states('sensor.hdd_65_running') | float(0) | round(1) }}"
+
+      - name: "Last Day HVAC kWh"
+        unique_id: last_day_hvac_kwh
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: measurement
+        state: "{{ states('sensor.hvac_daily_energy') | float(0) | round(2) }}"
+
+      - name: "Last Day Whole Home kWh"
+        unique_id: last_day_whole_home_kwh
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: measurement
+        state: "{{ states('sensor.whole_home_daily_energy') | float(0) | round(2) }}"
+
+      # The ratios — only meaningful if CDD > 0.5 (skip cool days where AC barely ran)
+      - name: "Last Day HVAC kWh per CDD-65"
+        unique_id: last_day_hvac_kwh_per_cdd_65
+        unit_of_measurement: "kWh/°F·d"
+        state_class: measurement
+        state: >
+          {% set kwh = states('sensor.hvac_daily_energy') | float(0) %}
+          {% set cdd = states('sensor.cdd_65_running') | float(0) %}
+          {{ (kwh / cdd) | round(2) if cdd > 0.5 else 0 }}
+
+      - name: "Last Day HVAC kWh per CDD-72"
+        unique_id: last_day_hvac_kwh_per_cdd_72
+        unit_of_measurement: "kWh/°F·d"
+        state_class: measurement
+        state: >
+          {% set kwh = states('sensor.hvac_daily_energy') | float(0) %}
+          {% set cdd = states('sensor.cdd_72_running') | float(0) %}
+          {{ (kwh / cdd) | round(2) if cdd > 0.5 else 0 }}
+
+      - name: "Last Day Whole Home kWh per CDD-65"
+        unique_id: last_day_whole_home_kwh_per_cdd_65
+        unit_of_measurement: "kWh/°F·d"
+        state_class: measurement
+        state: >
+          {% set kwh = states('sensor.whole_home_daily_energy') | float(0) %}
+          {% set cdd = states('sensor.cdd_65_running') | float(0) %}
+          {{ (kwh / cdd) | round(2) if cdd > 0.5 else 0 }}
+
+      - name: "Last Day Whole Home kWh per CDD-72"
+        unique_id: last_day_whole_home_kwh_per_cdd_72
+        unit_of_measurement: "kWh/°F·d"
+        state_class: measurement
+        state: >
+          {% set kwh = states('sensor.whole_home_daily_energy') | float(0) %}
+          {% set cdd = states('sensor.cdd_72_running') | float(0) %}
+          {{ (kwh / cdd) | round(2) if cdd > 0.5 else 0 }}
