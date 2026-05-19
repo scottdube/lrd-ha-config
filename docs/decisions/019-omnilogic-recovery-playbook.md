@@ -184,6 +184,8 @@ Four takeaways:
 
 4. **A Hayward firmware update is in the pipeline.** Scott is already on the latest stable MSP (5.2.0), so the pending fix would have to be a 5.2.1 patch, a future 5.4.x, or targeted at the VSP firmware level (currently R.1.0.17 — low version number suggests room for newer revs). Open question for the next dealer conversation: "what version is Hayward targeting for the fix, and what's the rollout timeline?"
 
+**Update 2026-05-19 (Billy via text):** target version is **MSP 5.4.0**, specifically intended to address the comm-loss issues. Rollout timeline still unknown. Billy also flagged that VSP firmware has been pinned at R.1.0.17 for years — MSP firmware has continued evolving while the VSP comm-board firmware sat still, suggesting the bug may live in the protocol drift between newer MSPs and older VSPs. Billy is raising this with his Hayward contacts as a candidate architectural fix beyond the 5.4.0 patch. **Watch path:** check the [Hayward firmware page](https://www.hayward.com/support/resources/firmware) weekly for 5.4.0 release, and watch the inbox for community reports on TFP threads.
+
 ### Multi-issue synthesis (revised after Billy's 2026-05-18 explanation)
 
 Walking through the events of 2026-04-30 through 2026-05-18, the picture simplifies to **two root causes** plus their downstream effects:

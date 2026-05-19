@@ -115,6 +115,59 @@ have wider thresholds and don't need to change.
 
 ---
 
+## External Water Temp Tile
+
+**Purpose:** simple display tile for the external water temp probe (XIAO ESP32-C6
+deployed 2026-05-18 per ADR-015). Sits in the Local Integration section of the
+Local Pool dashboard `/local-pool/pool-test`.
+
+**Dependencies:**
+
+- External temp sensor: `sensor.pool_water_temp_external` (renamed from the
+  ESPHome-default doubled slug `pool_water_temp_external_pool_water_temp_external`).
+  See `integrations/omnilogic.md` and ADR-015 for setup.
+
+**Simple variant (HA built-in tile, no HACS dependency):**
+
+```yaml
+type: tile
+entity: sensor.pool_water_temp_external
+name: External Water Temp
+icon: mdi:thermometer-water
+color: blue
+```
+
+**Mushroom variant with freshness coloring (HACS dependency):**
+
+Greys out the icon when the reading is stale (>35 min), matching the freshness
+threshold defined in `pool/scripts/state_logger.py` (FRESHNESS_THRESHOLD_MIN).
+Keeps the dashboard visually consistent with the logger's authoritative-temp
+fallback logic — if the icon is grey, the cascading fallback would NOT use this
+sensor.
+
+```yaml
+type: custom:mushroom-entity-card
+entity: sensor.pool_water_temp_external
+name: External Water Temp
+icon: mdi:thermometer-water
+icon_color: |
+  {% set last = states.sensor.pool_water_temp_external.last_changed %}
+  {% if last %}
+    {% set age_min = (now() - last).total_seconds() / 60 %}
+    {% if age_min <= 35 %}blue{% else %}grey{% endif %}
+  {% else %}grey{% endif %}
+secondary_info: last-changed
+```
+
+**Placement:** Local Pool dashboard → `pool-test` view → Local Integration section.
+
+**Caveat:** if the external sensor's entity_id is ever renamed again, both variants
+above need updating. The entity_id `sensor.pool_water_temp_external` is sticky in
+HA's entity registry across ESPHome flashes, but a deliberate user rename in the
+UI would break this reference.
+
+---
+
 ## Future card slots
 
 When new pool-related cards are added (pump status detail, blueprint state,
