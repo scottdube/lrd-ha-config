@@ -41,13 +41,19 @@ Phase scope
 -----------
 Phase 1: local OmniLogic + environmental + computed water_temp_reliable.
          ~35 columns. (shipped 2026-05-02)
-Phase 1.5 (this version): state-change triggers + per-entity context
-         capture (user_id, parent_id, last_changed) for pump, waterfall,
-         heater. Adds 9 columns (44 total). Schema version 2.0-phase1.5.
+Phase 1.5: state-change triggers + per-entity context capture
+         (user_id, parent_id, last_changed) for pump, waterfall, heater.
+         Adds 9 columns (44 total). Schema version 2.0-phase1.5.
          Schema rotation logic preserves phase 1 data side-by-side.
-Phase 2: cloud OmniLogic columns, expected_state computed columns,
-         trusted water temp via input_number helper.
-Phase 3: rsync backup to Mac mini.
+Phase 2 (this version): external water temp sensor integration per
+         ADR-015. Adds 5 columns (49 total) — external_water_temp,
+         external_water_temp_age_min, external_water_temp_fresh,
+         water_temp_authoritative (cascading fallback), water_temp_delta.
+         Pure observation in this phase — blueprint and auditor don't
+         act on these yet. Schema version 2.0-phase2. Schema rotation
+         preserves phase 1.5 data side-by-side.
+Phase 3: cloud OmniLogic columns, expected_state computed columns,
+         W1/W2 auditor assertions on external water temp data quality.
 """
 
 from __future__ import annotations
@@ -65,7 +71,22 @@ from pathlib import Path
 LOG_FILE = "/config/pool_state_log.csv"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
-SCHEMA_VERSION = "2.0-phase1.5"
+SCHEMA_VERSION = "2.0-phase2"
+
+# External water temp sensor entity (ADR-015 deployment, 2026-05-18).
+# Default ESPHome-composed entity_id was
+# `sensor.pool_water_temp_external_pool_water_temp_external` (doubled because
+# both the device name and the sensor name in ESPHome are "Pool Water Temp
+# External"). Renamed in HA UI to the clean form below — the override is
+# sticky in HA's entity registry and persists across ESPHome flashes.
+EXTERNAL_WATER_TEMP_ENTITY = "sensor.pool_water_temp_external"
+
+# Freshness threshold for external water temp reading. ESP32-C6 deep-sleeps
+# 30 min between samples (production cadence per ADR-015). Reading is
+# considered fresh if its last_changed timestamp is within 35 min of now
+# (30 min sleep + 5 min grace for boot/wifi/publish lag). Bench-test cadence
+# (1 min sleep) would want this set to ~2 min; production = 35 min.
+FRESHNESS_THRESHOLD_MIN = 35
 
 # Water-temp reliability threshold: pump must have been on for at least this
 # many seconds before the OmniLogic water temp sensor is considered settled.
@@ -165,8 +186,20 @@ COLUMNS: list[dict] = [
     {"name": "local_water_temp", "source": "state",
      "entity": "sensor.omnilogic_pool_watersensor"},
     {"name": "local_water_temp_reliable", "source": "compute"},
-    # Trusted water temp (forward-fill of last reliable read) — Phase 2.
-    # local_water_temp_trusted column placeholder added in v2 of this script.
+
+    # ---------- Phase 2: external water temp + cascading fallback (ADR-015) ----------
+    # External sensor on XIAO ESP32-C6 in the pool. 30-min deep-sleep cadence.
+    # See EXTERNAL_WATER_TEMP_ENTITY constant near top of file for the entity
+    # ID and the renaming history. The five columns here form the
+    # data-collection scaffold for ADR-015 stage 2 (gate C — 5-7 day soak
+    # verification). Blueprint and auditor do not act on these yet; that's
+    # Phase 3 work.
+    {"name": "external_water_temp", "source": "state",
+     "entity": EXTERNAL_WATER_TEMP_ENTITY},
+    {"name": "external_water_temp_age_min", "source": "compute"},
+    {"name": "external_water_temp_fresh", "source": "compute"},
+    {"name": "water_temp_authoritative", "source": "compute"},
+    {"name": "water_temp_delta", "source": "compute"},
 
     # Heater estimated power: HEATER_RATED_POWER_W when compressor binary
     # sensor reports 'on', else 0. Per HP31005T nameplate (33.9A @ 230V).
@@ -331,6 +364,106 @@ def compute_water_temp_reliable(
     return "true" if on_for >= WATER_TEMP_SETTLING_SECONDS else "false"
 
 
+def compute_external_water_temp_age_min(last_changed_iso: str | None) -> str:
+    """
+    Minutes since the external water temp sensor last reported a new value.
+
+    Returns 'unavailable' if last_changed is missing or unparseable. Otherwise
+    a string-formatted float with 1 decimal place (e.g., '4.7').
+
+    Implementation note: uses last_changed (state-value transition) rather
+    than last_updated (every state report). For the ADC-based temp sensor
+    with sub-degree noise, every wake produces a different value in
+    practice, so last_changed ≈ last_updated. If a future firmware revision
+    introduces smoothing or rounding that pins multiple samples to the same
+    value, switch to last_updated by extending fetch_entity.
+    """
+    last_changed = parse_iso_utc(last_changed_iso)
+    if last_changed is None:
+        return "unavailable"
+    age_sec = (datetime.now(timezone.utc) - last_changed).total_seconds()
+    return f"{age_sec / 60.0:.1f}"
+
+
+def compute_external_water_temp_fresh(last_changed_iso: str | None) -> str:
+    """
+    True iff the external water temp sensor reading is within the freshness
+    threshold (FRESHNESS_THRESHOLD_MIN). Per ADR-015 + 2026-05-18 production
+    cadence: 35 min (30 min deep-sleep + 5 min grace for boot/wifi/publish).
+
+    Returns 'true' / 'false' string for CSV. Returns 'false' if last_changed
+    is unparseable — treat unknown freshness as not-fresh, conservative
+    default for the cascading fallback in compute_water_temp_authoritative.
+    """
+    last_changed = parse_iso_utc(last_changed_iso)
+    if last_changed is None:
+        return "false"
+    age_sec = (datetime.now(timezone.utc) - last_changed).total_seconds()
+    return "true" if age_sec / 60.0 <= FRESHNESS_THRESHOLD_MIN else "false"
+
+
+def compute_water_temp_authoritative(
+    external_temp: str, external_fresh: str,
+    local_temp: str, local_reliable: str,
+    target_temp: str,
+) -> str:
+    """
+    Cascading fallback for the canonical water temp value, per ADR-015.
+
+    Tier 1: external_water_temp if fresh and numeric — preferred because it
+            works during pump-off intervals where the local sensor reads
+            'unknown' (no flow through the in-line probe).
+    Tier 2: local_water_temp if reliable per ADR-013 — settled, pump-on for
+            WATER_TEMP_SETTLING_SECONDS or more.
+    Tier 3: target_temp from the heater — ADR-013 tactical fallback when
+            local sensor reads 'unknown' and no fresh external sensor.
+
+    Returns the chosen value formatted to 1 decimal place, or 'unavailable'
+    if all three tiers fail to provide a usable number.
+    """
+    # Tier 1: external if fresh
+    if external_fresh == "true":
+        try:
+            return f"{float(external_temp):.1f}"
+        except (ValueError, TypeError):
+            pass
+    # Tier 2: local if reliable
+    if local_reliable == "true":
+        try:
+            return f"{float(local_temp):.1f}"
+        except (ValueError, TypeError):
+            pass
+    # Tier 3: heater target temp
+    try:
+        return f"{float(target_temp):.1f}"
+    except (ValueError, TypeError):
+        return "unavailable"
+
+
+def compute_water_temp_delta(
+    external_temp: str, local_temp: str, pump_on: bool,
+) -> str:
+    """
+    Difference between external and local water temp readings, in °F
+    (external minus local). Only meaningful when pump is on — local sensor
+    needs flow to read at all. Returns empty string when pump is off or
+    either reading is non-numeric.
+
+    Useful signal for future auditor assertion W2: sustained large delta
+    during pump-on suggests one sensor is miscalibrated or the external
+    probe is positioned somewhere with materially different water than
+    the in-line return-path probe. Format: '+/-X.XX' with two decimals.
+    """
+    if not pump_on:
+        return ""
+    try:
+        e = float(external_temp)
+        l = float(local_temp)
+        return f"{e - l:+.2f}"
+    except (ValueError, TypeError):
+        return ""
+
+
 def build_row(args: argparse.Namespace, token: str) -> list[str]:
     """Walk the COLUMNS manifest and produce one CSV row."""
     # Cache of fetched entities so multiple columns reading the same entity
@@ -368,6 +501,38 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
                 row.append(
                     compute_water_temp_reliable(pump_state, pump_last_changed)
                 )
+            elif name == "external_water_temp_age_min":
+                _, _, ext_last_changed, _ = get(EXTERNAL_WATER_TEMP_ENTITY)
+                row.append(
+                    compute_external_water_temp_age_min(ext_last_changed)
+                )
+            elif name == "external_water_temp_fresh":
+                _, _, ext_last_changed, _ = get(EXTERNAL_WATER_TEMP_ENTITY)
+                row.append(
+                    compute_external_water_temp_fresh(ext_last_changed)
+                )
+            elif name == "water_temp_authoritative":
+                ext_state, _, ext_last_changed, _ = get(
+                    EXTERNAL_WATER_TEMP_ENTITY
+                )
+                local_state, _, _, _ = get("sensor.omnilogic_pool_watersensor")
+                _, heater_attrs, _, _ = get(
+                    "water_heater.omnilogic_pool_heater"
+                )
+                target_temp = str(heater_attrs.get("temperature", ""))
+                fresh = compute_external_water_temp_fresh(ext_last_changed)
+                local_reliable = compute_water_temp_reliable(
+                    pump_state, pump_last_changed
+                )
+                row.append(compute_water_temp_authoritative(
+                    ext_state, fresh, local_state, local_reliable, target_temp
+                ))
+            elif name == "water_temp_delta":
+                ext_state, _, _, _ = get(EXTERNAL_WATER_TEMP_ENTITY)
+                local_state, _, _, _ = get("sensor.omnilogic_pool_watersensor")
+                row.append(compute_water_temp_delta(
+                    ext_state, local_state, pump_state == "on"
+                ))
             elif name == "local_heater_estimated_power_w":
                 heater_equip_state, _, _, _ = get(
                     "binary_sensor.omnilogic_pool_heater_heater_equipment_status"
