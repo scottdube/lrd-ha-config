@@ -1,0 +1,124 @@
+# Energy cost-mirror sensors + dashboard toggle helpers
+#
+# Two helpers + a set of monetary template sensors that mirror each daily
+# energy subtotal multiplied by input_number.electricity_rate. Mirrors are
+# state_class total_increasing so HA records long-term statistics in USD,
+# making per-system / per-circuit cost trends available in statistics-graph
+# cards. Cost history begins on the day this package is first loaded — there
+# is no way to back-fill the prior kWh history as cost.
+#
+# Whole-home Grid-consumption totals (Panel A / Panel B) already have HA-
+# generated cost statistics from the Energy dashboard's price configuration
+# (sensor.emporia_vue_panel_a_total_daily_energy_cost and Panel B sibling).
+# Those have full 14+ days of history and are what the whole-home $ chart
+# uses. Per-system cost sensors below are the only path for HVAC / pool /
+# always-on history because those circuits aren't Grid-consumption sources.
+
+input_number:
+  electricity_rate:
+    name: Electricity rate
+    min: 0.05
+    max: 0.50
+    step: 0.001
+    initial: 0.136
+    unit_of_measurement: "$/kWh"
+    icon: mdi:cash
+    mode: box
+
+input_boolean:
+  energy_show_cost:
+    name: Energy + — show as cost
+    icon: mdi:cash-multiple
+
+template:
+  - sensor:
+      - name: "Whole Home Cost Today"
+        unique_id: whole_home_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set kwh = states('sensor.whole_home_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ (kwh * rate) | round(2) }}
+        availability: "{{ has_value('sensor.whole_home_daily_energy') }}"
+
+      - name: "HVAC Cost Today"
+        unique_id: hvac_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set kwh = states('sensor.hvac_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ (kwh * rate) | round(2) }}
+
+      - name: "Air 1 Cost Today"
+        unique_id: air_1_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set wh = states('sensor.air_1_total_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ ((wh / 1000.0) * rate) | round(2) }}
+
+      - name: "Air 2 Cost Today"
+        unique_id: air_2_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set wh = states('sensor.air_2_total_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ ((wh / 1000.0) * rate) | round(2) }}
+
+      - name: "Garage Mini Split Cost Today"
+        unique_id: garage_mini_split_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set wh = states('sensor.emporia_vue_panel_a_circuit_10_garage_mini_split_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ ((wh / 1000.0) * rate) | round(2) }}
+
+      - name: "Pool Subpanel Cost Today"
+        unique_id: pool_subpanel_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set kwh = states('sensor.pool_subpanel_daily_energy_kwh') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ (kwh * rate) | round(2) }}
+
+      - name: "Always On Cost Today"
+        unique_id: always_on_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set kwh = states('sensor.always_on_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ (kwh * rate) | round(2) }}
+
+      - name: "Water Heater Cost Today"
+        unique_id: water_heater_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set wh = states('sensor.emporia_vue_panel_a_circuit_3_water_heater_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ ((wh / 1000.0) * rate) | round(2) }}
+
+      - name: "Dryer Cost Today"
+        unique_id: dryer_cost_today
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total_increasing
+        state: >
+          {% set wh = states('sensor.emporia_vue_panel_b_circuit_1_dryer_daily_energy') | float(0) %}
+          {% set rate = states('input_number.electricity_rate') | float(0.136) %}
+          {{ ((wh / 1000.0) * rate) | round(2) }}
