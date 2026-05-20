@@ -38,7 +38,7 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 | ? | Fibaro FGD212 | Fibaro | Outside / lamp post | `light.dimmer_2` | Dual-channel; second channel unused, unexposed from Assist |
 | ? | Kwikset 916 | Kwikset | Lanai door | `lock.?` | Battery drain issue — neighbors:[] on mesh |
 | ? | ZEN77 | Zooz | ? | ? | 700-series beaming repeater for lock |
-| ? | GE/Jasco fan controller | GE | ? | ? | Older device, may show as light not fan |
+| ? | 14314 / ZW4002 ×6 | Jasco | Lanai L/R, Living Room, Master Bedroom, Guest Bedroom 1+2 | `fan.<area>_ceiling[_<position>]` | 6× in-wall fan speed controllers; entity_ids renamed from auto-generated stems to location-first + `_ceiling` type marker 2026-05-20 via tools/rename_entities.py |
 | ? | ZEN25 (or Minoston MP26Z) | Zooz/Minoston | Bathroom — Mary's curling iron | ? | Per-outlet control for Away automation |
 | Dead 24 | (dead ghost node) | — | — | — | **Cleanup pending:** Remove Failed Node in Z-Wave JS |
 

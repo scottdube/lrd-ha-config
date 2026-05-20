@@ -12,7 +12,7 @@
 #   82–84°F      → dead band (no change)
 #   ≥84°F        → HIGH (100%)
 #
-# Speed mapping (per Jasco 500S in-wall fan controller + fan.lanai_fan_right
+# Speed mapping (per Jasco 500S in-wall fan controller + fan.lanai_ceiling_right
 # percentage_step=33.33, preset_modes=[]):
 #   LOW=33, MED=66, HIGH=100
 #
@@ -21,12 +21,9 @@
 #
 # Entity references:
 #   sensor.outdoor_air_temp                          — template, packages/environment/outdoor_temp.yaml
-#   fan.in_wall_fan_speed_control_500s_left          — Lanai Fan Left (Jasco 500S)
-#   fan.lanai_fan_right                              — Lanai Fan Right
+#   fan.lanai_ceiling_left                           — Lanai Fan Left (Jasco 500S); renamed from fan.in_wall_fan_speed_control_500s_left 2026-05-20
+#   fan.lanai_ceiling_right                          — Lanai Fan Right (Jasco 500S); renamed from fan.lanai_fan_right 2026-05-20
 #   input_boolean.vacation                           — packages/pool/pool_modes.yaml
-#
-# Future: rename fan.in_wall_fan_speed_control_500s_left → fan.lanai_fan_left
-# for consistency. Requires grep across automations + scripts before rename.
 
 automation:
   - id: lanai_fan_climate
@@ -38,8 +35,8 @@ automation:
     mode: single
     variables:
       lanai_fans:
-        - fan.in_wall_fan_speed_control_500s_left
-        - fan.lanai_fan_right
+        - fan.lanai_ceiling_left
+        - fan.lanai_ceiling_right
     triggers:
       - trigger: numeric_state
         entity_id: sensor.outdoor_air_temp

@@ -220,7 +220,7 @@
       action: light.turn_on
     - metadata: {}
       target:
-        entity_id: fan.in_wall_fan_speed_control_500s_2
+        entity_id: fan.master_bedroom_ceiling
       data:
         percentage: 33
       action: fan.turn_on
@@ -238,8 +238,8 @@
     - metadata: {}
       target:
         entity_id:
-          - fan.in_wall_fan_speed_control_500s_left
-          - fan.lanai_fan_right
+          - fan.lanai_ceiling_left
+          - fan.lanai_ceiling_right
       data: {}
       action: fan.turn_off
   mode: single
