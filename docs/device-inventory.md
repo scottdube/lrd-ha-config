@@ -146,5 +146,6 @@ Known HA quirk: `androidtv.adb_command` service can vanish from HA if the integr
 
 ## Entity exposure to Assist
 
-**Currently:** 573 entities exposed (too many — audit needed)
-**Default behavior:** "Expose new entities" is ON (turn off, expose manually going forward)
+**Currently:** 45 entities exposed (audit completed — see current-state.md Done section).
+**Default behavior:** "Expose new entities" is OFF for Assist, Alexa, and Google.
+**MCP note:** The Claude MCP Server integration shares this allowlist. Exposing an entity to Assist also exposes it to Claude (and to Alexa/Google to the extent they're enabled). Audit before exposing new entities.
