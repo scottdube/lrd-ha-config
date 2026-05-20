@@ -39,6 +39,8 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 | ? | Kwikset 916 | Kwikset | Lanai door | `lock.?` | Battery drain issue — neighbors:[] on mesh |
 | ? | ZEN77 | Zooz | ? | ? | 700-series beaming repeater for lock |
 | ? | 14314 / ZW4002 ×6 | Jasco | Lanai L/R, Living Room, Master Bedroom, Guest Bedroom 1+2 | `fan.<area>_ceiling[_<position>]` | 6× in-wall fan speed controllers; entity_ids renamed from auto-generated stems to location-first + `_ceiling` type marker 2026-05-20 via tools/rename_entities.py |
+| 53 | ZEN77 | Zooz | Guest Room 1 — cans | `light.s2_dimmer_4` (legacy) | Added 2026-05-20. name_by_user = "Guest Room 1 Cans". 50 entities still on legacy `s2_dimmer_*` stem (mixed `_2`/`_4` suffixes from earlier S2 Dimmer pairings) — entity_id rename deferred to ADR-021; needs script `--regex` enhancement to handle suffix cleanup. |
+| (pending) | ZEN77 | Zooz | Guest Room 2 — cans | (none yet) | Added via SmartStart 2026-05-20 — provisioning entry exists (`provision_14244-44678-...`) but device hasn't completed inclusion. Power-cycle the dimmer or check Z-Wave JS UI → Provisioning to trigger inclusion. Once included: same entity_id rename treatment as GR1 Cans. |
 | ? | ZEN25 (or Minoston MP26Z) | Zooz/Minoston | Bathroom — Mary's curling iron | ? | Per-outlet control for Away automation |
 | Dead 24 | (dead ghost node) | — | — | — | **Cleanup pending:** Remove Failed Node in Z-Wave JS |
 
