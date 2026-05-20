@@ -40,7 +40,7 @@ shell_command:
     python3 /config/pool/scripts/state_logger.py
     --row-type {{ row_type | default('time_pattern') }}
     --trigger-entity "{{ trigger_entity | default('') }}"
-  git_pull_config: cd /config && git pull --ff-only origin main 2>&1
+  git_pull_config: cd /config && git -c safe.directory=/config pull --ff-only origin main 2>&1
 
 recorder:
   exclude:
