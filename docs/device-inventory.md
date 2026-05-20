@@ -33,15 +33,14 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 | 033 | HS-WX300 | HomeSeer | Master Suite | `light.master_suite_hall_light` (inferred) | |
 | 034 | HS-WX300 | HomeSeer | Kitchen | `light.kitchen_4_cans` | FW outlier — already on v2.2.0; group source for node 026's associations. |
 | ? | Jasco AS2005 | Jasco | Kitchen (over bar) | none | Add-on switch, associated to kitchen cans at Z-Wave level |
-| 32 | ZEN75 | Zooz | Master Suite — shower fan | `switch.heavy_duty_switch_shower` | FW v1.30.0 |
-| ? | ZEN75 | Zooz | Master Suite — toilet fan | `switch.heavy_duty_switch_toilet` | Re-included after failed FW update |
+| 32 | ZEN75 | Zooz | Master Suite — shower fan | `switch.shower_fan` | FW v1.30.0; renamed from `switch.heavy_duty_switch_shower` 2026-05-20 |
+| 51 | ZEN75 | Zooz | Master Suite — toilet fan | `switch.toilet_fan` | Re-included 2026-05-20 as Z-Wave Classic. Previously node 256 on Z-Wave LR — single-link failures in bathroom RF environment; Classic re-include gave 29 mesh neighbors, health check 10/10. FW v1.30.0 |
 | ? | Fibaro FGD212 | Fibaro | Outside / lamp post | `light.dimmer_2` | Dual-channel; second channel unused, unexposed from Assist |
 | ? | Kwikset 916 | Kwikset | Lanai door | `lock.?` | Battery drain issue — neighbors:[] on mesh |
 | ? | ZEN77 | Zooz | ? | ? | 700-series beaming repeater for lock |
 | ? | GE/Jasco fan controller | GE | ? | ? | Older device, may show as light not fan |
 | ? | ZEN25 (or Minoston MP26Z) | Zooz/Minoston | Bathroom — Mary's curling iron | ? | Per-outlet control for Away automation |
 | Dead 24 | (dead ghost node) | — | — | — | **Cleanup pending:** Remove Failed Node in Z-Wave JS |
-| 256 | (Z-Wave LR device) | ? | ? | ? | LR node — identify which device |
 
 ---
 
