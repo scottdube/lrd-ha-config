@@ -48,3 +48,23 @@ python3 "${REPO_ROOT}/pool/scripts/auditor.py" \
     --token-file "$TOKEN_FILE" \
     --notify-target scott_and_ha \
     --print
+
+# Commit + push the audit JSON so it propagates to GitHub for the daily
+# Claude review scheduled task to read via raw URL. pool/audit/ was
+# un-gitignored 2026-05-21 specifically to enable this flow. Failure to
+# push is non-fatal — the JSON is still on the Mac mini and the FAIL push
+# notification already fired (if applicable); we'll retry on the next run.
+AUDIT_JSON="${OUT_DIR}/pool_audit_${YESTERDAY}.json"
+if [[ -f "$AUDIT_JSON" ]]; then
+    cd "$REPO_ROOT"
+    if ! git diff --quiet "$AUDIT_JSON" 2>/dev/null || ! git ls-files --error-unmatch "$AUDIT_JSON" >/dev/null 2>&1; then
+        git add "$AUDIT_JSON"
+        git -c user.name="Pool Auditor" -c user.email="audit@dubecars.com" \
+            commit -m "audit: ${YESTERDAY} result" --quiet
+        if ! git push origin main --quiet 2>&1; then
+            echo "WARN: git push failed; audit JSON is on disk but not propagated. Will retry next run." >&2
+        fi
+    fi
+else
+    echo "WARN: expected audit JSON not found at $AUDIT_JSON" >&2
+fi

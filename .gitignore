@@ -41,8 +41,11 @@ pool_action_log.csv    # logger v2 phase 4 action log
 # See pool/docs/rsync-setup.md.
 pool/analysis/pool_state_log_live.csv
 
-# Auditor output. Re-derivable from the CSV; not worth tracking churn.
-pool/audit/
+# Auditor output. Tracked as of 2026-05-21 — original rationale ("re-derivable
+# from CSV") superseded by the need for cross-machine read (daily Claude review
+# scheduled task reads via GitHub raw URL). ~6 KB/day = ~2 MB/year, trivial.
+# Historical audits valuable for longitudinal D3/P5 trend analysis.
+# pool/audit/
 
 # Lock files
 *.lock
