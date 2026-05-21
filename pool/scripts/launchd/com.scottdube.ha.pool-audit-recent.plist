@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Pool recent-state audit. Runs every 3 hours via launchd on the Mac mini.
+
+  Silent on clean (zero push), notification only on detected problems.
+  Complements:
+    - pool/scripts/audit_yesterday.sh (00:05 nightly, full retrospective)
+    - packages/pool/pool_health_watcher.yaml (real-time event watchers)
+
+  Schedule: :15 past every 3rd hour (02:15, 05:15, 08:15, 11:15, 14:15,
+  17:15, 20:15, 23:15). Offset from pump schedule transitions at :00 and
+  :30 to avoid running during the brief integration churn at scheduled
+  pump-on/off.
+
+  Install:
+    cp pool/scripts/launchd/com.scottdube.ha.pool-audit-recent.plist \
+       ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.scottdube.ha.pool-audit-recent.plist
+
+  Verify next scheduled run:
+    launchctl list | grep pool-audit-recent
+    cat ~/Library/Logs/ha-pool-audit-recent.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottdube.ha.pool-audit-recent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/scottdube/code/home-assistant/pool/scripts/audit_recent.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>15</integer></dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/Users/scottdube/Library/Logs/ha-pool-audit-recent.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/scottdube/Library/Logs/ha-pool-audit-recent.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/scottdube/code/home-assistant</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>
