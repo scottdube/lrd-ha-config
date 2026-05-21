@@ -123,3 +123,69 @@
         {% set light = states('switch.omnilogic_pool_light') %}
         Pump:{{ pump }} Heater:{{ heater }} Waterfall:{{ waterfall }} Light:{{ light }}
       icon: mdi:pool
+
+    # Cascading water-temp fallback per ADR-015 — mirrors
+    # compute_water_temp_authoritative() in pool/scripts/state_logger.py
+    # so the live HA value matches what the logger records as
+    # `water_temp_authoritative` in the CSV.
+    #
+    # Tier 1: external_water_temp if fresh (<= 35 min since last_changed).
+    #         Works during pump-off intervals because the external probe
+    #         doesn't depend on flow.
+    # Tier 2: local_water_temp if pump-on for >= 60 sec (in-line probe
+    #         settled with flow).
+    # Tier 3: heater target temp (ADR-013 tactical fallback).
+    #
+    # State updates on any referenced-entity change AND on time tick
+    # (because now() is referenced — HA auto-triggers periodic
+    # re-evaluation for time-sensitive templates).
+    #
+    # Phase 2 prep — Phase 1 (logger collection) is shipping data since
+    # 2026-05-18. This template sensor goes live for observation +
+    # dashboard use. Phase 2 blueprint integration (replacing direct
+    # local_water_temp reads in pool_automation v1.11.0 with this
+    # authoritative sensor) lands after gate C completes (~2026-05-23).
+    - name: Pool Water Temp Authoritative
+      unique_id: pool_water_temp_authoritative
+      unit_of_measurement: "°F"
+      device_class: temperature
+      state_class: measurement
+      icon: mdi:thermometer-water
+      state: >
+        {%- set ext = states.sensor.pool_water_temp_external -%}
+        {%- set ext_val = states('sensor.pool_water_temp_external') | float(none) -%}
+        {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
+        {%- set ext_fresh = ext_age <= 35 and ext_val is not none -%}
+        {%- set local_val = states('sensor.omnilogic_pool_watersensor') | float(none) -%}
+        {%- set pump = states.switch.omnilogic_pool_filter_pump -%}
+        {%- set pump_on = is_state('switch.omnilogic_pool_filter_pump', 'on') -%}
+        {%- set pump_sec = ((now() - pump.last_changed).total_seconds()) if (pump and pump_on) else 0 -%}
+        {%- set local_reliable = pump_on and pump_sec >= 60 and local_val is not none -%}
+        {%- set target = state_attr('water_heater.omnilogic_pool_heater', 'temperature') | float(none) -%}
+        {%- if ext_fresh -%}{{ ext_val | round(1) }}
+        {%- elif local_reliable -%}{{ local_val | round(1) }}
+        {%- elif target is not none -%}{{ target | round(1) }}
+        {%- else -%}{{ none }}{%- endif -%}
+      attributes:
+        source: >
+          {%- set ext = states.sensor.pool_water_temp_external -%}
+          {%- set ext_val = states('sensor.pool_water_temp_external') | float(none) -%}
+          {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
+          {%- set ext_fresh = ext_age <= 35 and ext_val is not none -%}
+          {%- set local_val = states('sensor.omnilogic_pool_watersensor') | float(none) -%}
+          {%- set pump = states.switch.omnilogic_pool_filter_pump -%}
+          {%- set pump_on = is_state('switch.omnilogic_pool_filter_pump', 'on') -%}
+          {%- set pump_sec = ((now() - pump.last_changed).total_seconds()) if (pump and pump_on) else 0 -%}
+          {%- set local_reliable = pump_on and pump_sec >= 60 and local_val is not none -%}
+          {%- if ext_fresh -%}external
+          {%- elif local_reliable -%}local
+          {%- else -%}target{%- endif -%}
+        external_age_min: >
+          {%- set ext = states.sensor.pool_water_temp_external -%}
+          {%- if ext -%}{{ ((now() - ext.last_changed).total_seconds() / 60) | round(1) }}
+          {%- else -%}unknown{%- endif -%}
+        external_fresh: >
+          {%- set ext = states.sensor.pool_water_temp_external -%}
+          {%- set ext_val = states('sensor.pool_water_temp_external') | float(none) -%}
+          {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
+          {{ ext_age <= 35 and ext_val is not none }}
