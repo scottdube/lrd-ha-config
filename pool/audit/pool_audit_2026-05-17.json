@@ -1,0 +1,248 @@
+{
+  "date": "2026-05-17",
+  "auditor_version": "1.2.0",
+  "swim_day": true,
+  "row_count": 231,
+  "schema_columns": 44,
+  "summary": {
+    "passed": 8,
+    "failed": 5,
+    "skipped": 3
+  },
+  "assertions": [
+    {
+      "id": "D1",
+      "name": "swim_day_consistency",
+      "status": "PASS",
+      "expected": "swim_day_raw constant across day (ignoring transient unavailable)",
+      "observed": "swim_day_raw=Yes",
+      "severity": "low",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "D2",
+      "name": "log_cadence",
+      "status": "PASS",
+      "expected": "time_pattern rows every 10\u00b12 min",
+      "observed": "143 gaps, mean 10.0 min, out-of-spec 0.0% (0), max gap 10.0 min",
+      "severity": "low",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "D3",
+      "name": "sensor_availability",
+      "status": "FAIL",
+      "expected": "no critical sensor unavailable >30 cumulative min (water_temp exempt while pump is off \u2014 sensor settles only with flow)",
+      "observed": "local_water_temp=111 min; local_filter_state=700 min; local_waterfall_state=700 min",
+      "severity": "med",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "W1",
+      "name": "waterfall_window_only",
+      "status": "FAIL",
+      "expected": "waterfall open only between 08:00:00 and 20:00:00",
+      "observed": "3 off-window open rows",
+      "severity": "high",
+      "violating_rows": [
+        {
+          "timestamp": "2026-05-17 20:50:50",
+          "local_waterfall_state": "open"
+        },
+        {
+          "timestamp": "2026-05-17 20:50:51",
+          "local_waterfall_state": "open"
+        },
+        {
+          "timestamp": "2026-05-17 20:50:51",
+          "local_waterfall_state": "open"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "W2",
+      "name": "waterfall_opens_at_start",
+      "status": "PASS",
+      "expected": "closed\u2192open transition near 08:00 on swim days",
+      "observed": "opened at 08:10:01",
+      "severity": "med",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "W3",
+      "name": "waterfall_closes_at_end",
+      "status": "FAIL",
+      "expected": "open\u2192closed transition near 20:00 if waterfall opened today",
+      "observed": "no open\u2192closed transition within \u00b115 min of 20:00:00; this is the assertion that catches the late-April class of bug",
+      "severity": "high",
+      "violating_rows": [
+        {
+          "timestamp": "2026-05-17 23:50:00",
+          "local_waterfall_state": "closed"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "P1",
+      "name": "swim_day_pump_window",
+      "status": "PASS",
+      "expected": "pump on through swim-day filtration window",
+      "observed": "13/135 interior rows pump=off (9.6%)",
+      "severity": "med",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "P2",
+      "name": "nonswim_day_pump_off",
+      "status": "SKIP",
+      "expected": "pump off \u226595% of day on non-swim days",
+      "observed": "",
+      "severity": "med",
+      "violating_rows": [],
+      "reason": "swim day"
+    },
+    {
+      "id": "P3",
+      "name": "pump_speed_when_heating",
+      "status": "PASS",
+      "expected": "pump_speed \u2265 65% on heater-active time_pattern rows; first heater-active row of each run skipped (race: logger snapshot at same instant blueprint fires, before pump-speed command lands)",
+      "observed": "all heater-active time_pattern rows had pump at heater speed (post-first)",
+      "severity": "high",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "P4",
+      "name": "pump_speed_when_idle",
+      "status": "FAIL",
+      "expected": "pump_speed \u2264 55% on idle time_pattern rows; first idle row after each heater run skipped (race: pump-speed-down command lands after the time_pattern snapshot at the same instant)",
+      "observed": "2 idle-pump time_pattern rows with speed > 55%",
+      "severity": "med",
+      "violating_rows": [
+        {
+          "timestamp": "2026-05-17 22:40:00",
+          "local_filter_speed": "90"
+        },
+        {
+          "timestamp": "2026-05-17 22:50:00",
+          "local_filter_speed": "90"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "P5",
+      "name": "pump_on_actually_drawing_power",
+      "status": "FAIL",
+      "expected": "when local_filter_state=on for >5 consecutive min (after a 120s priming/spin-up skip), local_filter_power must be >=50 W; zero power with state=on indicates an OmniLogic wedge",
+      "observed": "8 pump-on run(s) with power <50 W for >=5 min \u2014 check OmniLogic UI for MSP_DEV_COMM_LOSS alarms (ADR-019)",
+      "severity": "high",
+      "violating_rows": [
+        {
+          "started": "2026-05-17 08:02:11",
+          "duration_min_so_far": 7.82
+        },
+        {
+          "started": "2026-05-17 08:10:00",
+          "duration_min_so_far": 8.42
+        },
+        {
+          "started": "2026-05-17 22:50:00",
+          "duration_min_so_far": 10.0
+        },
+        {
+          "started": "2026-05-17 23:00:00",
+          "duration_min_so_far": 10.0
+        },
+        {
+          "started": "2026-05-17 23:10:00",
+          "duration_min_so_far": 10.0
+        },
+        {
+          "started": "2026-05-17 23:20:00",
+          "duration_min_so_far": 10.0
+        },
+        {
+          "started": "2026-05-17 23:30:00",
+          "duration_min_so_far": 10.0
+        },
+        {
+          "started": "2026-05-17 23:40:00",
+          "duration_min_so_far": 10.0
+        },
+        {
+          "timestamp": "2026-05-17 08:02:11",
+          "local_filter_state": "on",
+          "local_filter_speed": "55",
+          "local_filter_power": "0",
+          "duration_min": 7.82
+        },
+        {
+          "timestamp": "2026-05-17 08:10:00",
+          "local_filter_state": "on",
+          "local_filter_speed": "55",
+          "local_filter_power": "0",
+          "duration_min": 0.02
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "H1",
+      "name": "heater_state_matches_swim_day",
+      "status": "PASS",
+      "expected": "heater on iff swimming_day; allow 1 mismatch in first 10 min",
+      "observed": "heater state matches swim_day (True) all day",
+      "severity": "med",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "H2",
+      "name": "heater_active_implies_pump_on",
+      "status": "PASS",
+      "expected": "when heater actively delivering, pump must be on",
+      "observed": "no heater-on/pump-off violations",
+      "severity": "high",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "H3",
+      "name": "water_temp_rising_when_heating",
+      "status": "PASS",
+      "expected": "\u2265 +0.3\u00b0F over 60 min when heating",
+      "observed": "2 heating runs all rose \u2265 0.3\u00b0F",
+      "severity": "low",
+      "violating_rows": [],
+      "reason": ""
+    },
+    {
+      "id": "I1",
+      "name": "omnilogic_local_uptime",
+      "status": "SKIP",
+      "expected": "OmniLogic Local available \u226597.0% of rows",
+      "observed": "",
+      "severity": "low",
+      "violating_rows": [],
+      "reason": "needs omnilogic_local_last_update_success column (not in phase 1 schema)"
+    },
+    {
+      "id": "I2",
+      "name": "midnight_burst_bounded",
+      "status": "SKIP",
+      "expected": "any sensor-error cluster ends by 01:30:00",
+      "observed": "",
+      "severity": "low",
+      "violating_rows": [],
+      "reason": "needs error log integration; deferred"
+    }
+  ]
+}
