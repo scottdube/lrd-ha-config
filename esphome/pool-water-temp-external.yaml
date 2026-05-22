@@ -28,10 +28,12 @@ ota:
     password: !secret ota_password
 
 wifi:
-  ssid: !secret legacy_iot_ssid
-  password: !secret legacy_iot_password
+  networks:
+    - ssid: !secret legacy_iot_ssid
+      password: !secret legacy_iot_password
+      bssid: 66:D6:1F:AE:47:69
   power_save_mode: NONE
-  fast_connect: false
+  fast_connect: true
   ap:
     ssid: "Pool Float Fallback"
     password: !secret fallback_password
@@ -47,7 +49,7 @@ safe_mode:
 deep_sleep:
   id: deep_sleep_main
   run_duration: 30s
-  sleep_duration: 30min
+  sleep_duration: 10min
 
 binary_sensor:
   - platform: homeassistant

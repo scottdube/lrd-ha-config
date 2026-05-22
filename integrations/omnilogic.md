@@ -49,7 +49,7 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 - **Status:** Stable
 - **Communication:** Cloud relay through Hayward servers
 - **Authentication:** Hayward app credentials
-- **Used for:** ORP, salt level, pH (sensors not exposed by local integration)
+- **Used for:** salt level (smoothed + instant), per-equipment alarm binary_sensors, plus a few sensors not exposed by the local integration. **Correction 2026-05-22:** the LRD install does NOT have ORP or pH probes installed at the controller — those are optional OmniLogic Pro hardware add-ons that this site doesn't have. Earlier text claiming cloud exposes ORP/pH was overstated and reflected the upstream integration's possible-entity set, not the installed-and-exposed set. Verified entity inventory at LRD: `sensor.pool_pool_chlorinator_average_salt_level`, `sensor.pool_pool_chlorinator_instant_salt_level`, `sensor.pool_pool_chlorinator_setting`, `binary_sensor.pool_pool_{chlorinator,filter_pump,heater_heater,light,waterfall}_alarm`, `binary_sensor.omnilogic_pool_pool_flow` (local integration, despite the cloud-style naming). No ORP, no pH.
 
 ### Entity naming convention
 `*.pool_pool_*` (note the doubled "pool"). Not used in blueprint service calls — sensors only.

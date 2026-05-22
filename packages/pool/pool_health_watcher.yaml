@@ -76,6 +76,88 @@
 #     integration reloads without false-positive.
 #   - 5 min ping-off threshold (class 3) catches sustained outages
 #     while tolerating single missed ping cycles.
+#
+# 2026-05-22 addition: chemistry + equipment-health watchers (class-C).
+# Added to close the absence-mode gap. With the pool_automation blueprint
+# disabled during extended absence (per pre-departure plan), the pool
+# runs on the OmniLogic MSP's local schedule for filtration and
+# chlorination, and T&D Pool Construction handles weekly chemistry on
+# their service visits. The watchers below provide between-visit
+# alerting for chemistry drift and mechanical failures that can develop
+# in days, not weeks.
+#
+# Entity inventory check 2026-05-22: this install does NOT have ORP or
+# pH probes (Hayward optional add-ons not installed at LRD). Only the
+# chlorinator's salt sensors are exposed. Watcher scope was reduced
+# accordingly and rebuilt around Hayward's per-equipment alarm
+# binary_sensors plus the local-integration flow detection. The
+# integrations/omnilogic.md note about cloud exposing ORP/salt/pH was
+# overstated and has been corrected.
+#
+# Detection summary (chemistry + equipment, separate from the three
+# failure-class watchers above):
+#   - automation.pool_alert_on_salt_out_of_band            → chlorinator
+#                                                             can't produce
+#                                                             OR corrosion
+#                                                             risk
+#   - automation.pool_alert_on_hayward_equipment_alarm     → any of the
+#                                                             five Hayward
+#                                                             per-device
+#                                                             alarm binary
+#                                                             sensors on for
+#                                                             5+ min
+#   - automation.pool_alert_on_flow_loss_with_pump_on      → pump on but
+#                                                             no flow (dry
+#                                                             run, blocked
+#                                                             impeller,
+#                                                             airlock)
+#   - automation.pool_alert_on_cloud_salt_feed_stale       → cloud feed
+#                                                             gone; suppress
+#                                                             salt watcher
+#                                                             noise and
+#                                                             surface the
+#                                                             feed-loss
+#                                                             event itself
+#
+# Sensor source mix:
+#   - Salt: djtimca/haomnilogic CLOUD integration. Entity:
+#     `sensor.pool_pool_chlorinator_average_salt_level` (smoothed,
+#     stable for sustained-threshold checks). Use
+#     `sensor.pool_pool_chlorinator_instant_salt_level` for live spot
+#     checks.
+#   - Hayward equipment alarms: also cloud. Five entities in the form
+#     `binary_sensor.pool_pool_<equipment>_alarm` (chlorinator,
+#     filter_pump, heater_heater, light, waterfall). These are tuned by
+#     Hayward — no thresholds for us to invent.
+#   - Flow: LOCAL integration. Entity:
+#     `binary_sensor.omnilogic_pool_pool_flow`. Note the unusual prefix
+#     `omnilogic_pool_pool_` (vs the usual `omnilogic_pool_` for local
+#     entities) — this is the local integration's representation of the
+#     cloud-style `pool_pool_*` namespace for a specific sensor type.
+#     If a future cryptk/haomnilogic-local release renames this, the
+#     watcher goes silent until updated.
+#
+# Threshold rationale (saltwater pool chemistry, conservative for
+# unattended operation):
+#   - Salt 2500-3800 ppm: target typically 2700-3400 ppm for our cell.
+#     Below 2500 the chlorinator can't produce; above 3800 risks
+#     corrosion of metal hardware.
+#   - 30-min `for:` duration on salt: absorbs cloud polling jitter +
+#     brief chemistry transients during active chlorinator runs.
+#   - 5-min `for:` duration on Hayward alarms: absorbs brief alarm
+#     flickers during state transitions (e.g. chlorinator momentarily
+#     alarms during pump startup).
+#   - 5-min `for:` duration on flow-loss: matches expected flow-sensor
+#     settling time after pump start.
+#   - 60-min `for:` duration on cloud-feed-stale: well above normal
+#     polling jitter, suppresses false positives on transient cloud
+#     drops.
+#
+# Gating: all four watchers are gated by input_boolean.pool_service_lockout
+# (ADR-011) so T&D's panel-toggle service mode silences them while
+# they're on site. Not gated by pool_integration_recovering — that
+# boolean is local-integration-specific, doesn't apply to cloud
+# chemistry sensors or to Hayward's per-equipment alarms.
 
 automation:
   - alias: "Pool: Alert on pump-on but no power"
@@ -233,3 +315,220 @@ automation:
             push:
               interruption-level: time-sensitive
             tag: pool_controller_unreachable
+
+  # ===================================================================
+  # Chemistry + equipment-health watchers (class-C).
+  # Added 2026-05-22 to close the absence-mode gap. See header for
+  # rationale.
+  #
+  # Entity inventory check 2026-05-22 revealed this install does NOT
+  # have ORP or pH probes — only the chlorinator's salt sensors are
+  # exposed via cloud (`sensor.pool_pool_chlorinator_*_salt_level`).
+  # ORP and pH are optional OmniLogic Pro add-ons not installed at LRD.
+  # Watchers scoped accordingly:
+  #   - Salt-based chemistry monitoring (the one we have)
+  #   - Per-equipment Hayward alarm sensors (already-tuned by Hayward —
+  #     no thresholds for us to invent, just OR-of-five binary_sensors)
+  #   - Flow loss detection (mechanical failure catcher — pump claims
+  #     on but `binary_sensor.omnilogic_pool_pool_flow` is off)
+  # ===================================================================
+
+  - alias: "Pool: Alert on salt out of band"
+    id: pool_alert_on_salt_out_of_band
+    description: >
+      Chemistry — salt level outside chlorinator's operating window.
+      Target band 2700-3400 ppm typical for saltwater pools; thresholds
+      set to 2500 (low) and 3800 (high) to give margin against polling
+      noise. Uses the chlorinator's AVERAGE (smoothed) salt reading
+      rather than instant — average is what the chlorinator itself uses
+      to regulate behavior, and it's the more stable signal for a
+      30-min sustained-threshold check.
+      Below 2500 ppm: chlorinator cannot produce hypochlorite
+      efficiently — pool sanitation degrades regardless of chlorinator
+      percent setpoint. Add salt.
+      Above 3800 ppm: corrosion risk on metal hardware (heater heat
+      exchanger, ladder, lights, deck-level metalwork). Partial drain +
+      refill needed.
+      Gated by pool_service_lockout (ADR-011). Single automation with
+      two trigger thresholds; message branches on which fired.
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.pool_pool_chlorinator_average_salt_level
+        below: 2500
+        for: "00:30:00"
+        id: salt_low
+      - platform: numeric_state
+        entity_id: sensor.pool_pool_chlorinator_average_salt_level
+        above: 3800
+        for: "00:30:00"
+        id: salt_high
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: >
+            Pool: salt {{ 'LOW' if trigger.id == 'salt_low' else 'HIGH' }}
+            ({{ states('sensor.pool_pool_chlorinator_average_salt_level') }} ppm)
+          message: >
+            {% if trigger.id == 'salt_low' %}
+            Salt level has been below 2500 ppm for 30+ min — chlorinator
+            cannot produce. Instant reading:
+            {{ states('sensor.pool_pool_chlorinator_instant_salt_level') }} ppm.
+            Add salt; target 2700-3400 ppm.
+            {% else %}
+            Salt level has been above 3800 ppm for 30+ min — corrosion
+            risk on metal hardware. Instant reading:
+            {{ states('sensor.pool_pool_chlorinator_instant_salt_level') }} ppm.
+            Partial drain and refill to bring back into 2700-3400 target.
+            {% endif %}
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_chem_salt_oob
+
+  - alias: "Pool: Alert on Hayward equipment alarm"
+    id: pool_alert_on_hayward_equipment_alarm
+    description: >
+      Hayward-side equipment alarm — fires when any of the five per-
+      equipment alarm binary sensors transitions to `on` and stays on
+      for 5+ min. These alarms are surfaced by the OmniLogic controller
+      itself when it detects equipment-specific faults (chlorinator
+      no-flow, pump overcurrent, heater fault, light circuit issue,
+      waterfall actuator stall, etc.). The 5-min threshold absorbs
+      brief alarm flickers during state transitions (e.g. chlorinator
+      momentarily alarms during pump startup).
+      No threshold to invent — Hayward has already tuned these per
+      device. Our job is to surface them quickly.
+      Single automation watching all five sensors via OR-of-states.
+      Message identifies which equipment.
+      Gated by pool_service_lockout (ADR-011) — T&D may intentionally
+      trip an alarm during diagnostic work.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.pool_pool_chlorinator_alarm
+          - binary_sensor.pool_pool_filter_pump_alarm
+          - binary_sensor.pool_pool_heater_heater_alarm
+          - binary_sensor.pool_pool_light_alarm
+          - binary_sensor.pool_pool_waterfall_alarm
+        to: "on"
+        for: "00:05:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: >
+            Pool: Hayward equipment alarm —
+            {{ trigger.entity_id.split('.')[1]
+              | replace('pool_pool_', '')
+              | replace('_alarm', '')
+              | replace('_', ' ')
+              | title }}
+          message: >
+            {{ trigger.entity_id }} has been ON for 5+ min. Check the
+            OmniLogic UI alarms panel for the specific alarm code and
+            recommended action. Common causes by equipment: chlorinator
+            (no flow / cell fault), filter_pump (overcurrent / dry
+            run), heater (no flow / low refrigerant), light (circuit
+            fault), waterfall (actuator stall).
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_hayward_alarm
+
+  - alias: "Pool: Alert on flow loss with pump on"
+    id: pool_alert_on_flow_loss_with_pump_on
+    description: >
+      Mechanical/plumbing — fires when the filter pump is reporting
+      ON but `binary_sensor.omnilogic_pool_pool_flow` shows no flow
+      for 5+ min. Catches: clogged impeller, closed valve in the suction
+      line, dropped water level below skimmer intake, broken impeller,
+      airlock. Distinct from class-2 MSP↔peripheral comm-loss because
+      class 2 surfaces "pump reports on but power=0" — this one is
+      "pump reports on AND drawing power AND no flow downstream."
+      No power check in the trigger because a dry-running pump still
+      draws power; the diagnostic signal is absence of water movement.
+      Flow binary_sensor is from the LOCAL integration (note the
+      `omnilogic_pool_pool_flow` naming — the integration's prefix on
+      cloud-style entities). Verify periodically that this entity stays
+      available; if the local integration changes naming, this watcher
+      goes silent.
+      Gated by pool_service_lockout (ADR-011).
+    mode: single
+    trigger:
+      - platform: template
+        value_template: >
+          {% set pump = states('switch.omnilogic_pool_filter_pump') %}
+          {% set flow = states('binary_sensor.omnilogic_pool_pool_flow') %}
+          {{ pump == 'on' and flow == 'off' }}
+        for: "00:05:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: pump on but no flow"
+          message: >
+            Filter pump reports ON but flow sensor is OFF for 5+ min.
+            Mechanical failure suspected: clogged impeller, closed
+            suction valve, low water level below skimmer, broken
+            impeller, airlock, or flow-sensor failure. Pump running
+            without flow = damage to seals and impeller. Investigate
+            urgently.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_flow_loss
+
+  - alias: "Pool: Alert on cloud salt feed stale"
+    id: pool_alert_on_cloud_salt_feed_stale
+    description: >
+      Cloud feed health — fires when the salt sensor has been
+      unavailable for 60+ min. This is the meta-watcher for the salt
+      out-of-band automation above: if the cloud feed is down, salt
+      threshold checks aren't meaningful and we want to know about the
+      FEED outage rather than miss the upstream signal entirely.
+      Possible causes: Nabu Casa cloud lost, Hayward cloud outage,
+      cloud integration coordinator wedge, controller lost its outbound
+      cloud channel (independent of the local-network classes above —
+      controller's cloud path goes WAN-out, not via the IoT VLAN UDP
+      path that classes 1-3 cover).
+      60-min threshold absorbs normal cloud polling jitter without
+      firing on transient drops.
+      Gated by pool_service_lockout (ADR-011).
+    mode: single
+    trigger:
+      - platform: template
+        value_template: >
+          {{ states('sensor.pool_pool_chlorinator_average_salt_level')
+             in ['unavailable', 'unknown'] }}
+        for: "01:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: cloud salt feed stale"
+          message: >
+            Cloud chlorinator salt sensor has been unavailable for 60+
+            min — chemistry watcher is blind. Possible causes: Nabu
+            Casa cloud lost, Hayward cloud outage, cloud integration
+            coordinator wedge. Investigate cloud integration status
+            (Settings → Devices & Services → OmniLogic Cloud). Local
+            integration may still be healthy — this is independent.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_chem_feed_stale
