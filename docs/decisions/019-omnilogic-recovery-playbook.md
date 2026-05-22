@@ -240,6 +240,85 @@ Scott departs 2026-05-30. 12 days for diagnostic and fix runway. With the cascad
 
 ---
 
+## Addendum 2026-05-22: class-3c — UDM auto-reboot triggered port-VLAN drift
+
+### Incident summary
+
+2026-05-22 04:00 EDT: UDM Pro auto-rebooted (confirmed via `uptime` showing 8h37m at 12:37 EDT). Post-boot config push to the USW Pro Max 16 PoE clobbered port 12's Native VLAN — the port the OmniLogic MSP is wired to silently reverted from IoT (VLAN 4) to Trusted-LRD (VLAN 1, default network). 04:27 EDT: MSP's session on port 12 terminated as the switch finished re-applying the now-wrong config. 11:15 EDT: MSP came back up but DHCPed into Trusted-LRD scope (port was now serving that VLAN untagged), got 192.168.0.203. HA's local API integration — hardcoded for the MSP at 192.168.11.19 — went unreachable. User-visible symptom: pool pump running on its local schedule, but HA showed all OmniLogic entities `unavailable`.
+
+### Distinguishing class-3c from prior class-3 modes
+
+| Class | Symptom | Switch port | Controller |
+|---|---|---|---|
+| 3a (RJ45 marginal) | Controller off network; ICMP fails | Disconnected | Display lit |
+| 3b (controller dead) | Controller off network; ICMP fails | Disconnected | Display dark |
+| **3c (port VLAN drift) — NEW** | **Controller appears online but at wrong IP / wrong VLAN** | **Connected; client reports unexpected Network/IP** | **Display lit, normal local operation** |
+
+Class-3c is the most insidious of the three because the controller is *fine* — running its local schedule, equipment doing what it should — but HA is blind. No `controller_unreachable` event (the controller IS reachable, just at the wrong IP), no `MSP_DEV_COMM_LOSS` alarm. The only signal is that HA's integration entities go `unavailable` (the class-1 watcher catches it after 10 min), and a careful look at UniFi shows the client on an unexpected VLAN.
+
+### Root-cause chain
+
+1. **Trigger:** UDM Pro auto-update or auto-reboot at 04:00 EDT. UniFi OS has an auto-update window enabled by default; today's incident is consistent with a scheduled update activating during that window.
+2. **Bug:** UniFi config-push code path that runs after controller/UDM boot does not faithfully reapply per-port Native VLAN overrides on the USW Pro Max 16 PoE. The port reverted to the controller's default network (Trusted-LRD), losing its IoT(4) assignment.
+3. **Bug confirmed via second trigger:** during today's troubleshooting, administratively disabling and re-enabling port 12 in the UniFi UI *also* reverted the Native VLAN to Trusted-LRD. So the revert is a property of any port state-machine transition that re-evaluates port config, not just boot — UI disable/enable triggers the same path.
+
+### Recovery procedure (validated 2026-05-22)
+
+Pure software-only recovery via UI did not work — every UI lever (Block/Unblock, Remove client, dnsmasq lease deletion via SSH + SIGHUP) either had no effect or didn't force the MSP to drop its cached `.0.203` lease. The MSP's DHCP client clung to the lease until T1 renewal (~23:15 EDT tonight) — that would have been the no-action path with ~11 hours of HA blindness. The recovery that actually worked:
+
+1. Verify port 12 Native VLAN = IoT (4), Tagged VLAN Management = Block All, STP Edge = Enabled. Save in UniFi. (Don't admin-bounce the port after — that re-triggers the revert.)
+2. Re-add the Fixed IP reservation for the MSP MAC `00:23:62:04:f4:d9` → `192.168.11.19` on the IoT network, **with Virtual Network Override checked**. This is critical — see Insurance section below.
+3. Power-cycle the MSP via the equipment-pad breakers. **Important correction to original ADR-019:** the MSP touchscreen does NOT expose a software reboot option. There is no soft-reboot path. The only way to restart the MSP is to remove power.
+4. Staged sequence (validated 2026-05-22):
+    - Both controller and pump breakers OFF
+    - Wait briefly so caps fully discharge (Billy's 3-5 min concern is satisfied by the all-off interval here)
+    - Controller breaker ON first
+    - Wait ~30 sec for the MSP display to reach its home screen
+    - Pump (VSP) breaker ON
+5. MSP boots, Ethernet link comes up on port 12, DHCP DISCOVER goes out untagged → switch tags IoT(4) → IoT scope sees the reservation → MSP gets `192.168.11.19`.
+6. Verify recovery from SCS:
+
+```
+curl -s -H "Authorization: Bearer $(cat /config/.state_logger_token)" \
+  "http://172.30.32.1:8123/api/states/binary_sensor.pool_controller_reachable" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['state'], d['last_changed'])"
+```
+
+`binary_sensor.pool_controller_reachable` flips to `on` within ~60 sec; the OmniLogic Local integration's "Failed setup, will retry: No ACK received for message type GET_TELEMETRY after 6 attempts" banner clears within another 1-2 min as its retry loop succeeds.
+
+### Why the staged sequence works (refinement over Billy's procedure)
+
+The 2026-05-22 staged sequence is subtly different from Billy's 3-5 minute cap-discharge sequence in the main ADR-019 body:
+
+- **Billy's procedure:** turn the indoor pool sub-panel breaker off for 5+ minutes (waits for VSP DC-bus caps to fully discharge), then back on. Both controller and pump re-power simultaneously.
+- **Today's procedure:** both breakers off (all caps drain), controller breaker on first, MSP boots into a quiet network with no VSP yet, 30-sec wait, then VSP breaker on. VSP boots into a network where MSP is already listening — handshake registers cleanly on the first try.
+
+This avoids the "MSP and VSP race each other on boot" failure mode that broke the simultaneous procedure on 5-17 evening and 5-18 morning, without requiring the full 5-minute wait. The "both off" interval accomplishes cap discharge passively; the staged power-on accomplishes clean handshake ordering. Worth folding into the canonical recovery procedure as the preferred sequence.
+
+### Insurance: Virtual Network Override on critical IoT Fixed IPs
+
+UniFi's per-client Fixed IP reservation has two modes:
+
+- **VNO unchecked (default):** Fixed IP applies only when the client appears on its *expected* network. If the client shows up on a different VLAN (e.g., because the port's Native VLAN drifted), the reservation is silently ignored and the client gets a dynamic IP from whichever scope its DHCP request lands in.
+- **VNO checked:** Fixed IP applies regardless of which network the client appears on. UniFi will match by MAC across VLANs and assign the reserved IP.
+
+Today's incident would have been recoverable purely by waiting for DHCP T1 renewal (~12 hours) IF the MSP's reservation had VNO checked — the MSP would have been pinned to `192.168.11.19` on whatever VLAN port 12 was delivering. Without VNO, the MSP landed on Trusted-LRD, got `.0.203` dynamically, and held that lease.
+
+**Policy:** all critical IoT-VLAN Fixed IP reservations should have VNO checked. Sweep target list: OmniLogic MSP (done 2026-05-22 during recovery), cameras, Emporia Vues, ESPHome devices HA depends on (XIAO ESP32-C6 pool water temp probe, garage voice satellite), any other device HA integrates with via IP. Audit to be tracked as a pre-departure task.
+
+### Detection gap: HA-side watcher should alert on MSP IP change
+
+Current `automation.pool_alert_on_omnilogic_integration_wedge` fires on `switch.omnilogic_pool_filter_pump` going `unavailable` for 10+ min. This catches class-3c after the fact (integration times out) but not at the IP-change moment. A faster watcher would alert when the MSP's IP no longer resolves to `192.168.11.19` — would have caught today's class-3c at 04:27 EDT instead of after the user noticed something was off hours later. Future automation candidate — see pre-departure task list.
+
+### Pre-departure mitigation (Scott departs 2026-05-30)
+
+1. **Disable UniFi OS auto-updates** on the UDM Pro. Single most important mitigation — removes the dominant exposure window. Path: UniFi → Console → Settings → Auto-Update → toggle off (or set the maintenance window to a deliberately constrained time and accept the risk on that window).
+2. **Audit VNO on all critical IoT Fixed IPs.** Sweep the IoT client list and check VNO on every device HA integrates with by IP.
+3. **Add HA-side IP-change watcher.** Beyond unreachability — alert if the MSP's IP changes from `.11.19`, catches class-3c in minutes.
+4. **Document the revert behavior** in `integrations/omnilogic.md` Known network-side gotchas — this ADR is the deep dive; the integrations file is the operational quick-reference.
+
+---
+
 ## Verification
 
 - 2026-05-17 incident: post-cycle observation confirmed `sensor.omnilogic_pool_filter_pump_power` left 0 W and `local_water_temp` left `unknown` within the expected window. Live state log timestamps captured in `docs/current-state.md` Pool automation in-flight section.

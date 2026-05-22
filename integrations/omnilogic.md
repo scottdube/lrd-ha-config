@@ -88,6 +88,7 @@ Three distinct failure modes have been observed within a 24-hour window. Classes
 | ✓ Reachable | Sensors stale, integration logs `Failed to update data`, eventually entities go `unavailable` | Usually clean (no alarms) | 1 — Integration↔MSP wedge | Read-side stale | Try integration reload first. If no recovery in ~60 sec, breaker-cycle. |
 | ✓ Reachable | State changes ack cleanly in HA but `local_filter_power = 0` with pump claimed on; `local_water_temp` stays `unknown` despite pump claimed on | `MSP_DEV_COMM_LOSS,Comm Loss Device:<device> HUA:<address>` alarm(s) | 2 — MSP↔peripheral comm-loss | Write-side dead (chlorinator may dose into dead leg — worst for salt cell) | Breaker-cycle directly (HUA re-handshake on boot). Do NOT reload integration first — integration is healthy. |
 | ✗ Unreachable | All entities `unavailable` simultaneously; ICMP fails from both HA and any workstation on the IoT VLAN | Likely inaccessible (UI may not load either) | 3 — Physical/network | Controller off the network entirely | Physical triage at equipment pad. Display lit = network-side (reseat RJ45 at controller, check switch port). Display dark = power-side (check pool sub-panel breaker, then controller PSU). |
+| ✗ Unreachable at `192.168.11.19` but UniFi Clients page shows the Hayward MAC connected on a *different* network/IP | All OmniLogic Local entities `unavailable`; integration UI shows "Failed setup, will retry: No ACK received for message type GET_TELEMETRY" | OmniLogic web/app may still work (cloud channel is independent of local LAN IP) | **3c — Port VLAN drift** | Controller is fine but UniFi switch port reverted its Native VLAN, putting MSP on wrong network. Triggered by UDM auto-reboot OR UI port disable/enable. | Set port's Native VLAN back to IoT (4). **Do NOT bounce the port** — same code path causes the revert again. With VNO-checked Fixed IP reservation, MSP self-recovers at next DHCP renewal (could be hours). To force immediate recovery: power-cycle the MSP at the equipment-pad breakers (MSP has no soft-reboot option). See ADR-019 Addendum 2026-05-22. |
 
 **Detection layers (all three implemented in `packages/pool/pool_health_watcher.yaml`):**
 
@@ -119,6 +120,50 @@ The integration's config entry lives in `.storage/core.config_entries` (not vers
 - "Pool Controller Network Health" dashboard card — see `pool/docs/dashboard-cards.md` for paste-ready Mushroom YAML
 
 Note that diagnostic entity IDs use the host IP (`sensor.192_168_11_19_packet_loss` etc.) rather than the device name. If the controller IP ever changes, all references in the watcher YAML and the dashboard card YAML need to be updated.
+
+---
+
+## Known network-side gotchas
+
+Operational quirks observed and confirmed in the wild. Deep reasoning in the linked ADRs.
+
+### UniFi port Native VLAN reverts on port state-machine transition (class-3c)
+
+The USW Pro Max 16 PoE (firmware 7.4.1 as of 2026-05-22) has a bug where any port-config re-evaluation event reverts the port's Native VLAN override to the controller's default network (Trusted-LRD in our config). Confirmed triggers:
+
+- **UDM Pro auto-reboot.** UniFi OS auto-update windows are enabled by default; when the UDM reboots during an update, the post-boot config push to the switch clobbers Native VLAN overrides. Today's 2026-05-22 incident.
+- **UI port disable/enable.** Administratively bouncing a port from UniFi → Devices → switch → port settings reverts the Native VLAN. Confirmed during 2026-05-22 troubleshooting — every cycle reverted port 12 from IoT(4) back to Trusted-LRD.
+
+**Implication for the MSP and other VLAN-pinned IoT devices:** when port 12 reverts, the MSP DHCPs into Trusted-LRD scope at next renewal, gets a `.0.0/24` IP, and HA's hardcoded `192.168.11.19` reference can't reach it. This is class-3c — see Failure-mode triage table above and ADR-019 Addendum 2026-05-22.
+
+**Mitigations (defense in depth):**
+
+1. **Disable UniFi OS auto-updates** on the UDM Pro. UniFi → Console → Settings → Auto-Update → off. Single most effective mitigation — removes the dominant trigger.
+2. **Check Virtual Network Override on Fixed IP reservations.** UniFi Network → Clients → device → IP Settings → Fixed IP Address + **Virtual Network Override**. With VNO checked, the Fixed IP applies regardless of which VLAN the device shows up on — so even if the port drifts, the device still gets its expected IP at next DHCP renewal. Without VNO, the reservation is silently ignored on the wrong VLAN.
+3. **Avoid UI port disable/enable as a troubleshooting tool.** It triggers the same revert. Use physical link bounce (unplug/replug at the device end) if you need to force link renegotiation, or restart the switch.
+
+### MSP has no software reboot path (correction to earlier docs)
+
+The OmniLogic MSP touchscreen (firmware R.5.2.0-b28706) does NOT expose a software reboot option. There is no "Restart Controller" menu item. The only way to restart the MSP is to remove power.
+
+This was assumed earlier in this file and in ADR-019 ("MSP soft-reboot via touchscreen" was suggested as a clean recovery path) — that assumption was incorrect. Updated 2026-05-22 after Scott confirmed via direct inspection at the equipment pad. Always plan recovery sequences around breaker access, not cloud or local UI commands.
+
+### UniFi UI "Remove" doesn't clear DHCP leases
+
+Removing a client from UniFi → Clients only removes the controller's tracked record. The UDM Pro's dnsmasq backend retains the lease in `/ssd1/.data/udapi-config/dnsmasq.lease` until natural expiry. To actually release a lease requires SSH access to the UDM (toggle SSH on at UniFi → Console → Settings → Advanced) and either:
+
+```
+dhcp_release <br_iface> <ip> <mac>
+```
+
+(if `dhcp_release` is available — it wasn't on UDM SE as of 2026-05-22) or the sed + SIGHUP fallback:
+
+```
+sed -i '/<mac>/d' /ssd1/.data/udapi-config/dnsmasq.lease
+kill -HUP $(cat /run/dnsmasq-main.pid)
+```
+
+Lease release alone doesn't force the client to re-DHCP — the client only learns its lease was invalidated when it tries to renew at T1 or sees a NAK on a new request. To force immediate re-DHCP, drop the client's L2 link (physical cable bounce, switch restart, or MSP power-cycle in the case of OmniLogic).
 
 ---
 
