@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Pulls /config/pool_state_log.2.0-*.csv (schema-rotation archives) from the
+  HA NUC into the local repo's pool/analysis/ directory.
+
+  Companion to com.scottdube.ha.pool-log-rsync.plist which pulls the live
+  file every 5 min. This plist pulls only the archive files (renamed by
+  state_logger.py's maybe_rotate_csv on schema bumps), which change at
+  rotation events — rare enough that daily cadence is plenty.
+
+  Why this exists: cross-schema-version analyses (e.g. publish-event
+  reconstruction across the phase2 → phase2.1 boundary) need access to
+  archives. Without this plist, the workspace mirror only has the current
+  live file and multi-day analyses lose the data that lived in the
+  pre-rotation file.
+
+  Install:
+    cp pool/scripts/launchd/com.scottdube.ha.pool-log-archive-rsync.plist \
+       ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.scottdube.ha.pool-log-archive-rsync.plist
+
+  Verify:
+    launchctl list | grep pool-log-archive-rsync
+    ls -la ~/code/home-assistant/pool/analysis/pool_state_log.2.0-*.csv
+    cat ~/Library/Logs/ha-pool-log-archive-rsync.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottdube.ha.pool-log-archive-rsync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/rsync</string>
+        <string>-az</string>
+        <string>-e</string>
+        <string>ssh -p 22 -i /Users/scottdube/.ssh/ha_nuc_rsync -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10</string>
+        <string>sdube@192.168.50.11:/config/pool_state_log.2.0-*.csv</string>
+        <string>/Users/scottdube/code/home-assistant/pool/analysis/</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/scottdube/Library/Logs/ha-pool-log-archive-rsync.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/scottdube/Library/Logs/ha-pool-log-archive-rsync.err.log</string>
+</dict>
+</plist>
