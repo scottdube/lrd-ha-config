@@ -45,15 +45,23 @@ Phase 1.5: state-change triggers + per-entity context capture
          (user_id, parent_id, last_changed) for pump, waterfall, heater.
          Adds 9 columns (44 total). Schema version 2.0-phase1.5.
          Schema rotation logic preserves phase 1 data side-by-side.
-Phase 2 (this version): external water temp sensor integration per
-         ADR-015. Adds 5 columns (49 total) — external_water_temp,
+Phase 2: external water temp sensor integration per ADR-015. Added
+         5 columns (49 total) — external_water_temp,
          external_water_temp_age_min, external_water_temp_fresh,
          water_temp_authoritative (cascading fallback), water_temp_delta.
          Pure observation in this phase — blueprint and auditor don't
          act on these yet. Schema version 2.0-phase2. Schema rotation
          preserves phase 1.5 data side-by-side.
+Phase 2.1 (this version, 2026-05-22): external probe diagnostics.
+         Adds 1 column (50 total) — external_wifi_rssi. Used to
+         investigate the 5-19 → 5-21 freshness-degradation pattern
+         (86% → 70% publish success). Distinguishes signal-attenuation
+         cause from battery-sag cause. Schema version 2.0-phase2.1.
+         Schema rotation preserves phase 2 data side-by-side.
 Phase 3: cloud OmniLogic columns, expected_state computed columns,
          W1/W2 auditor assertions on external water temp data quality.
+         Likely also: VBAT sensing for the external probe (requires
+         hardware mod — external voltage divider on a free XIAO C6 GPIO).
 """
 
 from __future__ import annotations
@@ -71,7 +79,7 @@ from pathlib import Path
 LOG_FILE = "/config/pool_state_log.csv"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
-SCHEMA_VERSION = "2.0-phase2"
+SCHEMA_VERSION = "2.0-phase2.1"
 
 # External water temp sensor entity (ADR-015 deployment, 2026-05-18).
 # Default ESPHome-composed entity_id was
@@ -80,6 +88,17 @@ SCHEMA_VERSION = "2.0-phase2"
 # External"). Renamed in HA UI to the clean form below — the override is
 # sticky in HA's entity registry and persists across ESPHome flashes.
 EXTERNAL_WATER_TEMP_ENTITY = "sensor.pool_water_temp_external"
+
+# Phase 2.1 (2026-05-22): WiFi signal sensor for the external probe.
+# Already exposed by esphome/pool-water-temp-external.yaml as a
+# `wifi_signal` sensor named "Pool Float WiFi Signal" — published once
+# per wake by the on_boot script. The ESPHome-composed entity_id is
+# typically `sensor.pool_water_temp_external_pool_float_wifi_signal`
+# (device friendly_name + sensor name slugified). If renamed in HA UI,
+# adjust this constant to match. Used to correlate publish-success with
+# signal strength to diagnose the 2026-05-22 freshness-degradation
+# pattern (declining from 86% on 5-19 to 70% on 5-21).
+EXTERNAL_WIFI_RSSI_ENTITY = "sensor.pool_water_temp_external_pool_float_wifi_signal"
 
 # Freshness threshold for external water temp reading. ESP32-C6 deep-sleeps
 # 30 min between samples (production cadence per ADR-015). Reading is
@@ -200,6 +219,17 @@ COLUMNS: list[dict] = [
     {"name": "external_water_temp_fresh", "source": "compute"},
     {"name": "water_temp_authoritative", "source": "compute"},
     {"name": "water_temp_delta", "source": "compute"},
+
+    # ---------- Phase 2.1: external probe diagnostics (2026-05-22) ----------
+    # WiFi RSSI for the floating external temp probe. Published by the
+    # XIAO ESP32-C6 once per 30-min wake cycle. Used to investigate the
+    # freshness-degradation pattern observed 5-19 → 5-21 (86% → 70%
+    # successful publish rate). If declining publish success correlates
+    # with declining RSSI, the cause is signal/distance/water-attenuation;
+    # if RSSI is stable but publishes still fail, cause is more likely
+    # battery sag under TX load or AP-side intermittent behavior.
+    {"name": "external_wifi_rssi", "source": "state",
+     "entity": EXTERNAL_WIFI_RSSI_ENTITY},
 
     # Heater estimated power: HEATER_RATED_POWER_W when compressor binary
     # sensor reports 'on', else 0. Per HP31005T nameplate (33.9A @ 230V).
