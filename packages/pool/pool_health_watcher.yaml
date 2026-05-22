@@ -490,6 +490,101 @@ automation:
               interruption-level: time-sensitive
             tag: pool_flow_loss
 
+  # ===================================================================
+  # Class-3c watcher — MSP IP drift.
+  # Added 2026-05-22 (evening) after the class-3c outage validated that
+  # UDM Pro UniFi OS auto-update can cascade-reboot the controller stack
+  # and reset switch port profiles to Trusted-LRD default. MSP then
+  # DHCPs onto the wrong subnet (.0.x) and the OmniLogic Local
+  # integration loses its API path. See ADR-019 addendum.
+  # This watcher is the early-warning signal that catches IP drift
+  # BEFORE the integration wedges out — gives 2-7 min head start over
+  # the class-1 / class-3 watchers above.
+  # ===================================================================
+
+  - alias: "Pool: Alert on MSP IP drift"
+    id: pool_alert_on_msp_ip_drift
+    description: >
+      Class 3c (network-layer drift) — fires when the OmniLogic MSP's
+      UniFi-tracked IP moves away from its expected 192.168.11.19.
+      Early-warning signal that catches port-VLAN drift or DHCP
+      reassignment BEFORE the OmniLogic Local integration wedges out.
+      Source: device_tracker.unifi_default_00_23_62_04_f4_d9 — the
+      UniFi Network integration's tracker for the MSP's hardwired MAC
+      00:23:62:04:f4:d9. The `ip` attribute reflects the IP UniFi sees
+      the device using, independent of any HA-side ping or integration
+      polling. If the UniFi integration is ever reconfigured to stop
+      tracking this MAC, this watcher silently goes blind.
+      Trigger pair:
+        - `drift` fires when the IP is set, not equal to .11.19, and
+          not in the transient unavailable/unknown/empty states, held
+          for 2+ min. The 2-min `for:` suppresses DHCP renewal flicker
+          (the brief window between lease release and reacquisition)
+          without meaningfully delaying real drift events.
+        - `restored` fires immediately on return to .11.19. Reuses the
+          same iOS `tag:` so the push thread updates in place rather
+          than stacking a second notification.
+      `mode: restart` so a recovery cleanly supersedes any in-flight
+      drift action.
+      NOT gated by pool_integration_recovering — IP drift is a
+      network-layer signal independent of integration recovery state.
+      Gated by pool_service_lockout (ADR-011) so deliberate network
+      moves during service work don't false-positive.
+    mode: restart
+    trigger:
+      - platform: template
+        value_template: >
+          {% set ip = state_attr('device_tracker.unifi_default_00_23_62_04_f4_d9', 'ip') %}
+          {{ ip is not none and ip not in ['192.168.11.19', 'unavailable', 'unknown', ''] }}
+        for: "00:02:00"
+        id: drift
+      - platform: template
+        value_template: >
+          {% set ip = state_attr('device_tracker.unifi_default_00_23_62_04_f4_d9', 'ip') %}
+          {{ ip == '192.168.11.19' }}
+        id: restored
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: drift
+            sequence:
+              - service: notify.scott_and_ha
+                data:
+                  title: "Pool: MSP on wrong IP (class 3c)"
+                  message: >
+                    OmniLogic MSP is at
+                    {{ state_attr('device_tracker.unifi_default_00_23_62_04_f4_d9', 'ip') }}
+                    (expected 192.168.11.19). UniFi-side IP drift —
+                    likely port-VLAN revert (ADR-019 class-3c) or DHCP
+                    reassignment. Local API will be unreachable until
+                    MSP returns to .11.19. Check UniFi port 12 native
+                    VLAN (should be IoT(4)) and clear stale dnsmasq
+                    lease on UDM if needed.
+                  data:
+                    push:
+                      interruption-level: time-sensitive
+                    tag: pool_msp_ip_drift
+          - conditions:
+              - condition: trigger
+                id: restored
+            sequence:
+              - service: notify.scott_and_ha
+                data:
+                  title: "Pool: MSP back on .11.19"
+                  message: >
+                    MSP IP restored to 192.168.11.19. OmniLogic Local
+                    integration should recover within ~5 min once the
+                    coordinator next polls.
+                  data:
+                    push:
+                      interruption-level: active
+                    tag: pool_msp_ip_drift
+
   - alias: "Pool: Alert on cloud salt feed stale"
     id: pool_alert_on_cloud_salt_feed_stale
     description: >
