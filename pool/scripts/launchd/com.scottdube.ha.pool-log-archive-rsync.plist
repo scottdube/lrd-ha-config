@@ -33,10 +33,12 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/rsync</string>
-        <string>-az</string>
+        <string>-azv</string>
+        <string>--include=pool_state_log.2.0-*.csv</string>
+        <string>--exclude=*</string>
         <string>-e</string>
         <string>ssh -p 22 -i /Users/scottdube/.ssh/ha_nuc_rsync -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10</string>
-        <string>sdube@192.168.50.11:/config/pool_state_log.2.0-*.csv</string>
+        <string>sdube@192.168.50.11:/config/</string>
         <string>/Users/scottdube/code/home-assistant/pool/analysis/</string>
     </array>
 
