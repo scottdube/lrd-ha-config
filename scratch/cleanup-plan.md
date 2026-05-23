@@ -157,7 +157,7 @@ Sequence the flash from controller-nearest nodes outward. Take a Z-Wave JS contr
 **Done when:** all 16 HS-WX300 nodes (including 034 already on v2.2.0) report v2.2.0.
 
 ### 4.2 Rename `light.dimmer_2_2` (cosmetic) — RESOLVED 2026-05-23
-Re-inclusion of the Fibaro FGD-212 on 2026-05-23 cleared both the ghost-suffixed primary entity (`light.dimmer_2` → `light.lamp_post_dimmer`) and the unused secondary channel naming. New node 55. Two `automations.yaml` references updated in commit 1a36010. If the second channel ever resurfaces as `light.lamp_post_dimmer_2` and needs cosmetic naming, rename via Settings → Devices & Services → Fibaro FGD212 → entity rename → "Lamp Post - Unused Channel".
+Re-inclusion of the Fibaro FGD-212 on 2026-05-23 cleared both the ghost-suffixed primary entity (`light.dimmer_2` → `light.lamp_post_dimmer`) and gave the unused secondary channel a clean entity_id (`light.lamp_post_dimmer_2`). New node 55. Two `automations.yaml` references updated in commit 1a36010. Secondary channel friendly name set to "Lamp Post - Unused Channel" via HA entity registry. Sunrise/sunset automation tests passed end-to-end same day.
 
 ### 4.3 Resolve `valve.omnilogic_pool_waterfall_2` ghost
 Discovered 2026-04-28. Active blueprint instance in `automations.yaml` line 532 references `valve.omnilogic_pool_waterfall_2` (ghost suffix), while the canonical entity is `valve.omnilogic_pool_waterfall`.
