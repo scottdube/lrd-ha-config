@@ -33,7 +33,7 @@ Network is fully migrated from Hubitat (retired). All Z-Wave devices currently l
 
 ## Known issues / patterns
 
-- **Ghost nodes after failed inclusion.** Pattern: re-include a device, original orphan persists in registry, new entity ends up with `_2` suffix (e.g., `light.dimmer_2_2`). Fix: remove orphan from Z-Wave JS UI ("Remove Failed Node"), then optionally rename the survivor in HA registry to drop the suffix.
+- **Ghost nodes after failed inclusion.** Pattern: re-include a device, original orphan persists in registry, new entity ends up with `_2` (or higher) suffix. Fix: remove orphan from Z-Wave JS UI ("Remove Failed Node"), then optionally rename the survivor in HA registry to drop the suffix. Historical case: the lamp post Fibaro FGD-212 carried a `light.dimmer_2` suffix from a prior inclusion, finally cleared by full re-inclusion 2026-05-23 (now node 55, `light.lamp_post_dimmer`).
 - **HS-WX300 fan controllers presenting as lights.** Older GE/Jasco devices and some HomeSeer fan switches expose a light entity rather than a fan entity. Workaround: treat as light or use device-specific config parameter to change.
 - **No Security inclusion** required for some older GE/Jasco devices. S2 inclusion fails silently; fall back to "No Security" path in Z-Wave JS UI.
 - **Mesh weakness around the lock.** Kwikset 916 has shown `neighbors:[]` / weak LWR — root cause of historic battery drain (retry storm). ZEN77 is acting as repeater for the lock; verify it's still reachable.
