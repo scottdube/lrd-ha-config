@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Z-Wave node health probe — node 038 (Kwikset 916 deadbolt, lanai door at LRD).
+
+  Battery-powered FLiRS device with documented mesh weakness (neighbors:[]
+  history, ZEN77 acting as repeater per integrations/zwave-js.md). Battery
+  was at 30% as of 2026-05-22 per current-state.md — replacement window
+  open.
+
+  Aggressively conservative schedule (12h interval, 3 rounds = ~9 wake
+  events per probe = 18 wake events/day) to avoid contributing to drain
+  while the battery is low. Two data points per day is enough to spot
+  trend changes.
+
+  After battery replacement, this plist should be retargeted to a faster
+  cadence (match node-008's 6h schedule) so the post-replacement mesh
+  picture has good resolution.
+
+  Pattern: see ADR-021.
+
+  Install/uninstall: same shape as the node-55 plist in this directory.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottdube.ha.zwave-health-probe-node-038</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/Users/scottdube/code/home-assistant/tools/zwave_health_probe.py</string>
+        <string>--node</string>
+        <string>38</string>
+        <string>--rounds</string>
+        <string>3</string>
+        <string>--csv</string>
+        <string>/Users/scottdube/zwave-health/node-038.csv</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>43200</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/scottdube/Library/Logs/zwave-health-probe-node-038.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/scottdube/Library/Logs/zwave-health-probe-node-038.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

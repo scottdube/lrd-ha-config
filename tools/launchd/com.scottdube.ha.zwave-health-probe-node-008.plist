@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Z-Wave node health probe — node 008 (Kwikset 916 deadbolt, front door at LRD).
+
+  Battery-powered FLiRS device. Beam-based wakeup means probes work but each
+  round consumes beam-wake battery. Schedule is conservative (6h interval,
+  3 rounds per probe = ~9 wake events per probe = 36 wake events/day) vs
+  the mains node 55 default (4h / 5 rounds = ~60 wake events/day, irrelevant
+  for mains).
+
+  Battery is at 100% as of 2026-05-22 per current-state.md. Watch the slope
+  of `sensor.<lock>_battery_level` after this probe goes live — if drain
+  noticeably accelerates, increase interval or reduce rounds.
+
+  Pattern: see ADR-021. Companion plist for the lanai lock (node 038) uses
+  a 12h interval because that lock is at 30% battery.
+
+  Install/uninstall: same shape as the node-55 plist in this directory.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottdube.ha.zwave-health-probe-node-008</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/Users/scottdube/code/home-assistant/tools/zwave_health_probe.py</string>
+        <string>--node</string>
+        <string>8</string>
+        <string>--rounds</string>
+        <string>3</string>
+        <string>--csv</string>
+        <string>/Users/scottdube/zwave-health/node-008.csv</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>21600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/scottdube/Library/Logs/zwave-health-probe-node-008.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/scottdube/Library/Logs/zwave-health-probe-node-008.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

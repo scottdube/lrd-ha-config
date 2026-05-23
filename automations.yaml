@@ -718,15 +718,15 @@
                 message: "{{ (pull_result.stdout | string)[:500] }}"
   mode: single
   max_exceeded: silent
-- id: lamp_post_signal_baseline_ping
-  alias: "Lamp post signal baseline ping (TEMP — delete after ZEN05 install)"
+- id: zwave_health_keepalive_lamp_post
+  alias: "Z-Wave health keepalive — lamp post (node 55)"
   description: >-
-    Pings node 55 (Fibaro FGD-212 lamp post dimmer) every 30 min so HA's
-    per-frame RSSI diagnostic sensor on this node accumulates enough samples
-    for a meaningful 24-48h baseline ahead of installing the Zooz ZEN05
-    outdoor repeater. Uses zwave_js.ping (NoOperation CC frame) — lightweight,
-    no state change on the dimmer. Delete this automation once pre/post
-    comparison is complete.
+    Every 30 min, sends a NoOperation Command Class ping to node 55 (Fibaro
+    FGD-212 lamp post dimmer at LRD) via zwave_js.ping. Each ping forces a
+    response frame, which populates HA's per-frame RSSI diagnostic sensor
+    and refreshes the Z-Wave JS statistics layer. Pairs with the Mac mini
+    launchd zwave-health-probe-node-55 for full RF telemetry on this
+    property-edge node. ADR-021 covers the pattern and ongoing intent.
   triggers:
     - trigger: time_pattern
       minutes: "/30"
