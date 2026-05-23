@@ -61,7 +61,12 @@ probe sparingly, especially below 50% battery.
 2. **Copy** an existing plist to `tools/launchd/com.scottdube.ha.zwave-health-probe-node-NNN.plist`
 3. **Edit** the Label, `--node`, `--rounds`, `--csv`, `StartInterval`, log paths
 4. **Commit + push** the new plist
-5. **On the Mac mini:** `git pull --ff-only`
+5. **On the Mac mini:** `git pull --ff-only`. If this is the first probe being installed, also create the venv:
+   ```
+   python3 -m venv ~/.venv/zwave-health
+   ~/.venv/zwave-health/bin/pip install websockets
+   ```
+   The Mac mini's Homebrew-managed Python blocks `pip3 install --user` (PEP 668), so the venv is the canonical install path. All plists invoke `~/.venv/zwave-health/bin/python3` directly.
 6. **Install the launchd:**
    ```
    ln -sf ~/code/home-assistant/tools/launchd/com.scottdube.ha.zwave-health-probe-node-NNN.plist \

@@ -14,7 +14,8 @@
   Designed for the always-on Mac mini at LRD.
 
   Install:
-      pip3 install --user websockets
+      python3 -m venv ~/.venv/zwave-health
+      ~/.venv/zwave-health/bin/pip install websockets
       ln -sf /Users/scottdube/code/home-assistant/tools/launchd/com.scottdube.ha.zwave-health-probe.plist \
              ~/Library/LaunchAgents/
       launchctl bootstrap gui/$(id -u) \
@@ -35,8 +36,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/env</string>
-        <string>python3</string>
+        <string>/Users/scottdube/.venv/zwave-health/bin/python3</string>
         <string>/Users/scottdube/code/home-assistant/tools/zwave_health_probe.py</string>
         <string>--node</string>
         <string>55</string>
