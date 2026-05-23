@@ -131,11 +131,23 @@ def load_recent_rows(csv_path: Path, hours_back: int) -> tuple[list[str], list[d
     return cols, rows
 
 
-def check_pump_schedule(rows: list[dict]) -> Optional[str]:
+def check_pump_schedule(rows: list[dict], vacation_mode: bool = False) -> Optional[str]:
     """
     Returns a problem message if pump state contradicts schedule for >30 min
     in the window, else None.
+
+    When vacation_mode is True (HA `input_boolean.vacation` on, per ADR-012,
+    or CLI flag --skip-schedule-check), the normal-mode 08:30-20:00 window
+    doesn't apply — the blueprint switches to a filter-only window
+    (vacation_filter_start_time + min_filter_hours from blueprint inputs).
+    Rather than mirror that logic here, skip the schedule check entirely
+    in vacation mode and rely on the other four checks (no_power,
+    external_fresh, integration_flap, water_temp_range), which remain
+    valid regardless of pump-on window. Re-enable schedule check by
+    clearing input_boolean.vacation (and not passing the CLI flag).
     """
+    if vacation_mode:
+        return None
     if not rows:
         return None
     # Bin rows into expected-on vs expected-off based on time-of-day
@@ -280,6 +292,30 @@ def check_water_temp_range(rows: list[dict]) -> Optional[str]:
     return None
 
 
+def fetch_state(entity_id: str, token_file: Path) -> Optional[str]:
+    """
+    Fetch the current state of an HA entity via REST API. Returns the
+    state string, or None if the call fails for any reason (missing
+    token, network, HTTP error, JSON parse). Failure is non-fatal —
+    callers should treat None as 'unknown' and decide policy.
+    """
+    try:
+        token = token_file.read_text().strip()
+    except FileNotFoundError:
+        return None
+    req = urllib.request.Request(
+        f"{HA_BASE}/api/states/{entity_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+            return data.get("state")
+    except (urllib.error.HTTPError, urllib.error.URLError,
+            TimeoutError, json.JSONDecodeError):
+        return None
+
+
 def push_notify(title: str, message: str, token_file: Path) -> None:
     """Send notification via notify.scott_and_ha. Failure is non-fatal."""
     try:
@@ -314,6 +350,14 @@ def main() -> int:
     parser.add_argument("--no-notify", action="store_true")
     parser.add_argument("--print-clean", action="store_true")
     parser.add_argument(
+        "--skip-schedule-check", action="store_true",
+        help=(
+            "Force-skip the pump-schedule check (equivalent to "
+            "input_boolean.vacation being on). Useful for ad-hoc runs "
+            "or when the schedule baseline is intentionally non-standard."
+        ),
+    )
+    parser.add_argument(
         "--token-file", type=Path, default=TOKEN_FILE,
         help=f"HA long-lived token file (default {TOKEN_FILE})",
     )
@@ -332,8 +376,17 @@ def main() -> int:
             )
         return 0
 
+    # Determine vacation mode. CLI flag is a hard override; otherwise read
+    # input_boolean.vacation from HA. Failure to fetch (None) is treated as
+    # 'normal mode' so a token/network glitch can't silently disable the
+    # schedule check.
+    vacation_mode = (
+        args.skip_schedule_check
+        or fetch_state("input_boolean.vacation", args.token_file) == "on"
+    )
+
     checks = [
-        ("schedule", check_pump_schedule),
+        ("schedule", lambda r: check_pump_schedule(r, vacation_mode=vacation_mode)),
         ("no_power", check_pump_no_power),
         ("external_fresh", check_external_freshness),
         ("integration_flap", check_integration_flapping),
