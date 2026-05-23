@@ -718,3 +718,22 @@
                 message: "{{ (pull_result.stdout | string)[:500] }}"
   mode: single
   max_exceeded: silent
+- id: lamp_post_signal_baseline_ping
+  alias: "Lamp post signal baseline ping (TEMP — delete after ZEN05 install)"
+  description: >-
+    Pings node 55 (Fibaro FGD-212 lamp post dimmer) every 30 min so HA's
+    per-frame RSSI diagnostic sensor on this node accumulates enough samples
+    for a meaningful 24-48h baseline ahead of installing the Zooz ZEN05
+    outdoor repeater. Uses zwave_js.ping (NoOperation CC frame) — lightweight,
+    no state change on the dimmer. Delete this automation once pre/post
+    comparison is complete.
+  triggers:
+    - trigger: time_pattern
+      minutes: "/30"
+  conditions: []
+  actions:
+    - action: zwave_js.ping
+      target:
+        entity_id: light.lamp_post_dimmer
+  mode: single
+  max_exceeded: silent

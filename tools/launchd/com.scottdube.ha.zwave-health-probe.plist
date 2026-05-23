@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs zwave_health_probe.py every 4 hours, appending one row per run to
+  ~/zw-baseline-node55.csv. RunAtLoad fires once at bootstrap to seed an
+  immediate baseline data point.
+
+  Designed for the always-on Mac mini at LRD. Captures pre-install
+  signal-strength baseline for node 55 (Fibaro FGD-212 lamp post dimmer)
+  before the Zooz ZEN05 outdoor repeater goes in, then continues post-
+  install for direct comparison.
+
+  Install:
+      pip3 install --user websockets
+      ln -sf /Users/scottdube/code/home-assistant/tools/launchd/com.scottdube.ha.zwave-health-probe.plist \
+             ~/Library/LaunchAgents/
+      launchctl bootstrap gui/$(id -u) \
+          ~/Library/LaunchAgents/com.scottdube.ha.zwave-health-probe.plist
+
+  Tail the log on first fire:
+      tail -f ~/Library/Logs/zwave-health-probe.log
+
+  Remove after ZEN05 install + comparison:
+      launchctl bootout gui/$(id -u) \
+          ~/Library/LaunchAgents/com.scottdube.ha.zwave-health-probe.plist
+      rm ~/Library/LaunchAgents/com.scottdube.ha.zwave-health-probe.plist
+
+  Prerequisites: repo cloned to /Users/scottdube/code/home-assistant on
+  the Mac mini, Python 3 + websockets installed, NUC reachable at
+  192.168.50.11:3000 (override via --uri if Z-Wave JS app is only on the
+  IoT VLAN side).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottdube.ha.zwave-health-probe</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/Users/scottdube/code/home-assistant/tools/zwave_health_probe.py</string>
+        <string>--node</string>
+        <string>55</string>
+        <string>--rounds</string>
+        <string>5</string>
+        <string>--csv</string>
+        <string>/Users/scottdube/zw-baseline-node55.csv</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>14400</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/scottdube/Library/Logs/zwave-health-probe.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/scottdube/Library/Logs/zwave-health-probe.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>
