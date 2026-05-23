@@ -4,6 +4,35 @@
 # =============================================================================
 #
 # CHANGELOG:
+#  v1.12.0 Reconcile pool_pump_actual_start when blueprint takes over a
+#          running pump. Closes the 2026-05-22 incident where the blueprint
+#          was disabled mid-day for pool service work (pump driven by
+#          Hayward MSP schedule), then re-enabled while pump was still on.
+#          PUMP START's `not pump_is_on` guard meant pool_pump_actual_start
+#          was never written, leaving hours_pumped_today pinned at 0 and
+#          filtration_complete pinned at False. WATERFALL END's pump-off
+#          gate (which requires filtration_complete) silently failed, pump
+#          ran ~22h continuous before the recent-audit fired the alert.
+#
+#          Fix: new PUMP-RECONCILE branch placed FIRST in the inner choose
+#          of MAIN POLL. Condition: pump_is_on AND service_lockout off AND
+#          pool_pump_actual_start at the midnight sentinel ('1970-...') or
+#          unknown/unavailable. Action: set pool_pump_actual_start to the
+#          pump switch's last_changed (clamped to <= now), falling back to
+#          now() if last_changed isn't usable. Backdating to last_changed
+#          captures runtime accumulated under non-blueprint control
+#          (Hayward MSP schedule, manual app override), so filtration_
+#          complete reflects actual pump-on time rather than only blueprint-
+#          managed time.
+#
+#          Placement is critical — must be FIRST in the choose so it claims
+#          the poll before WATERFALL END would evaluate its gate against
+#          stale (1970) state. Worst-case ordering cost: one 10-min poll
+#          delay between reconcile and the next branch's evaluation. At
+#          the 20:00 boundary that means waterfall closes at 20:10 instead
+#          of 20:00 on the reconciliation poll, acceptable for a once-per-
+#          handover edge case.
+#
 #  v1.11.0 Sticky swim_day with morning lock + waterfall-window guard on
 #          NOT-A-SWIM-DAY shutdown branch (ADR-017). Closes the 2026-05-03
 #          incident where WeatherFlow forecast updated 81→77°F at 19:00 →
@@ -695,6 +724,45 @@ action:
             value_template: "{{ states(pump_switch) != 'unavailable' }}"
         sequence:
           - choose:
+              # PUMP RECONCILE - claim a running pump whose start time is
+              # unknown to the blueprint. Added v1.12.0.
+              # Scenario: blueprint disabled mid-day (e.g., for pool service),
+              # pump driven externally (Hayward MSP schedule, app override),
+              # blueprint re-enabled with pump still on. PUMP START's
+              # `not pump_is_on` guard prevents it from setting actual_start,
+              # so hours_pumped_today stays at 0 and WATERFALL END's
+              # filtration_complete gate fails indefinitely.
+              # Placement: FIRST in choose. WATERFALL END defers one poll on
+              # the reconciliation cycle — acceptable for a once-per-handover
+              # edge case.
+              # Gated on `not service_active`: don't claim if a tech is
+              # actively working (lockout is on for that reason).
+              # Backdates to pump's last_changed when available so filtration
+              # accounting reflects actual physical runtime, not just
+              # blueprint-managed time. Clamps to <= now for clock-skew
+              # safety, falls back to now() if last_changed isn't usable.
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set start = states('input_datetime.pool_pump_actual_start') %}
+                      {{ pump_is_on
+                         and not service_active
+                         and (start in ['unknown', 'unavailable', '']
+                              or start.startswith('1970')) }}
+                sequence:
+                  - action: input_datetime.set_datetime
+                    target:
+                      entity_id: input_datetime.pool_pump_actual_start
+                    data:
+                      datetime: >
+                        {% set st = states[pump_switch] %}
+                        {% if st is not none and st.last_changed is not none
+                              and as_local(st.last_changed) <= now() %}
+                          {{ as_local(st.last_changed).strftime('%Y-%m-%d %H:%M:%S') }}
+                        {% else %}
+                          {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+                        {% endif %}
+
               # PUMP START - conditions met and time reached
               # swim_day guard added v1.9.0: previously fired regardless of
               # swim_day, requiring the NOT-A-SWIM-DAY branch to undo it.
