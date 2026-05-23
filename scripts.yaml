@@ -1,5 +1,10 @@
 bed_time_script:
   sequence:
+  - action: media_player.turn_off
+    metadata: {}
+    target:
+      entity_id: media_player.living_room_tv
+    data: {}
   - action: input_boolean.turn_on
     metadata: {}
     target:
