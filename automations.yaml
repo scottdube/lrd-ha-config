@@ -20,7 +20,7 @@
           - light.smart_plug_dimmerdesk
           - light.smart_plug_dimmer
           - light.wall_dimmer_switch
-          - light.dimmer_2
+          - light.lamp_post_dimmer
       data: {}
     - action: switch.turn_off
       metadata: {}
@@ -75,7 +75,7 @@
     - action: light.turn_on
       metadata: {}
       target:
-        entity_id: light.dimmer_2
+        entity_id: light.lamp_post_dimmer
       data:
         brightness_pct: 15
   mode: single
