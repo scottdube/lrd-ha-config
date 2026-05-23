@@ -627,3 +627,89 @@ automation:
             push:
               interruption-level: time-sensitive
             tag: pool_chem_feed_stale
+
+  # ===================================================================
+  # Configuration sanity watcher — dual control surface conflict.
+  # Added 2026-05-22 to catch the post-return-from-absence misconfig
+  # where MSP schedules weren't disabled when the HA blueprint was
+  # re-enabled. The two control surfaces are designed to be mutually
+  # exclusive; running both simultaneously doesn't cause safety issues
+  # (pump breaker is the physical interlock) but produces phantom
+  # behavior — duplicate commands, conflicting setpoints, confusing
+  # Activity entries — that looks like a wedge or scheduling bug when
+  # really it's just a missed mode-switch step.
+  # ===================================================================
+
+  - alias: "Pool: Alert on blueprint + MSP schedule conflict"
+    id: pool_alert_on_blueprint_msp_schedule_conflict
+    description: >
+      Configuration sanity check — fires when the HA blueprint
+      (automation.pool_automation_v1_7_0) is enabled AND any of the
+      four MSP-side schedule switches is also on. The two control
+      surfaces are designed to be mutually exclusive:
+        - Normal operation: blueprint on, all MSP schedules off
+        - Absence mode: blueprint off, MSP filter pump schedule on,
+          waterfall/light/heater MSP schedules off
+      Running both simultaneously doesn't cause safety issues (pump
+      breaker is the physical interlock during service work) but does
+      produce phantom behavior — duplicate commands, conflicting
+      setpoints, confusing Activity entries. Symptoms look like a
+      wedge or scheduling bug when really it's a misconfig left over
+      from a return-from-absence transition where the MSP schedules
+      weren't disabled. Message explicitly frames this as misconfig,
+      not a real failure, to short-circuit the "spend an hour chasing
+      it" reaction.
+      Watched MSP schedule switches:
+        - switch.omnilogic_pool_schedule_filter_pump_08_30_20_00_motuwethfrsasu
+        - switch.omnilogic_pool_schedule_waterfall_08_32_19_59_motuwethfrsasu
+        - switch.omnilogic_pool_schedule_light_26_26_22_59_motuwethfrsasu
+        - switch.omnilogic_backyard_schedule_heat_up_00_00_23_59_motuwethfrsasu
+      5-min `for:` threshold absorbs deliberate transitions during
+      mode switches (the few-seconds overlap between toggling the
+      blueprint and toggling MSP schedules) without firing falsely.
+      Gated by pool_service_lockout (ADR-011) — service work may
+      legitimately need both surfaces in non-standard states for
+      diagnostic purposes.
+    mode: single
+    trigger:
+      - platform: template
+        value_template: >
+          {% set bp_on = is_state('automation.pool_automation_v1_7_0', 'on') %}
+          {% set sched_on = is_state('switch.omnilogic_pool_schedule_filter_pump_08_30_20_00_motuwethfrsasu', 'on')
+              or is_state('switch.omnilogic_pool_schedule_waterfall_08_32_19_59_motuwethfrsasu', 'on')
+              or is_state('switch.omnilogic_pool_schedule_light_26_26_22_59_motuwethfrsasu', 'on')
+              or is_state('switch.omnilogic_backyard_schedule_heat_up_00_00_23_59_motuwethfrsasu', 'on') %}
+          {{ bp_on and sched_on }}
+        for: "00:05:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_service_lockout
+        state: "off"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Pool: blueprint + MSP schedule conflict (misconfig)"
+          message: >
+            Both control surfaces are active: HA blueprint is enabled
+            AND at least one MSP schedule is on. This is a MISCONFIG,
+            not a real failure — almost certainly a missed step in the
+            return-from-absence transition. Expected: blueprint on,
+            all MSP schedules off (normal) OR blueprint off, MSP
+            filter pump schedule on (absence). Active MSP schedules:
+            {% for s in expand([
+              'switch.omnilogic_pool_schedule_filter_pump_08_30_20_00_motuwethfrsasu',
+              'switch.omnilogic_pool_schedule_waterfall_08_32_19_59_motuwethfrsasu',
+              'switch.omnilogic_pool_schedule_light_26_26_22_59_motuwethfrsasu',
+              'switch.omnilogic_backyard_schedule_heat_up_00_00_23_59_motuwethfrsasu'
+            ]) if s.state == 'on' %}
+            - {{ s.entity_id | replace('switch.omnilogic_', '') | replace('_motuwethfrsasu', '') }}
+            {% endfor %}
+            Fix: disable the MSP schedule(s) above OR disable the
+            blueprint. Don't waste time chasing a "wedge" — this
+            alert means the system is doing exactly what its two
+            sources told it to do, and they're saying different
+            things.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: pool_schedule_conflict
