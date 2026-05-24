@@ -5,9 +5,22 @@ to measure the XIAO ESP32-C6's actual sleep and wake current draw, in
 both real-deployment configuration (supply at BAT) and isolated-ESP32
 configuration (supply at 3V3 pad).
 
-Output of this procedure: four current-vs-time captures (.ppk2 files)
+Output of this procedure: six current-vs-time captures (.ppk2 files)
 plus exported CSV data, sufficient to compute an exact battery-life
-budget at any chosen sleep cadence.
+budget at any chosen sleep cadence AND quantify the savings from
+enabling ESP-IDF Dynamic Frequency Scaling (DFS) + tickless idle.
+
+Capture plan at a glance:
+- A1, A2: production YAML, supply at BAT  (real-deployment baseline)
+- B1, B2: production YAML, supply at 3V3  (ESP32-isolated baseline)
+- C1, C2: DFS-enabled YAML, supply at BAT (DFS impact measurement)
+- D1, D2 (optional): DFS-enabled, supply at 3V3 (full decomposition)
+
+The forecast is that enabling DFS will reduce wake-cycle energy by
+30–45% by clock-scaling and/or auto-light-sleeping during the multiple
+seconds of CPU idle inside each wake (WiFi associate wait, API connect
+wait, OTA-flag-state wait). The C-vs-A comparison nails the actual
+number.
 
 Audience: first-time PPK2 user. Workflow runs on MacBook with the
 XIAO ESP32-C6 pool-float firmware (`esphome/pool-water-temp-external.yaml`)
@@ -294,6 +307,119 @@ get with a proper power profiler.
 
 ---
 
+## Section 9b — Capture set C and D: DFS A/B comparison
+
+Goal: quantify how much wake-cycle energy is saved by enabling ESP-IDF
+Dynamic Frequency Scaling + tickless idle in the firmware.
+
+Why this matters: your wake script spends ~7–9 sec of a ~14.8 sec avg
+wake inside `wait_until` blocks (waiting for `api.connected`, then for
+`ota_mode_flag.has_state()`). During those waits the CPU is idle. DFS
+lets the CPU drop from 160 MHz to 40 MHz during idle, and with auto
+light_sleep can drop the system into ~800 µA territory during those
+multi-second waits. Forecast savings: 30–45% reduction in per-cycle
+wake energy. Translates to ~30+ days of runtime gain at any cadence.
+
+Step 9b.1 — Disable PPK2 output. Disconnect XIAO from PPK2 (leaving
+the wiring intact but unpowered is fine).
+
+Step 9b.2 — On MacBook, edit `esphome/pool-water-temp-external.yaml`
+to add the power-management sdkconfig flags. The `framework:` block
+currently reads:
+
+```
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+```
+
+Change to:
+
+```
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_PM_ENABLE: y
+      CONFIG_PM_DFS_INIT_AUTO: y
+      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP: "3"
+      CONFIG_PM_SLP_IRAM_OPT: y
+      CONFIG_PM_RTOS_IDLE_OPT: y
+```
+
+Step 9b.3 — Commit, push, and flash the DFS-enabled firmware:
+
+On MacBook:
+```
+cd ~/code/home-assistant
+git add esphome/pool-water-temp-external.yaml
+git commit -m "ADR-015: test DFS + tickless idle for PPK2 A/B comparison"
+git push
+```
+
+On SCS:
+```
+cd /config
+git pull
+```
+
+Then in the ESPHome dashboard (HA UI add-on), install the new firmware
+to the float. Wait for the install to complete and the device to reboot.
+
+Step 9b.4 — Re-enable PPK2 output (VOUT still wired to BAT+ from
+Capture set A).
+
+Step 9b.5 — Repeat Section 5 procedure for **Capture C1** (BAT + DFS,
+sleep). Save as `ppk2-C1-bat-dfs-sleep-2026-05-26.ppk2`.
+
+Sleep current should be **very close to A1** — DFS doesn't materially
+change deep_sleep current (the CPU is already off, not just clock-scaled).
+A noticeable difference here would actually suggest something is wrong.
+
+Step 9b.6 — Repeat Section 6 procedure for **Capture C2** (BAT + DFS,
+full wake cycle). Save as `ppk2-C2-bat-dfs-wake-2026-05-26.ppk2`.
+
+This is the critical capture. Compare:
+- A2 charge (mC/cycle, no DFS)
+- C2 charge (mC/cycle, with DFS)
+- Savings = (A2 − C2) / A2 × 100%
+
+Look at the wake trace shape. Without DFS, the idle phases of the wake
+(waiting for API, waiting for OTA flag) sit at a consistent ~70–100 mA
+plateau. With DFS, you should see those plateaus drop noticeably — either
+to a lower plateau (~30–50 mA, DFS clock-scaled only) or to bursty
+near-zero traces with brief active spikes (auto-light-sleep engaging).
+
+Step 9b.7 — (Optional) Re-wire VOUT to the 3V3 pad and capture **D1**
+and **D2** for the 3V3-supplied DFS measurements. Useful for full
+decomposition (separating ESP32 savings from SGM6029 conduction
+differences) but not strictly required for the cadence decision.
+
+Step 9b.8 — Decision point:
+
+If C2/A2 shows ≥20% wake-cycle energy reduction → keep DFS enabled in
+production YAML.
+
+If C2/A2 shows <10% reduction → DFS isn't paying off for this firmware
+(unusual — would suggest the wait_until blocks aren't actually idle, or
+some other lock is holding CPU at max). Revert to non-DFS YAML, save
+yourself the build complexity.
+
+If C2/A2 shows 10–20% → judgment call, but I'd lean toward keeping
+DFS since the cost is just 6 YAML lines.
+
+Step 9b.9 — Cleanup: regardless of decision, finalize the YAML's
+`sleep_duration` to the production cadence chosen from the full
+analysis (Section 10), commit, push, pull on SCS, flash one final time,
+reinstall float.
+
+---
+
 ## Section 10 — Analysis and battery-life recalculation
 
 Step 10.1 — Open each .ppk2 file in turn, read the AVG current values
@@ -301,17 +427,24 @@ Step 10.1 — Open each .ppk2 file in turn, read the AVG current values
 
 | Capture | What it measures | Typical expected | Your measured |
 |---|---|---|---|
-| A1 sleep BAT | Real-deployment sleep current | ~15 µA | ___ µA |
-| A2 wake BAT | Real-deployment wake (mC/cycle) | ~1.4 mC | ___ mC |
-| B1 sleep 3V3 | ESP32-only sleep | ~5–7 µA | ___ µA |
-| B2 wake 3V3 | ESP32-only wake (mC/cycle) | ~1.3 mC | ___ mC |
+| A1 sleep BAT (no DFS) | Real-deployment sleep | ~15 µA | ___ µA |
+| A2 wake BAT (no DFS) | Real-deployment wake | ~1.4 mC | ___ mC |
+| B1 sleep 3V3 (no DFS) | ESP32-only sleep | ~5–7 µA | ___ µA |
+| B2 wake 3V3 (no DFS) | ESP32-only wake | ~1.3 mC | ___ mC |
+| C1 sleep BAT (DFS) | DFS sleep current | ≈ A1 | ___ µA |
+| C2 wake BAT (DFS) | DFS-reduced wake | 0.7–0.85 × A2 | ___ mC |
+| D1 sleep 3V3 (DFS) optional | ESP32+DFS sleep | ≈ B1 | ___ µA |
+| D2 wake 3V3 (DFS) optional | ESP32+DFS wake | 0.7–0.85 × B2 | ___ mC |
 
 (Reference values are inferred from the SGM6029 datasheet + ESP32-C6
-datasheet + earlier rough budgets. Yours will be exact.)
+datasheet + Espressif's published DFS savings + earlier rough budgets.
+Yours will be exact.)
 
 Step 10.2 — Compute decomposed quiescents:
 - SGM6029 sleep quiescent = A1 − B1 µA
 - SGM6029 wake conduction loss = A2 − B2 mC/cycle
+- DFS wake-cycle savings = (A2 − C2) / A2 × 100%
+- DFS wake-cycle savings (ESP32-only) = (B2 − D2) / B2 × 100%
 
 Step 10.3 — Plug A1 sleep current and A2 wake CHARGE into the
 battery-life formula:
@@ -473,10 +606,15 @@ SAMPLE:    100 kS/s
 OUTPUT:    Enable after wiring verified
 
 CAPTURE SEQUENCE:
-  A1 = BAT  + sleep, 60+ sec after stabilization
-  A2 = BAT  + full wake cycle
-  B1 = 3V3  + sleep, 60+ sec after stabilization
-  B2 = 3V3  + full wake cycle
+  A1 = BAT  + no DFS + sleep, 60+ sec after stabilization
+  A2 = BAT  + no DFS + full wake cycle
+  B1 = 3V3  + no DFS + sleep
+  B2 = 3V3  + no DFS + full wake cycle
+  --- flash DFS-enabled YAML at this point ---
+  C1 = BAT  + DFS    + sleep
+  C2 = BAT  + DFS    + full wake cycle  (the key capture)
+  D1 = 3V3  + DFS    + sleep    (optional)
+  D2 = 3V3  + DFS    + full wake cycle  (optional)
 
 SAVE: .ppk2 immediately after each, then CSV export
 NEVER deselect device before saving.
