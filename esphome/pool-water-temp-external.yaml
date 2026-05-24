@@ -120,13 +120,13 @@ script:
   - id: take_reading_and_sleep
     then:
       - component.update: pool_temp_voltage
-      - component.update: pool_float_uptime
-      - component.update: pool_float_wifi
       - delay: 500ms
       - wait_until:
           condition:
             api.connected:
           timeout: 35s
+      - component.update: pool_float_uptime
+      - component.update: pool_float_wifi
       - wait_until:
           condition:
             lambda: 'return id(ota_mode_flag).has_state();'
