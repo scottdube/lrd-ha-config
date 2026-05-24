@@ -34,6 +34,12 @@ wifi:
       bssid: 66:D6:1F:AE:47:69
   power_save_mode: NONE
   fast_connect: true
+  output_power: 20.0
+  manual_ip:
+    static_ip: 192.168.11.111
+    gateway: 192.168.11.1
+    subnet: 255.255.255.0
+    dns1: 192.168.11.1
   ap:
     ssid: "Pool Float Fallback"
     password: !secret fallback_password
@@ -48,7 +54,7 @@ safe_mode:
 
 deep_sleep:
   id: deep_sleep_main
-  run_duration: 30s
+  run_duration: 40s
   sleep_duration: 10min
 
 binary_sensor:
@@ -113,7 +119,7 @@ script:
       - wait_until:
           condition:
             api.connected:
-          timeout: 25s
+          timeout: 35s
       - delay: 2s
       - if:
           condition:
