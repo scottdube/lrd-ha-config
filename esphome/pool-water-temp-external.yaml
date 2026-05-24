@@ -16,6 +16,13 @@ esp32:
   variant: esp32c6
   framework:
     type: esp-idf
+    sdkconfig_options:
+      CONFIG_PM_ENABLE: y
+      CONFIG_PM_DFS_INIT_AUTO: y
+      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP: "3"
+      CONFIG_PM_SLP_IRAM_OPT: y
+      CONFIG_PM_RTOS_IDLE_OPT: y
 
 logger:
 
