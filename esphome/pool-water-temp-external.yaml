@@ -103,6 +103,11 @@ sensor:
     state_class: measurement
     filters:
       - lambda: return x * 9.0 / 5.0 + 32.0;
+      - median:
+          window_size: 3
+          send_every: 3
+      - delta: 2.0
+      - heartbeat: 2h
 
   - platform: wifi_signal
     name: "Pool Float WiFi Signal"
@@ -120,7 +125,11 @@ script:
   - id: take_reading_and_sleep
     then:
       - component.update: pool_temp_voltage
-      - delay: 500ms
+      - delay: 250ms
+      - component.update: pool_temp_voltage
+      - delay: 250ms
+      - component.update: pool_temp_voltage
+      - delay: 250ms
       - wait_until:
           condition:
             api.connected:
