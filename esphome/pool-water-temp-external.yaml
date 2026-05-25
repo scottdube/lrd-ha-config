@@ -62,7 +62,7 @@ safe_mode:
 deep_sleep:
   id: deep_sleep_main
   run_duration: 40s
-  sleep_duration: 10min
+  sleep_duration: 2min
 
 binary_sensor:
   - platform: homeassistant
