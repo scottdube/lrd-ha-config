@@ -1,0 +1,81 @@
+substitutions:
+  device_name: s3-power-test
+  friendly_name: "S3 Power Test"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Bench-only PPK2 power-consumption test on ESP32-S3-DevKitC-1 (SANXIXING N16R8). Mirrors pool-water-temp-external script structure for direct comparison. Not deployed - bench-only device."
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: take_reading_and_sleep
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_PM_ENABLE: y
+      CONFIG_PM_DFS_INIT_AUTO: y
+      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP: "3"
+      CONFIG_PM_SLP_IRAM_OPT: y
+      CONFIG_PM_RTOS_IDLE_OPT: y
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  networks:
+    - ssid: !secret legacy_iot_ssid
+      password: !secret legacy_iot_password
+  power_save_mode: NONE
+  fast_connect: true
+  ap:
+    ssid: "S3 Power Test Fallback"
+    password: !secret fallback_password
+
+safe_mode:
+  boot_is_good_after: 5s
+  num_attempts: 100
+
+deep_sleep:
+  id: deep_sleep_main
+  run_duration: 40s
+  sleep_duration: 1min
+
+sensor:
+  - platform: wifi_signal
+    name: "S3 Power Test WiFi Signal"
+    id: s3_wifi_signal
+    update_interval: never
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: "S3 Power Test Uptime"
+    id: s3_uptime
+    update_interval: never
+    entity_category: diagnostic
+
+script:
+  - id: take_reading_and_sleep
+    then:
+      - delay: 500ms
+      - wait_until:
+          condition:
+            api.connected:
+          timeout: 35s
+      - component.update: s3_uptime
+      - component.update: s3_wifi_signal
+      - delay: 1s
+      - deep_sleep.enter:
+          id: deep_sleep_main
