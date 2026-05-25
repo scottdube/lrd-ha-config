@@ -1,0 +1,9 @@
+sensor:
+  - platform: filter
+    name: "Pool Water Temp External Filtered"
+    unique_id: pool_water_temp_external_filtered
+    entity_id: sensor.pool_water_temp_external
+    filters:
+      - filter: outlier
+        window_size: 5
+        radius: 2.0

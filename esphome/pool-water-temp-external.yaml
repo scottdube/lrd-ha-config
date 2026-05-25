@@ -106,8 +106,6 @@ sensor:
       - median:
           window_size: 3
           send_every: 3
-      - delta: 2.0
-      - heartbeat: 2h
 
   - platform: wifi_signal
     name: "Pool Float WiFi Signal"
