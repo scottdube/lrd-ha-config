@@ -105,7 +105,11 @@ sensor:
     state_class: measurement
     entity_category: diagnostic
     filters:
-      - multiply: 4.853
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 0.379 -> 3.000
+            - 0.530 -> 3.600
 
   - platform: resistance
     sensor: pool_temp_voltage
