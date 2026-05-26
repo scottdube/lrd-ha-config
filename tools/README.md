@@ -17,7 +17,7 @@ Pattern + rationale: `docs/decisions/021-zwave-node-health-monitoring.md`.
 |---|---|---|
 | `zwave_health_probe.py` | Calls `node.check_lifeline_health` via the zwave-js-server WebSocket against a target node, summarises the result, appends a row to a per-node CSV. | Mac mini |
 | `launchd/com.scottdube.ha.zwave-health-probe-node-XXX.plist` | macOS launchd schedule for one monitored node. | Mac mini |
-| HA automation `zwave_health_keepalive_<area>` (in `automations.yaml`) | 30-min `zwave_js.ping` against a specific entity to keep HA's per-frame RSSI sensor populated. Only needed for mains nodes with low natural traffic (e.g. lamp post that only fires twice a day). Not needed for battery FLiRS devices (locks generate traffic on every use). | HA |
+| HA automation `zwave_health_keepalive_<area>` (in `automations.yaml`) | 30-min `zwave_js.ping` against a specific entity to keep HA's per-frame RSSI sensor populated. Only needed for mains nodes with low natural traffic. Not needed for battery FLiRS devices (locks generate traffic on every use) OR for mains nodes once they have a healthy neighbor that itself generates organic traffic. Currently no instances deployed — the original lamp-post-node-55 keepalive was deleted 2026-05-26 once ZEN05 (node 56) provided enough background traffic on the same route. | HA |
 
 ### Currently monitored nodes
 

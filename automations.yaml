@@ -718,22 +718,3 @@
                 message: "{{ (pull_result.stdout | string)[:500] }}"
   mode: single
   max_exceeded: silent
-- id: zwave_health_keepalive_lamp_post
-  alias: "Z-Wave health keepalive — lamp post (node 55)"
-  description: >-
-    Every 30 min, sends a NoOperation Command Class ping to node 55 (Fibaro
-    FGD-212 lamp post dimmer at LRD) via zwave_js.ping. Each ping forces a
-    response frame, which populates HA's per-frame RSSI diagnostic sensor
-    and refreshes the Z-Wave JS statistics layer. Pairs with the Mac mini
-    launchd zwave-health-probe-node-55 for full RF telemetry on this
-    property-edge node. ADR-021 covers the pattern and ongoing intent.
-  triggers:
-    - trigger: time_pattern
-      minutes: "/30"
-  conditions: []
-  actions:
-    - action: zwave_js.ping
-      target:
-        entity_id: light.lamp_post_dimmer
-  mode: single
-  max_exceeded: silent

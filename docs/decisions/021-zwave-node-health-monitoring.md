@@ -101,6 +101,72 @@ The components:
   different but no LR devices currently exist on the network. Trivial
   to add when one shows up.
 
+## Validation — node 55 / ZEN05 case study (2026-05-23 → 2026-05-26)
+
+The lamp post Fibaro FGD-212 (node 55) is the inaugural test case for
+this monitoring pattern. Three days of data spanning before and after
+the Zooz ZEN05 outdoor repeater install (node 56, 2026-05-25 ~12:34Z)
+validates that the metrics captured here cleanly surface mesh changes.
+
+**Pre-ZEN05 baseline (12 probes, 5/23 16:37Z → 5/25 13:28Z):**
+
+| Metric | Range / Avg |
+|---|---|
+| `max_latency_ms` | 5,607–11,555ms, avg ~8,030ms |
+| `total_failed_pings` per 50-ping probe | 2–38, avg ~21 |
+| `worst_route_changes` | 0–3 |
+| `worst_snr_margin_db` | -21 to +33 (volatile) |
+| numNeighbors in route | 7 |
+
+**Post-ZEN05, settled (7 scheduled probes, 5/25 20:06Z → 5/26 20:25Z):**
+
+| Metric | Range / Avg |
+|---|---|
+| `max_latency_ms` | 60–350ms, avg ~129ms (60ms floor hit in 5 of 7) |
+| `total_failed_pings` per 25-ping probe | 0 in every probe |
+| `worst_route_changes` | 0 in every probe |
+| per-round `snrMargin` | mostly 50–70 dB; occasional single-round dips |
+| numNeighbors in route | 2 (direct + ZEN05 hop) |
+
+**Observations the data made visible that a Network Graph snapshot
+wouldn't:**
+
+1. **Mesh-settling tail after heal.** The first post-install probe at
+   12:34Z (immediately after the single-node heal on node 55) showed
+   76% failure rate — worse than baseline. The 15:56Z probe (~3 hours
+   later) was the first to show the structural improvement. A graph
+   snapshot at 12:35Z would have shown the new route through node 56
+   but masked that the route hadn't stabilized yet. The CSV
+   time-series caught the transient clearly.
+2. **Single-round SNR dips don't indicate degradation.** The
+   `worst_snr_margin_db` column reflects the worst single round per
+   probe. Several post-install probes show -16 to -2 dB in this
+   column despite per-round SNR averaging 50-70 dB. Reading the raw
+   per-round data is necessary to distinguish "transient
+   single-round noise" from "actual link weakness."
+3. **`failedPingsController = 10` sentinel masks meaningful rating.**
+   Across all probes for both the FGD-212 and the Kwikset 916 (node
+   008), the `failedPingsController` field is always 10 and `rating`
+   is always 0. The sentinel value indicates the controller-side
+   ping test wasn't able to use Powerlevel CC on these nodes. Look
+   at the other fields (latency, failedPingsNode, snrMargin,
+   routeChanges, numNeighbors) — not the top-level rating.
+4. **FW update visible in the data.** Scott applied a Zooz FW update
+   2.0 → 2.30 on node 56 sometime in the 12:18Z–16:21Z window on
+   5/26. The latency floor of 60ms held in every probe before that
+   window; the two probes after (16:21Z, 20:25Z) show 250–350ms max
+   latency — still excellent but slightly off the floor. Consistent
+   with the repeater briefly leaving the route during FW reboot,
+   then re-inserting. Useful as a future signature for "non-routing
+   transient event."
+
+After the ZEN05 was confirmed stable, the temporary
+`zwave_health_keepalive_lamp_post` automation in `automations.yaml`
+was deleted (2026-05-26) — node 56's organic traffic provides enough
+RF activity for HA's per-frame RSSI sensor on node 55 to populate
+without forced 30-min pings. Future low-natural-traffic mains nodes
+may still want the keepalive pattern; see `tools/README.md`.
+
 ## Why this shape
 
 **Why probe via direct zwave-js-server WebSocket and not HA service
