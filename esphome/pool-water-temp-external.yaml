@@ -5,11 +5,20 @@ substitutions:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  comment: "Floating pool water temp sensor per ADR-015. Production: 30-min cadence, ~6s wake. OTA mode via input_boolean.pool_float_ota_mode for maintenance pushes. safe_mode boot_is_good_after fix is critical for deep_sleep on subsequent wakes."
+  comment: "Pool float v2 (ADR-025): regulator bypassed (BAT+ direct to 3V3), NTC on GPIO1, battery voltage on GPIO0 onboard divider, external U.FL antenna via powered RF switch. OTA via input_boolean.pool_float_ota_mode."
   on_boot:
-    priority: -100
-    then:
-      - script.execute: take_reading_and_sleep
+    - priority: 800
+      then:
+        - lambda: |-
+            gpio_reset_pin((gpio_num_t)3);
+            gpio_set_direction((gpio_num_t)3, GPIO_MODE_OUTPUT);
+            gpio_set_level((gpio_num_t)3, 0);
+            gpio_reset_pin((gpio_num_t)14);
+            gpio_set_direction((gpio_num_t)14, GPIO_MODE_OUTPUT);
+            gpio_set_level((gpio_num_t)14, 1);
+    - priority: -100
+      then:
+        - script.execute: take_reading_and_sleep
 
 esp32:
   board: esp32-c6-devkitc-1
@@ -62,7 +71,7 @@ safe_mode:
 deep_sleep:
   id: deep_sleep_main
   run_duration: 40s
-  sleep_duration: 1min
+  sleep_duration: 30min
 
 binary_sensor:
   - platform: homeassistant
@@ -77,11 +86,26 @@ binary_sensor:
 
 sensor:
   - platform: adc
-    pin: GPIO0
+    pin: GPIO1
     id: pool_temp_voltage
     attenuation: 12db
     update_interval: never
     samples: 16
+
+  - platform: adc
+    pin: GPIO0
+    id: pool_float_battery_voltage_raw
+    name: "Pool Float Battery Voltage"
+    attenuation: 12db
+    update_interval: never
+    samples: 16
+    accuracy_decimals: 2
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    entity_category: diagnostic
+    filters:
+      - multiply: 2.0
 
   - platform: resistance
     sensor: pool_temp_voltage
@@ -128,6 +152,7 @@ script:
       - delay: 250ms
       - component.update: pool_temp_voltage
       - delay: 250ms
+      - component.update: pool_float_battery_voltage_raw
       - wait_until:
           condition:
             api.connected:
