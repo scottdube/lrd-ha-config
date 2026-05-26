@@ -51,7 +51,7 @@ safe_mode:
 deep_sleep:
   id: deep_sleep_main
   run_duration: 40s
-  sleep_duration: 1min
+  sleep_duration: 20s
 
 sensor:
   - platform: wifi_signal
