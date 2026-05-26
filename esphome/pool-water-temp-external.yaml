@@ -105,7 +105,7 @@ sensor:
     state_class: measurement
     entity_category: diagnostic
     filters:
-      - multiply: 2.0
+      - multiply: 4.853
 
   - platform: resistance
     sensor: pool_temp_voltage
