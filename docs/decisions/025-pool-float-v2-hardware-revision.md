@@ -126,3 +126,47 @@ If the v2 hardware exhibits issues in field (brownouts, premature battery deplet
 - **Single 14500 Li-Po with proper LDO**: would eliminate the lithium-AA voltage range concern + give a higher cell voltage that lets the SGM6029 work cleanly. Different battery holder geometry required.
 - **Custom PCB with sized LDO**: cleanest engineering path. Defer until summer-long deployment data informs design.
 - **HA template + automation for low-battery notification**: triggered off the new battery voltage sensor. Phase 2 of battery health tracking (ADR-014).
+
+---
+
+## Amendment — 2026-05-26 deployment session
+
+Pre-deployment validation revealed several findings that adjust the expected outcomes above. v2 flashed and deployed to the pool 2026-05-26 evening EDT.
+
+### Voltage trap confirmed — bypass alone doesn't drop sleep current to 55 µA
+
+PPK2 source-mode capture at 3.300 V on the v2 hardware (regulator bypassed, all four changes applied) measured deep_sleep current at ~381 µA, not the predicted 55 µA. Root cause: the SGM6029 bypass eliminates the regulator's switching quiescent contribution, but the XIAO C6's onboard charge-controller IC is parasitically powered from the 3V3 rail through internal protection diodes whenever the supply sits in the 3.0–3.6 V band. This is independent of whether USB is connected and is not addressed by the regulator bypass alone. Per Seeed forum threads, the ESP32-C6 power management does not enter clean sub-100 µA sleep below ~3.5 V supply, and the 2× L91 series stack range (3.0–3.4 V across discharge curve) sits squarely inside this trap.
+
+Fully eliminating the residual draw would require cutting the trace feeding the charge IC from the 3V3 net (needs the board schematic) or replacing the cell topology with a single 14500 Li-Po behind a proper LDO (already listed under Related future work).
+
+Updated runtime math at 30-min cadence: 381 µA sleep × 24 h = 9.14 mAh/day, plus 48 wakes × 232 mC per wake = 3.1 mAh/day, total ~12.2 mAh/day. Against the L91 stack's 3500 mAh nominal: ~287 days runtime, clearing the 138-day departure window with >100 % margin. The trap is accepted for the v2 deployment.
+
+### Battery voltage cal needs 2-point `calibrate_linear`, not single-point multiplier
+
+The 200 kΩ : 200 kΩ onboard divider feeding A0 has a measured ratio closer to 2.51 : 1, not 2.0 : 1 as the Change 3 section assumed. Combined with the ESP32-C6 ADC's nonlinearity at 12 dB attenuation, a single `multiply` filter cannot accurately recover supply voltage across the L91 discharge range.
+
+Empirical cal procedure that landed: PPK2 source meter at two known voltages (3.000 V and 3.600 V bracket the L91 discharge curve), capture published `battery_voltage` with whatever filter is currently on the sensor, back-calculate raw ADC from `raw = published / current_multiplier`, then replace the multiplier with a `calibrate_linear` filter using the two points. Validated 2026-05-26: at PPK2 3.300 V midpoint the two-point fit predicts 3.43 V published; observed 3.11 V. Residual midrange bowing ~6 % from ADC nonlinearity — acceptable for trend monitoring (Tier 2 EOL detection), not absolute precision.
+
+This is the canonical pattern for any ADC sensor on the C6 at 12 dB attenuation that needs accuracy beyond ±20 %.
+
+### Charge LED flashes continuously in v2 modded topology
+
+Once the SGM6029 is bypassed and L91s feed 3V3 directly, the onboard red charge-status LED flashes continuously even with no USB connected. Per Seeed docs the documented states are battery-only + no USB = LED off, battery + USB charging = LED flashes. The v2's continuous flash is a non-documented state caused by the charge IC's STAT pin entering an indeterminate toggling state when the 3V3 rail is energized via the bypass instead of via the IC's regulated output.
+
+LED current contribution is small — PPK2 captured ~70 µA peak-to-peak oscillation in the sleep floor with mean 381 µA. Removing the LED (hot air or fine-tip iron, 280–300 °C, tweezer-lift) eliminates the visible flash but does not measurably change average sleep current; the charge IC continues toggling regardless. Cosmetic surgery, not a battery-life intervention. The series resistor next to the LED can stay — without the LED downstream it sits at an open node and draws zero.
+
+### OTA workflow gotcha — `input_boolean.pool_float_ota_mode` must be cleared post-flash
+
+The firmware's wake script gates `deep_sleep.enter` behind the `ota_mode_flag` binary sensor. If the flag is left on after an OTA flash, the device stays awake indefinitely and sleep-current measurements come back at ~200 mA instead of ~381 µA. Easy to miss because `automation.pool_float_ota_mode_auto_clear_at_6h` only fires 6 h later. Pre/post-OTA checklist now explicit: clear the flag with `curl ... /api/services/input_boolean/turn_off` before any PPK2 measurement or runtime expectation.
+
+### In-pool RSSI baseline — target met
+
+Final in-pool readings 2026-05-26 17:00 EDT onward: **−61 to −70 dBm, mean ~−66 dBm**, with publish reliability ~77 % per minute on the 1-min test cadence. Meets the predicted −66 to −70 dBm range from the bundled v2 changes (powered RF switch + external U.FL antenna + ADR-023's omni AP antenna). Bench readings during the LED-rework phase showed −75 to −95 dBm (garage, far from AP) — those values are not deployment-relevant.
+
+### Bone-dry case after overnight bench cycle
+
+After the v2 build the float was run on the bench overnight before deployment. Morning case-open revealed zero condensation inside the case — validates the ADR-015 condensation analysis and the gasket / dome / desiccant approach against the v1 moisture failure mode.
+
+### Status
+
+Pre-deployment validation complete; v2 deployed in pool 2026-05-26 evening on used L91 cells at 1-min cadence for continued in-pool data collection. Fresh-cell swap and final flip to 30-min cadence + final OTA scheduled for 2026-05-28/29 (Thu/Fri) before the 2026-05-30 (Sat) departure.
