@@ -2,14 +2,37 @@ substitutions:
   device_name: c6-bare-power-test
   friendly_name: "C6 Bare Power Test"
 
+# 2026-05-27 Test C — pool float v2 firmware on a stock (unmodded) C6.
+# Discriminates firmware-induced sleep current from hardware-mod-induced.
+# Test B baseline at PPK2 3.3V via 3V3 pin: 15.74 uA sleep. If this
+# firmware lands near 381 uA on the same board, the firmware is the
+# cause (RF switch enable + NTC divider always-on). If it stays low,
+# the modded pool-float board has a hardware-side issue.
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  comment: "Bare XIAO ESP32-C6 power baseline (2026-05-27). No hardware mods, no peripherals, default internal PCB antenna. Wake/sleep cycle and DFS flags mirror pool-water-temp-external.yaml so PPK2 traces are directly comparable to the v2 modded-board numbers from 2026-05-26."
+  comment: "Pool float v2 firmware on stock C6. Isolates FW vs HW mod contribution to sleep current."
   on_boot:
+    - priority: 800
+      then:
+        - lambda: |-
+            // Release hold on NTC-divider power pin from previous sleep,
+            // then drive HIGH to power the 47k reference resistor.
+            gpio_hold_dis((gpio_num_t)2);
+            gpio_reset_pin((gpio_num_t)2);
+            gpio_set_direction((gpio_num_t)2, GPIO_MODE_OUTPUT);
+            gpio_set_level((gpio_num_t)2, 1);
+            // RF switch enable + external antenna select (unchanged).
+            gpio_reset_pin((gpio_num_t)3);
+            gpio_set_direction((gpio_num_t)3, GPIO_MODE_OUTPUT);
+            gpio_set_level((gpio_num_t)3, 0);
+            gpio_reset_pin((gpio_num_t)14);
+            gpio_set_direction((gpio_num_t)14, GPIO_MODE_OUTPUT);
+            gpio_set_level((gpio_num_t)14, 1);
     - priority: -100
       then:
-        - script.execute: wake_and_publish
+        - script.execute: take_reading_and_sleep
 
 esp32:
   board: esp32-c6-devkitc-1
@@ -45,39 +68,78 @@ wifi:
     ssid: "C6 Bare Power Test Fallback"
     password: !secret fallback_password
 
-# safe_mode default boot_is_good_after of 60s silently blocks deep_sleep on
-# every wake. 5s allows the wake/publish/sleep cycle to actually enter sleep.
 safe_mode:
   boot_is_good_after: 5s
   num_attempts: 100
 
 deep_sleep:
   id: deep_sleep_main
-  run_duration: 30s
+  run_duration: 40s
   sleep_duration: 1min
 
 sensor:
-  - platform: uptime
-    name: "C6 Bare Test Uptime"
-    id: bare_test_uptime
+  - platform: adc
+    pin: GPIO1
+    id: pool_temp_voltage
+    attenuation: 6db
     update_interval: never
-    entity_category: diagnostic
+    samples: 16
+
+  - platform: resistance
+    sensor: pool_temp_voltage
+    configuration: DOWNSTREAM
+    resistor: 47kOhm
+    id: pool_temp_resistance
+
+  - platform: ntc
+    sensor: pool_temp_resistance
+    calibration:
+      - 153kOhm -> 0.0°C
+      - 52.6kOhm -> 23.17°C
+      - 22.8kOhm -> 43.06°C
+    name: "Bare Test NTC Temp"
+    id: pool_temp_external
+    unit_of_measurement: "°F"
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - lambda: return x * 9.0 / 5.0 + 32.0;
+      - median:
+          window_size: 3
+          send_every: 3
 
   - platform: wifi_signal
-    name: "C6 Bare Test WiFi Signal"
+    name: "Bare Test WiFi Signal"
     id: bare_test_wifi
     update_interval: never
     entity_category: diagnostic
 
+  - platform: uptime
+    name: "Bare Test Uptime"
+    id: bare_test_uptime
+    update_interval: never
+    entity_category: diagnostic
+
 script:
-  - id: wake_and_publish
+  - id: take_reading_and_sleep
     then:
+      - component.update: pool_temp_voltage
+      - delay: 250ms
+      - component.update: pool_temp_voltage
+      - delay: 250ms
+      - component.update: pool_temp_voltage
+      - delay: 250ms
       - wait_until:
           condition:
             api.connected:
-          timeout: 25s
+          timeout: 35s
       - component.update: bare_test_uptime
       - component.update: bare_test_wifi
       - delay: 2s
+      - lambda: |-
+          // Drop NTC-divider power before sleep; hold pin LOW through deep sleep.
+          gpio_set_level((gpio_num_t)2, 0);
+          gpio_hold_en((gpio_num_t)2);
       - deep_sleep.enter:
           id: deep_sleep_main

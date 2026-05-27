@@ -135,6 +135,8 @@ Pre-deployment validation revealed several findings that adjust the expected out
 
 ### Voltage trap confirmed — bypass alone doesn't drop sleep current to 55 µA
 
+**SUPERSEDED 2026-05-27** — see "Amendment correction" below. The voltage-trap framing in this subsection is incorrect; a fresh unmodded C6 powered via 3V3 pin at 3.3 V achieves 15.66 µA sleep, matching Seeed forum reports. The 381 µA on the deployed float is fully explained by ADC subsystem bias + always-on NTC divider, not by any parasitic in the SGM6029 or charge IC. Preserved here as a record of the diagnostic path.
+
 PPK2 source-mode capture at 3.300 V on the v2 hardware (regulator bypassed, all four changes applied) measured deep_sleep current at ~381 µA, not the predicted 55 µA. Root cause: the SGM6029 bypass eliminates the regulator's switching quiescent contribution, but the XIAO C6's onboard charge-controller IC is parasitically powered from the 3V3 rail through internal protection diodes whenever the supply sits in the 3.0–3.6 V band. This is independent of whether USB is connected and is not addressed by the regulator bypass alone. Per Seeed forum threads, the ESP32-C6 power management does not enter clean sub-100 µA sleep below ~3.5 V supply, and the 2× L91 series stack range (3.0–3.4 V across discharge curve) sits squarely inside this trap.
 
 Fully eliminating the residual draw would require cutting the trace feeding the charge IC from the 3V3 net (needs the board schematic) or replacing the cell topology with a single 14500 Li-Po behind a proper LDO (already listed under Related future work).
@@ -170,3 +172,75 @@ After the v2 build the float was run on the bench overnight before deployment. M
 ### Status
 
 Pre-deployment validation complete; v2 deployed in pool 2026-05-26 evening on used L91 cells at 1-min cadence for continued in-pool data collection. Fresh-cell swap and final flip to 30-min cadence + final OTA scheduled for 2026-05-28/29 (Thu/Fri) before the 2026-05-30 (Sat) departure.
+
+---
+
+## Amendment correction — 2026-05-27 bare-board characterization
+
+The 2026-05-26 amendment above attributed the 381 µA sleep current on the modded float to a "voltage trap" via the SGM6029 regulator and parasitic powering of the charge controller IC from the 3V3 rail. **That analysis is wrong.** A controlled bench session 2026-05-27 with a fresh unmodded XIAO ESP32-C6 disproved it directly and identified the real root cause.
+
+### Empirical findings
+
+Test matrix on a fresh stock C6, PPK2 source meter at 3.300 V via the 3V3 pin (matching the modded float's power topology), incremental hardware/firmware variations. Sleep current is the steady-state floor measured in a ~10 s selection between wake events:
+
+| Configuration | Sleep current |
+|---|---|
+| Bare board, minimal firmware (no ADC sensors) | 15.66 µA |
+| Bare board, full pool float v2 firmware (RF switch lambda + both ADC sensors configured, nothing wired) | 15.66 µA |
+| Bare board + v2 firmware + 47 kΩ + 47 kΩ NTC dummy divider with high side on 3V3 | 333.77 µA |
+| Same + divider's high side moved to GPIO2, driven HIGH on wake / LOW with `gpio_hold_en` for sleep | 89.51 µA |
+| Same + GPIO0 (battery voltage) ADC sensor removed from firmware | 89.55 µA |
+| Same + GPIO1 lifted from divider entirely (pin floating) | 89.53 µA |
+| Same + ADC attenuation changed 12 dB → 6 dB | 89.53 µA |
+
+### Real root cause — two independent components
+
+The 365 µA delta between the deployed modded float (381 µA) and the bare floor (16 µA) is the sum of two effects:
+
+1. **NTC voltage divider continuously powered from 3V3 — ~245 µA.** Far more than the passive divider math predicts (~35 µA for 94 kΩ at 3.3 V). The ADC pin's input loading at 12 dB attenuation magnifies current draw through the divider via internal frontend bias. Confirmed by the 333.77 µA → 89.51 µA drop when the divider's high side is moved off 3V3 and onto a GPIO that goes LOW during sleep.
+
+2. **ADC subsystem initialization bias — ~74 µA.** Fixed chip-level cost of having the ESP32-C6 SAR ADC peripheral configured in ESP-IDF, completely independent of channel count, attenuation setting, pin connection state, or pin voltage. Confirmed by the lift test (GPIO1 floating still 89.53 µA) and the attenuation change (12 dB and 6 dB both 89.53 µA). The bias only goes away when no ADC sensor is configured at all in the YAML.
+
+The SGM6029 quiescent + "voltage trap" framing was wrong. A fresh C6 powered via 3V3 pin at the same 3.300 V achieves 15.66 µA sleep, exactly matching the Seeed forum baseline (`forum.seeedstudio.com/t/15ua-with-xiao-esp32c6-with-ppk2-while-sleeping-basic-example/276412`).
+
+### Proven fix — GPIO-gated NTC divider (v2.1 design pattern)
+
+Single hardware change on the modded float + small firmware addition:
+
+Hardware: move the 47 kΩ NTC reference resistor's high side from the 3V3 pin/rail to a free GPIO. GPIO2 is a good choice — RTC-capable (state can be held through deep sleep) and the 20 mA default drive strength has >500× headroom over the divider's 35 µA load. RP2 datasheet specs: VOH essentially equals VDD at this load, so the divider sees the full supply during wake and ADC accuracy is preserved.
+
+Firmware additions to the existing pool float YAML:
+
+In the `on_boot` priority-800 lambda, before any sensor reads:
+
+```
+gpio_hold_dis((gpio_num_t)2);
+gpio_reset_pin((gpio_num_t)2);
+gpio_set_direction((gpio_num_t)2, GPIO_MODE_OUTPUT);
+gpio_set_level((gpio_num_t)2, 1);
+```
+
+In the wake script, immediately before `deep_sleep.enter`:
+
+```
+gpio_set_level((gpio_num_t)2, 0);
+gpio_hold_en((gpio_num_t)2);
+```
+
+Bench validation 2026-05-27 confirmed 244 µA recovered with this pattern (333.77 µA → 89.51 µA on the bare board, same firmware otherwise).
+
+### Updated runtime projection at 30-min cadence
+
+| Configuration | Sleep current | Daily mAh (sleep + 48 wakes × 232 mC) | Runtime on 3500 mAh L91 stack |
+|---|---|---|---|
+| Current deployed float (v2.0, divider on 3V3) | 381 µA | 12.2 | 287 days |
+| **v2.1 with GPIO-gated divider** | **~89 µA** | **5.2** | **~668 days** |
+| Hypothetical full ADC deinit before sleep | ~15 µA | 3.5 | ~1,000 days |
+
+### Recommendation
+
+For the 2026 summer deployment (departure 2026-05-30, return window unknown but bounded by 138 days): **deploy as-is.** The 287-day projection clears the 138-day window with >100 % margin. Mid-season firmware rework introduces risk for no operational benefit.
+
+For the next hardware-rework window (next-season maintenance pull, or any earlier reason the float comes out): **implement the GPIO-gated divider per the recipe above.** Single solder reroute + firmware update, 2.3× runtime improvement, fully bench-proven.
+
+For the future-rev candidate (next-next-season or new fleet members): consider a digital temperature sensor (DS18B20 1-wire or MCP9808 I²C) to eliminate the ADC subsystem cost entirely. Combined with the 14500 Li-Po + proper LDO path already in Related future work, target sleep current 10–25 µA and multi-year battery life on a single cell.
