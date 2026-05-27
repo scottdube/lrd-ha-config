@@ -24,6 +24,10 @@
 # Triggers / branches:
 #   arrived_garage    : light on, start 30-min timer
 #   heartbeat         : if watch still garage, restart 30-min timer
+#   light_turned_on   : if light goes off->on by any path (paddle single tap,
+#                       HA dashboard, voice, ...), start a 30-min timer.
+#                       Closes the round-3a hole where a paddle-turned-on
+#                       light with no watch-in-garage signal stayed on forever.
 #   timer_finished    : light off
 #   paddle 2x UP      : override on, cancel timer, light on
 #   paddle 2x DOWN    : override off, start fresh 30-min timer
@@ -39,6 +43,11 @@
 #   2026-05-27 - Round 2: for: 5m debounce on not_home, away_timeout 180->900
 #   2026-05-27 - Round 3: drop not_home path entirely, bump timer 10->30 min,
 #                add paddle double-tap override with 4-hour safety release
+#   2026-05-27 - Round 3a: add light_turned_on trigger. Discovered after round
+#                3 deployed cleanly but the light stayed on for ~3h with watch
+#                never re-entering garage zone: round 3 only managed the timer
+#                while watch was in garage, so paddle/dashboard turn-on had no
+#                auto-off path.
 
 input_boolean:
   bench_override:
@@ -58,6 +67,11 @@ automation:
       - trigger: time_pattern
         minutes: "/2"
         id: heartbeat
+      - trigger: state
+        entity_id: light.s2_dimmer
+        from: "off"
+        to: "on"
+        id: light_turned_on
       - trigger: event
         event_type: timer.finished
         event_data:
@@ -91,6 +105,19 @@ automation:
               - condition: state
                 entity_id: sensor.scottwatchbt
                 state: garage
+            sequence:
+              - action: timer.start
+                target:
+                  entity_id: timer.garage_bench_light_timer
+                data:
+                  duration: "00:30:00"
+
+          # Light got turned on by some path that didn't go through this
+          # automation (paddle single-tap, dashboard, voice). Start a timer
+          # so it eventually auto-offs even with no watch-in-garage signal.
+          - conditions:
+              - condition: trigger
+                id: light_turned_on
             sequence:
               - action: timer.start
                 target:
