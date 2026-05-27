@@ -1,0 +1,83 @@
+substitutions:
+  device_name: c6-bare-power-test
+  friendly_name: "C6 Bare Power Test"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Bare XIAO ESP32-C6 power baseline (2026-05-27). No hardware mods, no peripherals, default internal PCB antenna. Wake/sleep cycle and DFS flags mirror pool-water-temp-external.yaml so PPK2 traces are directly comparable to the v2 modded-board numbers from 2026-05-26."
+  on_boot:
+    - priority: -100
+      then:
+        - script.execute: wake_and_publish
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_PM_ENABLE: y
+      CONFIG_PM_DFS_INIT_AUTO: y
+      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP: "3"
+      CONFIG_PM_SLP_IRAM_OPT: y
+      CONFIG_PM_RTOS_IDLE_OPT: y
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  networks:
+    - ssid: !secret legacy_iot_ssid
+      password: !secret legacy_iot_password
+  power_save_mode: NONE
+  fast_connect: true
+  output_power: 20.0
+  ap:
+    ssid: "C6 Bare Power Test Fallback"
+    password: !secret fallback_password
+
+# safe_mode default boot_is_good_after of 60s silently blocks deep_sleep on
+# every wake. 5s allows the wake/publish/sleep cycle to actually enter sleep.
+safe_mode:
+  boot_is_good_after: 5s
+  num_attempts: 100
+
+deep_sleep:
+  id: deep_sleep_main
+  run_duration: 30s
+  sleep_duration: 1min
+
+sensor:
+  - platform: uptime
+    name: "C6 Bare Test Uptime"
+    id: bare_test_uptime
+    update_interval: never
+    entity_category: diagnostic
+
+  - platform: wifi_signal
+    name: "C6 Bare Test WiFi Signal"
+    id: bare_test_wifi
+    update_interval: never
+    entity_category: diagnostic
+
+script:
+  - id: wake_and_publish
+    then:
+      - wait_until:
+          condition:
+            api.connected:
+          timeout: 25s
+      - component.update: bare_test_uptime
+      - component.update: bare_test_wifi
+      - delay: 2s
+      - deep_sleep.enter:
+          id: deep_sleep_main
