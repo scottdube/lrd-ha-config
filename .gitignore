@@ -57,3 +57,7 @@ zigbee.db-wal
 tts/
 www/
 .DS_Store
+
+# Snagit source archives — extracted PNGs are the canonical record
+*.snagx
+**/_snagx-originals/
