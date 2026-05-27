@@ -100,8 +100,8 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 
 | Camera | Location | Integration | Notes |
 |---|---|---|---|
-| UniFi G5 Bullet | Garage exterior | UniFi Protect | `binary_sensor.g5_bullet_person_detected` |
-| UniFi G5 Bullet (2nd) | Garage exterior | UniFi Protect | `binary_sensor.g5_bullet_person_detected_2` — combined into `binary_sensor.garage_person_detected` template helper |
+| UniFi G5 Bullet | Garage interior (Left) | UniFi Protect | `binary_sensor.g5_bullet_person_detected`. Covers main bay + bench area. Person detection is motion-gated bursts, not continuous presence — see `packages/presence/garage_occupied.yaml`. |
+| UniFi G5 Bullet (2nd) | Garage interior (Right) | UniFi Protect | `binary_sensor.g5_bullet_person_detected_2` — combined into `binary_sensor.garage_person_detected` template helper |
 | (more?) | ? | ? | List others |
 
 ---

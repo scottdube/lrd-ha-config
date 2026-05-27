@@ -4,13 +4,18 @@ sensor:
   - platform: mqtt_room
     name: ScottPhoneBT
     device_id: "phone:scottphonebt_2"
-    away_timeout: 180
+    # 2026-05-27: was 180s. Apple BT advertising is sporadic enough that 180s
+    # caused scottwatchbt to flap garage<->not_home every ~3 min while at the
+    # bench. 900s (15 min) keeps state stable as long as a pulse arrives within
+    # the typical inter-advertisement interval. Trade-off: ~15 min lag on
+    # genuine departure. Phone sensor raised in parallel for consistency.
+    away_timeout: 900
     state_topic: "espresense/devices/phone:scottphonebt_2"
     unique_id: "c4d5e6f7-a8b9-0123-cdef-456789abcdef"
   - platform: mqtt_room
     name: ScottWatchBT
     device_id: "watch:scottswatch"
-    away_timeout: 180
+    away_timeout: 900
     state_topic: "espresense/devices/watch:scottswatch"
     unique_id: "e6f7a8b9-c0d1-2345-efab-678901cdef01"
 

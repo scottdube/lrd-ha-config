@@ -7,15 +7,23 @@
 #   Name: "Garage Bench Light Timer"   Duration: 0
 #
 # Logic:
-#   watch -> garage         : light on, start 10-min timer (or restart if running)
-#   watch -> not_home       : light off, cancel timer
-#   heartbeat (every 2 min) : restart 10-min timer if watch is still in garage
-#   timer finished          : light off
-#   golfing == on           : automation skipped entirely
+#   watch -> garage              : light on, start 10-min timer (or restart if running)
+#   watch -> not_home for 5 min  : light off, cancel timer
+#   heartbeat (every 2 min)      : restart 10-min timer if watch is still in garage
+#   timer finished               : light off
+#   golfing == on                : automation skipped entirely
 #
 # CHANGELOG:
 #   2026-05-03 - Add stay-on timer with watch-beacon keep-alive heartbeat,
 #                add golfing inhibit. Replaces simple BT-state toggle.
+#   2026-05-27 - Add for: 5m debounce on the not_home transition. ESPresense
+#                mqtt_room away_timeout is 180s, and Apple Watch BT advertising
+#                is sporadic enough that scottwatchbt was flapping garage
+#                <-> not_home every ~3 min while Scott was at the bench, killing
+#                the light each flap. 5-min debounce on not_home + 2-min
+#                heartbeat keep-alive means short flaps no longer turn the
+#                light off; the timer still expires 10 min after the last
+#                garage report as a backstop.
 
 automation:
   - alias: Garage Bench Light
@@ -30,6 +38,7 @@ automation:
       - trigger: state
         entity_id: sensor.scottwatchbt
         to: not_home
+        for: "00:05:00"
         id: left_home
       - trigger: time_pattern
         minutes: "/2"

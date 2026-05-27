@@ -590,8 +590,8 @@
       lights:
         - light.garage_lights
       timer_duration: 10
-      motion_timeout: 10
-      motion_sensor: binary_sensor.garage_person_detected
+      motion_timeout: 20
+      motion_sensor: binary_sensor.garage_occupied
       inhibit_boolean: input_boolean.golfing
       light_timer: timer.timer_garage_lights
 - id: "1775854500076"

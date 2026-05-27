@@ -1,0 +1,34 @@
+# Garage occupancy composite sensor
+#
+# binary_sensor.garage_person_detected (template OR of the two exterior G5
+# Bullets) only fires when someone crosses the camera frame -- it cannot see
+# Scott at the bench inside the garage. As a result the door_activated_lights
+# blueprint's motion_timeout expires 10 min after the last threshold crossing
+# and lights go off while Scott is still working.
+#
+# This composite OR's the person-detection signal (motion-gated, fires in
+# bursts) with the watch BT presence (scottwatchbt == "garage"). delay_off: 5m
+# smooths gaps so the blueprint sees a stable "occupied" signal as long as
+# either source refreshes within ~5 min.
+#
+# Sized against the new ESPresense away_timeout (900s in presence.yaml): a
+# single watch BT pulse keeps scottwatchbt=garage for 15 min, well inside the
+# typical Apple Watch inter-advertisement interval. delay_off then adds 5 min
+# of forgiveness on top.
+#
+# Wire this into automations.yaml entry 1775847529638 by changing
+# motion_sensor: binary_sensor.garage_person_detected
+# motion_sensor: binary_sensor.garage_occupied
+#
+# Created 2026-05-27 in response to "garage lights shut off while working at
+# the bench" diagnosis. See bench light counterpart in garage_bench_light.yaml.
+
+template:
+  - binary_sensor:
+      - name: "Garage Occupied"
+        unique_id: garage_occupied
+        device_class: motion
+        state: >
+          {{ is_state('binary_sensor.garage_person_detected', 'on')
+             or is_state('sensor.scottwatchbt', 'garage') }}
+        delay_off: "00:05:00"
