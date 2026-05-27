@@ -1,33 +1,53 @@
-# Garage Bench Light
-# Watch-presence-driven (sensor.scottwatchbt) with stay-on timer + watch
-# beacon keep-alive. Inhibited while input_boolean.golfing is on.
+# Garage Bench Light (Round 3 — timer-only + paddle override)
 #
-# Requires helper: timer.garage_bench_light_timer
-#   Settings -> Devices & Services -> Helpers -> Add -> Timer
-#   Name: "Garage Bench Light Timer"   Duration: 0
+# Why round 3:
+#   Round 1 used watch -> not_home as immediate light-off. Failed because
+#   the watch flapped to not_home every ~3 min while Scott was at the bench.
+#   Round 2 added for: 5m debounce on the not_home trigger and bumped
+#   ESPresense away_timeout 180 -> 900 s. Failed differently: the watch
+#   went BT-silent for 15+ continuous minutes while Scott stood at the bench
+#   (Apple Watch suppresses advertising when wrist is idle), so the watch
+#   genuinely transitioned to not_home and the 5-min debounce burned through.
+#   Bumping away_timeout further just delays the same failure.
 #
-# Logic:
-#   watch -> garage              : light on, start 10-min timer (or restart if running)
-#   watch -> not_home for 5 min  : light off, cancel timer
-#   heartbeat (every 2 min)      : restart 10-min timer if watch is still in garage
-#   timer finished               : light off
-#   golfing == on                : automation skipped entirely
+# Round 3 design:
+#   - Light is TIMER-ONLY. No watch -> not_home auto-off path at all.
+#     30-min timer is restarted whenever watch is reported in garage
+#     (arrival OR heartbeat). Timer expiry is the only path to off.
+#   - Heartbeat: every 2 min, if watch == garage, restart timer. So even
+#     one BT pulse per 28 min keeps the light on indefinitely.
+#   - Manual override via S2 dimmer paddle: double-tap UP forces light on
+#     and cancels the presence flow until override is released. Double-tap
+#     DOWN releases the override and starts a fresh 30-min timer.
+#   - Safety: input_boolean.bench_override auto-clears after 4 hours.
+#
+# Triggers / branches:
+#   arrived_garage    : light on, start 30-min timer
+#   heartbeat         : if watch still garage, restart 30-min timer
+#   timer_finished    : light off
+#   paddle 2x UP      : override on, cancel timer, light on
+#   paddle 2x DOWN    : override off, start fresh 30-min timer
+#   golfing == on     : presence automation skipped
+#   override == on    : presence automation skipped (paddle owns the light)
+#
+# Required helpers:
+#   timer.garage_bench_light_timer   (existing, duration 0)
+#   input_boolean.bench_override     (declared below)
 #
 # CHANGELOG:
-#   2026-05-03 - Add stay-on timer with watch-beacon keep-alive heartbeat,
-#                add golfing inhibit. Replaces simple BT-state toggle.
-#   2026-05-27 - Add for: 5m debounce on the not_home transition. ESPresense
-#                mqtt_room away_timeout is 180s, and Apple Watch BT advertising
-#                is sporadic enough that scottwatchbt was flapping garage
-#                <-> not_home every ~3 min while Scott was at the bench, killing
-#                the light each flap. 5-min debounce on not_home + 2-min
-#                heartbeat keep-alive means short flaps no longer turn the
-#                light off; the timer still expires 10 min after the last
-#                garage report as a backstop.
+#   2026-05-03 - Stay-on timer + 2-min heartbeat keep-alive + golfing inhibit
+#   2026-05-27 - Round 2: for: 5m debounce on not_home, away_timeout 180->900
+#   2026-05-27 - Round 3: drop not_home path entirely, bump timer 10->30 min,
+#                add paddle double-tap override with 4-hour safety release
+
+input_boolean:
+  bench_override:
+    name: Bench Light Override
+    icon: mdi:lightbulb-on-outline
 
 automation:
   - alias: Garage Bench Light
-    description: Watch presence + 10-min stay-on with periodic keep-alive
+    description: Watch presence + 30-min timer (no auto-off on watch leave)
     mode: parallel
     max_exceeded: silent
     triggers:
@@ -35,11 +55,6 @@ automation:
         entity_id: sensor.scottwatchbt
         to: garage
         id: arrived_garage
-      - trigger: state
-        entity_id: sensor.scottwatchbt
-        to: not_home
-        for: "00:05:00"
-        id: left_home
       - trigger: time_pattern
         minutes: "/2"
         id: heartbeat
@@ -51,6 +66,9 @@ automation:
     conditions:
       - condition: state
         entity_id: input_boolean.golfing
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.bench_override
         state: "off"
     actions:
       - choose:
@@ -65,18 +83,7 @@ automation:
                 target:
                   entity_id: timer.garage_bench_light_timer
                 data:
-                  duration: "00:10:00"
-
-          - conditions:
-              - condition: trigger
-                id: left_home
-            sequence:
-              - action: timer.cancel
-                target:
-                  entity_id: timer.garage_bench_light_timer
-              - action: light.turn_off
-                target:
-                  entity_id: light.s2_dimmer
+                  duration: "00:30:00"
 
           - conditions:
               - condition: trigger
@@ -89,7 +96,7 @@ automation:
                 target:
                   entity_id: timer.garage_bench_light_timer
                 data:
-                  duration: "00:10:00"
+                  duration: "00:30:00"
 
           - conditions:
               - condition: trigger
@@ -98,3 +105,65 @@ automation:
               - action: light.turn_off
                 target:
                   entity_id: light.s2_dimmer
+
+  - alias: Garage Bench Light - Paddle Override
+    description: S2 dimmer double-tap toggles bench_override
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: event.s2_dimmer_scene_001
+        id: tap_up
+      - trigger: state
+        entity_id: event.s2_dimmer_scene_002
+        id: tap_down
+    conditions:
+      # Only respond to double-tap (KeyPressed2x); ignore single tap, hold, etc.
+      # NOTE: event_type strings are HomeSeer WX300-R2 / Z-Wave JS convention.
+      # Verify first paddle double-tap fires before relying on this in production.
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.event_type == 'KeyPressed2x' }}"
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: tap_up
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.bench_override
+              - action: timer.cancel
+                target:
+                  entity_id: timer.garage_bench_light_timer
+              - action: light.turn_on
+                target:
+                  entity_id: light.s2_dimmer
+          - conditions:
+              - condition: trigger
+                id: tap_down
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.bench_override
+              - action: timer.start
+                target:
+                  entity_id: timer.garage_bench_light_timer
+                data:
+                  duration: "00:30:00"
+
+  - alias: Garage Bench Light - Override Safety Release
+    description: Auto-clear bench_override after 4 hours so a forgotten override doesn't strand the light on
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.bench_override
+        to: "on"
+        for: "04:00:00"
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.bench_override
+      - action: timer.start
+        target:
+          entity_id: timer.garage_bench_light_timer
+        data:
+          duration: "00:30:00"
