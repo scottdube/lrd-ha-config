@@ -1,0 +1,366 @@
+# Garage Mini Split climate control (ADR-027)
+#
+# State machine that drives climate.garage_ms based on mode (Active /
+# Storage / Sleep / Vacation / DoorOpen / ManualOff) with a humidity
+# guardrail that switches to `dry` HVAC mode when RH exceeds the ceiling.
+#
+# Design priorities (highest priority wins):
+#   1. DoorOpen     — either overhead door open  → off
+#   2. ManualOff    — input_boolean.garage_ms_manual_off on  → off
+#   3. Vacation     — input_boolean.vacation on  → 85°F + humidity guardrail
+#   4. Active       — schedule 09:00-13:00 daily OR garage_active_now on  → 76°F cool
+#   5. Sleep        — 22:00-06:00  → 83°F + humidity guardrail
+#   6. Storage      — default  → 82°F + humidity guardrail
+#
+# Materials targets (see ADR-027 §Materials analysis):
+#   ≤ 82°F sustained, ≤ 55% RH for golf grips / lead-acid batteries /
+#   cart electronics / leather.
+#
+# Hardware references at LRD:
+#   climate.garage_ms                                           — Midea 24k BTU package unit
+#   binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor    — Big Garage overhead
+#   binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2  — Golf Cart overhead
+#   binary_sensor.garage_door                                   — walk-in (not used; transient traffic)
+#   binary_sensor.garage_occupied / garage_person_detected      — motion (logged for schedule tuning)
+#   sensor.garage_ms_temp_indoor / sensor.garage_ms_temp_outdoor
+
+
+# ---------- Helpers ----------
+
+input_boolean:
+  garage_active_now:
+    name: Garage Active Now
+    icon: mdi:hammer-wrench
+    # Manual workshop-cooling override. Turn on (Echo, Companion app
+    # button, iOS Shortcut) when heading out to the garage. Auto-clears
+    # 2 hours after last activation by garage_ms_active_timer_expire.
+
+  garage_ms_manual_off:
+    name: Garage MS Manual Off
+    icon: mdi:fan-off
+    # Hard off — for cleaning the unit, mechanical work, or if Scott
+    # wants the MS off for any reason. Survives everything except
+    # explicit toggle.
+
+input_select:
+  garage_ms_mode:
+    name: Garage MS Mode (read-only)
+    icon: mdi:thermostat
+    options:
+      - Storage
+      - Active
+      - Sleep
+      - Vacation
+      - DoorOpen
+      - ManualOff
+    # Driven by the mode-evaluation automation; do not edit manually
+    # (it'll just be overwritten on the next evaluation tick).
+
+input_number:
+  garage_storage_setpoint:
+    name: Garage Storage Setpoint
+    icon: mdi:thermometer
+    unit_of_measurement: "°F"
+    min: 78
+    max: 86
+    step: 0.5
+    initial: 82
+    mode: box
+
+  garage_active_setpoint:
+    name: Garage Active Setpoint
+    icon: mdi:thermometer
+    unit_of_measurement: "°F"
+    min: 70
+    max: 80
+    step: 0.5
+    initial: 76
+    mode: box
+
+  garage_sleep_setpoint:
+    name: Garage Sleep Setpoint
+    icon: mdi:thermometer
+    unit_of_measurement: "°F"
+    min: 80
+    max: 86
+    step: 0.5
+    initial: 83
+    mode: box
+
+  garage_vacation_setpoint:
+    name: Garage Vacation Setpoint
+    icon: mdi:thermometer
+    unit_of_measurement: "°F"
+    min: 82
+    max: 86
+    step: 0.5
+    initial: 85
+    mode: box
+
+  garage_rh_ceiling:
+    name: Garage RH Ceiling
+    icon: mdi:water-percent
+    unit_of_measurement: "%"
+    min: 45
+    max: 70
+    step: 1
+    initial: 55
+    mode: box
+
+  garage_rh_release:
+    name: Garage RH Release
+    icon: mdi:water-percent
+    unit_of_measurement: "%"
+    min: 40
+    max: 68
+    step: 1
+    initial: 53
+    mode: box
+
+input_datetime:
+  garage_active_start:
+    name: Garage Active Start
+    has_date: false
+    has_time: true
+    initial: "09:00:00"
+
+  garage_active_end:
+    name: Garage Active End
+    has_date: false
+    has_time: true
+    initial: "13:00:00"
+
+
+# ---------- Derived sensors ----------
+
+template:
+  # ---------- Overhead-door composite with 5-min closed-resume delay ----------
+  - binary_sensor:
+      - name: "Garage Overhead Door Open"
+        unique_id: garage_overhead_door_open
+        device_class: door
+        # ON whenever either overhead door is open. delay_off keeps the
+        # "open" state for 5 minutes after the last underlying door closes,
+        # giving the climate entity time to stabilize before resuming.
+        delay_off: "00:05:00"
+        state: >
+          {{ is_state('binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor', 'on')
+             or is_state('binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2', 'on') }}
+
+  - sensor:
+      # Effective mode — single source of truth for what the climate
+      # entity should be doing. Read by the apply automation below.
+      - name: "Garage MS Target Mode"
+        unique_id: garage_ms_target_mode
+        icon: mdi:thermostat-cog
+        state: >
+          {% set active_start = states('input_datetime.garage_active_start') %}
+          {% set active_end = states('input_datetime.garage_active_end') %}
+          {% set t = now().strftime('%H:%M:%S') %}
+          {% set in_active_window = t >= active_start and t < active_end %}
+          {% if is_state('binary_sensor.garage_overhead_door_open', 'on') %}
+            DoorOpen
+          {% elif is_state('input_boolean.garage_ms_manual_off', 'on') %}
+            ManualOff
+          {% elif is_state('input_boolean.vacation', 'on') %}
+            Vacation
+          {% elif is_state('input_boolean.garage_active_now', 'on') or in_active_window %}
+            Active
+          {% elif now().hour >= 22 or now().hour < 6 %}
+            Sleep
+          {% else %}
+            Storage
+          {% endif %}
+
+      # Target temperature for the current mode (°F)
+      - name: "Garage MS Target Temperature"
+        unique_id: garage_ms_target_temperature
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state: >
+          {% set mode = states('sensor.garage_ms_target_mode') %}
+          {% if mode == 'Active' %}
+            {{ states('input_number.garage_active_setpoint') | float(76) }}
+          {% elif mode == 'Sleep' %}
+            {{ states('input_number.garage_sleep_setpoint') | float(83) }}
+          {% elif mode == 'Vacation' %}
+            {{ states('input_number.garage_vacation_setpoint') | float(85) }}
+          {% elif mode in ['Storage'] %}
+            {{ states('input_number.garage_storage_setpoint') | float(82) }}
+          {% else %}
+            {{ state_attr('climate.garage_ms', 'temperature') | float(76) }}
+          {% endif %}
+
+      # Target HVAC mode: off / cool / dry. Pure cool in Active (humidity
+      # is a non-goal when comfort is). Cool-with-dry-guardrail in
+      # Storage/Sleep/Vacation. Off in DoorOpen/ManualOff.
+      - name: "Garage MS Target HVAC Mode"
+        unique_id: garage_ms_target_hvac_mode
+        state: >
+          {% set mode = states('sensor.garage_ms_target_mode') %}
+          {% set rh = state_attr('climate.garage_ms', 'current_humidity') | float(0) %}
+          {% set ceiling = states('input_number.garage_rh_ceiling') | float(55) %}
+          {% set release = states('input_number.garage_rh_release') | float(53) %}
+          {% set current_hvac = states('climate.garage_ms') %}
+          {% if mode in ['DoorOpen', 'ManualOff'] %}
+            off
+          {% elif mode == 'Active' %}
+            cool
+          {% else %}
+            {# Storage / Sleep / Vacation — apply humidity guardrail with deadband #}
+            {% if current_hvac == 'dry' %}
+              {{ 'dry' if rh > release else 'cool' }}
+            {% else %}
+              {{ 'dry' if rh > ceiling else 'cool' }}
+            {% endif %}
+          {% endif %}
+
+
+# ---------- Automations ----------
+
+automation:
+  # ---- 1. Apply target state to climate.garage_ms ----
+  - alias: Garage MS — Apply target state
+    id: garage_ms_apply_target
+    description: >
+      Reconciles climate.garage_ms with the target mode + temp + hvac mode
+      template sensors. Fires whenever the targets change OR the climate
+      entity diverges from target. mode: single — debounce overlapping
+      transitions, take the latest.
+    mode: single
+    max_exceeded: silent
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.garage_ms_target_mode
+          - sensor.garage_ms_target_hvac_mode
+        for: "00:00:05"   # debounce — settle template re-evals
+      - platform: state
+        entity_id: sensor.garage_ms_target_temperature
+        for: "00:00:05"
+      - platform: state
+        entity_id: climate.garage_ms
+        for: "00:01:00"   # reconcile if external change (e.g. wall remote)
+      # Explicit boundary ticks — templates that depend on now() don't
+      # auto-re-evaluate on the minute, so we force a recompute at the
+      # standard transition points. Helper-driven start/end use the
+      # input_datetime triggers below; these cover the fixed sleep window.
+      - platform: time
+        at: "06:00:00"
+      - platform: time
+        at: "22:00:00"
+      - platform: time
+        at: input_datetime.garage_active_start
+      - platform: time
+        at: input_datetime.garage_active_end
+      - platform: time_pattern
+        minutes: "/15"   # safety tick — re-assert state every 15 min
+    action:
+      - variables:
+          target_mode: "{{ states('sensor.garage_ms_target_mode') }}"
+          target_hvac: "{{ states('sensor.garage_ms_target_hvac_mode') }}"
+          target_temp: "{{ states('sensor.garage_ms_target_temperature') | float(76) }}"
+          current_hvac: "{{ states('climate.garage_ms') }}"
+          current_temp: "{{ state_attr('climate.garage_ms', 'temperature') | float(0) }}"
+      # Reflect target mode into the input_select so dashboards / Activity
+      # show what state we're in.
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.garage_ms_mode
+        data:
+          option: "{{ target_mode }}"
+      # HVAC mode reconcile
+      - choose:
+          # Off cases — DoorOpen / ManualOff
+          - conditions: "{{ target_hvac == 'off' and current_hvac != 'off' }}"
+            sequence:
+              - service: climate.set_hvac_mode
+                target:
+                  entity_id: climate.garage_ms
+                data:
+                  hvac_mode: "off"
+          # Cool cases — set mode if changed, then set setpoint if changed
+          - conditions: "{{ target_hvac == 'cool' }}"
+            sequence:
+              - if: "{{ current_hvac != 'cool' }}"
+                then:
+                  - service: climate.set_hvac_mode
+                    target:
+                      entity_id: climate.garage_ms
+                    data:
+                      hvac_mode: cool
+                  - delay: "00:00:05"
+              - if: "{{ (current_temp - target_temp) | abs > 0.5 }}"
+                then:
+                  - service: climate.set_temperature
+                    target:
+                      entity_id: climate.garage_ms
+                    data:
+                      temperature: "{{ target_temp }}"
+          # Dry — humidity guardrail; no temperature setpoint applies
+          - conditions: "{{ target_hvac == 'dry' and current_hvac != 'dry' }}"
+            sequence:
+              - service: climate.set_hvac_mode
+                target:
+                  entity_id: climate.garage_ms
+                data:
+                  hvac_mode: dry
+
+  # ---- 2. Manual Active expiry — auto-clear garage_active_now after 2h ----
+  - alias: Garage MS — Active override auto-clear
+    id: garage_ms_active_timer_expire
+    description: >
+      Two hours after the manual Active override is turned on, turn it
+      off. Prevents stuck-on-forever if Scott forgets to flip it back.
+    mode: restart   # restart timer if turned on again before expiry
+    trigger:
+      - platform: state
+        entity_id: input_boolean.garage_active_now
+        to: "on"
+    action:
+      - delay: "02:00:00"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.garage_active_now
+
+  # ---- 3. Vacation mode entry notification ----
+  - alias: Garage MS — Vacation mode entry
+    id: garage_ms_vacation_entry
+    description: >
+      One-shot notify on vacation entry. Energy audit logs this in CSV;
+      this notification confirms the climate package picked it up.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.vacation
+        from: "off"
+        to: "on"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Garage MS — vacation mode active"
+          message: >
+            Switching to {{ states('input_number.garage_vacation_setpoint') }}°F
+            with {{ states('input_number.garage_rh_ceiling') }}% RH ceiling.
+            Humidity guardrail engages dry mode above ceiling.
+
+  # ---- 4. Door-open notify (>2 min open = real event, not a brief trip) ----
+  - alias: Garage MS — Overhead door open paused unit
+    id: garage_ms_door_open_paused
+    description: >
+      Belt-and-suspenders notify when the unit has been paused because
+      an overhead door opened. Only fires when sustained >2 min, so we
+      ignore brief in/out trips. Resume is implicit (composite sensor's
+      delay_off handles the 5-min hold after close).
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.garage_overhead_door_open
+        to: "on"
+        for: "00:02:00"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "Garage MS — paused (overhead door open >2 min)"
+          message: >
+            Unit suspended. Will resume 5 min after both doors close.

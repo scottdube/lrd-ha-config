@@ -231,6 +231,30 @@ python3 tools/energy_pull_stats.py \
 python3 tools/energy_analyze.py --stats /tmp/energy_stats.json
 ```
 
+## Garage motion / occupancy report (ADR-027)
+
+Ad-hoc trend tool that pulls 14 days of `binary_sensor.garage_person_detected`,
+`binary_sensor.garage_occupied`, both overhead-door tilt sensors, and
+`climate.garage_ms` from HA's recorder. Renders day-of-week × hour-of-day
+heat maps for spotting workshop-usage patterns to refine the
+`packages/garage_ms/climate.yaml` Active-mode schedule.
+
+```
+python3 tools/garage_motion_report.py \
+    --token ~/Documents/Claude/Projects/home-assistant/.ha-token \
+    --days 14
+```
+
+Caveats:
+
+- HA recorder default purge is 10 days. If `--days` > 10, query
+  `configuration.yaml` → `recorder:` → `days_to_keep` (or pull older
+  data from long-term statistics, which this tool doesn't currently
+  use).
+- Per-hour minutes is approximate — assumes contiguous ON intervals
+  between state transitions, which is correct for binary sensors but
+  fuzzy across recorder gaps.
+
 ## Other tools
 
 - **`rename_entities.py`** — bulk entity_id rename via the HA WebSocket
