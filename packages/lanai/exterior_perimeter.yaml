@@ -183,20 +183,26 @@ automation:
       # Push notification with attachment. Two shapes via choose: vacation uses
       # iOS critical=1 (bypasses DND/silent if permission granted), at-home uses
       # time-sensitive interruption-level (matches existing pool-alert pattern).
-      # Split avoids rendering critical/volume as string-templated values, which
-      # the iOS Companion handles inconsistently in nested data blocks.
+      #
+      # Split into two explicit calls per branch instead of notify.scott_and_ha:
+      #   - notify.mobile_app_iphone_sd → iOS push with attachment + url tap-action
+      #     (tap on push opens the snapshot URL directly, not the app shell).
+      #   - persistent_notification.create → HA bell entry with the snapshot
+      #     embedded inline via markdown image syntax (the group's
+      #     notify.persistent_notification service doesn't carry attachments).
       - choose:
           - conditions:
               - condition: template
                 value_template: "{{ is_vacation }}"
             sequence:
-              - action: notify.scott_and_ha
+              - action: notify.mobile_app_iphone_sd
                 data:
                   title: "Lanai {{ door_label }} door opened (VACATION)"
                   message: >-
                     {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
                   data:
                     tag: "lanai_perimeter_{{ triggered_door }}"
+                    url: "{{ snapshot_url }}"
                     push:
                       interruption-level: critical
                       sound:
@@ -206,19 +212,36 @@ automation:
                     attachment:
                       url: "{{ snapshot_url }}"
                       content-type: jpeg
+              - action: persistent_notification.create
+                data:
+                  notification_id: "lanai_perimeter_{{ triggered_door }}"
+                  title: "Lanai {{ door_label }} door opened (VACATION)"
+                  message: |
+                    {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
+
+                    ![snapshot]({{ snapshot_url }})
         default:
-          - action: notify.scott_and_ha
+          - action: notify.mobile_app_iphone_sd
             data:
               title: "Lanai {{ door_label }} door opened"
               message: >-
                 {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
               data:
                 tag: "lanai_perimeter_{{ triggered_door }}"
+                url: "{{ snapshot_url }}"
                 push:
                   interruption-level: time-sensitive
                 attachment:
                   url: "{{ snapshot_url }}"
                   content-type: jpeg
+          - action: persistent_notification.create
+            data:
+              notification_id: "lanai_perimeter_{{ triggered_door }}"
+              title: "Lanai {{ door_label }} door opened"
+              message: |
+                {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
+
+                ![snapshot]({{ snapshot_url }})
       # Start (or restart) the incident timer.
       - action: timer.start
         target:
