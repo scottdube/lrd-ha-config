@@ -149,9 +149,12 @@ automation:
         {% if triggered_door == 'binary_sensor.east_ext_door' %}East exterior
         {%- elif triggered_door == 'binary_sensor.west_ext_door' %}West exterior
         {%- else %}Unknown{% endif %}
+      # Camera names refer to MOUNT location, not direction of view.
+      # The east-mounted camera looks west, the west-mounted camera looks east.
+      # So the East door is covered by the west-mounted camera and vice versa.
       camera_entity: >-
-        {% if triggered_door == 'binary_sensor.east_ext_door' %}camera.g5_bullet_lanai_east_high_resolution_channel
-        {%- elif triggered_door == 'binary_sensor.west_ext_door' %}camera.g5_bullet_lanai_west_high_resolution_channel
+        {% if triggered_door == 'binary_sensor.east_ext_door' %}camera.g5_bullet_lanai_west_high_resolution_channel
+        {%- elif triggered_door == 'binary_sensor.west_ext_door' %}camera.g5_bullet_lanai_east_high_resolution_channel
         {%- endif %}
       snapshot_filename: >-
         {% set side = 'east' if triggered_door == 'binary_sensor.east_ext_door' else 'west' %}
