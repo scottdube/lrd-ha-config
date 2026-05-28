@@ -1,0 +1,188 @@
+substitutions:
+  device_name: c6-mode-tour-demo
+  friendly_name: "C6 Mode Tour Demo"
+
+# Sleep mode tour for HOT Small Computers club talk (2026-11/12).
+# Single firmware that cycles through ESP32-C6 power modes in sequence,
+# producing a continuous PPK2 trace that visually contrasts each mode:
+#
+#   Active (WiFi normal) -> Modem Sleep -> Active -> Light Sleep ->
+#   Active -> Deep Sleep -> Active -> Hibernation (waits for button) ->
+#   Active -> loop / end.
+#
+# LED on GPIO15 blinks during Active periods for visual cue.
+# Button on GPIO2 (low-active) wakes from Hibernation.
+# State machine uses esp_sleep_get_wakeup_cause() since RTC memory
+# doesn't survive Hibernation.
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Sleep mode tour demo - HOT club talk"
+  on_boot:
+    - priority: -100
+      then:
+        - script.execute: run_mode_tour
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_PM_ENABLE: y
+      CONFIG_PM_DFS_INIT_AUTO: y
+      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP: "3"
+      CONFIG_PM_SLP_IRAM_OPT: y
+      CONFIG_PM_RTOS_IDLE_OPT: y
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  networks:
+    - ssid: !secret legacy_iot_ssid
+      password: !secret legacy_iot_password
+  power_save_mode: NONE
+  fast_connect: true
+  output_power: 20.0
+  ap:
+    ssid: "C6 Mode Tour Fallback"
+    password: !secret fallback_password
+
+safe_mode:
+  boot_is_good_after: 5s
+  num_attempts: 100
+
+# LED on GPIO15 for "I am Active" visual indicator. Blinks 2 Hz during
+# Active periods, OFF during all sleep modes for clean PPK2 traces.
+output:
+  - platform: gpio
+    pin: GPIO15
+    id: status_led_pin
+    inverted: false
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO2
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Wake Button"
+    id: wake_button
+
+# Active-period blinker. Runs only when invoked; we stop it before sleep.
+script:
+  - id: blink_active_led
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: 'return true;'
+          then:
+            - output.turn_on: status_led_pin
+            - delay: 250ms
+            - output.turn_off: status_led_pin
+            - delay: 250ms
+
+  - id: stop_blink_and_off
+    then:
+      - script.stop: blink_active_led
+      - output.turn_off: status_led_pin
+
+  - id: run_mode_tour
+    then:
+      - lambda: |-
+          // ============================================================
+          // ESP32-C6 sleep mode tour
+          // Sequence determined by wake cause from previous sleep state.
+          // ============================================================
+          esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+          ESP_LOGI("tour", "=== Mode tour boot, wake_cause=%d ===", (int)cause);
+
+          // ----- Wait briefly for WiFi to associate so Active period
+          // shows the realistic 'WiFi connected' baseline on PPK2 -----
+          uint32_t wait_ms = 0;
+          while (!WiFi.isConnected() && wait_ms < 10000) {
+            delay(100);
+            wait_ms += 100;
+          }
+          ESP_LOGI("tour", "WiFi associated after %u ms", wait_ms);
+
+      # ===== Branch on wake cause =====
+      - if:
+          condition:
+            lambda: 'return esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED;'
+          then:
+            # ===== SEGMENT 1: Fresh boot - tour Modem + Light sleep, then enter Deep Sleep =====
+            - logger.log: ">>> SEGMENT 1: Active (WiFi normal) for 20s"
+            - script.execute: blink_active_led
+            - delay: 20s
+
+            - logger.log: ">>> Switch to MODEM SLEEP (WiFi power-save MAX_MODEM) for 30s"
+            - script.execute: stop_blink_and_off
+            - lambda: 'esp_wifi_set_ps(WIFI_PS_MAX_MODEM);'
+            - delay: 30s
+
+            - logger.log: ">>> Restore WiFi power save to NONE, Active for 10s"
+            - lambda: 'esp_wifi_set_ps(WIFI_PS_NONE);'
+            - script.execute: blink_active_led
+            - delay: 10s
+
+            - logger.log: ">>> LIGHT SLEEP for 30s (timer wake, execution resumes)"
+            - script.execute: stop_blink_and_off
+            - lambda: |-
+                esp_sleep_enable_timer_wakeup(30ULL * 1000000ULL);
+                esp_light_sleep_start();  // BLOCKS - returns when timer fires
+                ESP_LOGI("tour", "Light sleep returned - execution resumed without reboot");
+
+            - logger.log: ">>> Active for 10s after Light Sleep wake"
+            - script.execute: blink_active_led
+            - delay: 10s
+
+            - logger.log: ">>> DEEP SLEEP for 30s (timer wake, REBOOT on resume)"
+            - script.execute: stop_blink_and_off
+            - lambda: |-
+                esp_sleep_enable_timer_wakeup(30ULL * 1000000ULL);
+                esp_deep_sleep_start();  // NEVER RETURNS - chip reboots
+          else:
+            # ===== SEGMENT 2 or 3 =====
+            - if:
+                condition:
+                  lambda: 'return esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER;'
+                then:
+                  # ===== SEGMENT 2: Just woke from Deep Sleep - Active then Hibernation =====
+                  - logger.log: ">>> SEGMENT 2: Active for 20s after Deep Sleep wake"
+                  - script.execute: blink_active_led
+                  - delay: 20s
+
+                  - logger.log: ">>> HIBERNATION - waits for button press on GPIO2"
+                  - script.execute: stop_blink_and_off
+                  - lambda: |-
+                      // Configure EXT0 wake on GPIO2, active low (button pull-up + press to gnd)
+                      esp_sleep_enable_ext0_wakeup((gpio_num_t)2, 0);
+                      // Disable all RTC peripherals - true Hibernation
+                      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+                      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+                      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+                      esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_OFF);
+                      esp_deep_sleep_start();  // enters Hibernation - waits for button
+                else:
+                  # ===== SEGMENT 3: Just woke from Hibernation (EXT0 button) - final Active =====
+                  - logger.log: ">>> SEGMENT 3: Active for 20s after Hibernation button wake. Tour complete."
+                  - script.execute: blink_active_led
+                  - delay: 20s
+                  - logger.log: ">>> Tour complete. Looping back to start in 5s."
+                  - delay: 5s
+                  - lambda: 'esp_restart();'
