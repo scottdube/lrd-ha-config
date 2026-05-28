@@ -156,6 +156,15 @@ automation:
         {% if triggered_door == 'binary_sensor.east_ext_door' %}camera.g5_bullet_lanai_west_high_resolution_channel
         {%- elif triggered_door == 'binary_sensor.west_ext_door' %}camera.g5_bullet_lanai_east_high_resolution_channel
         {%- endif %}
+      # UniFi Protect cloud URL for the covering camera. Stable across networks
+      # (cellular, NH, FL) since it routes via unifi.ui.com → user's UI account
+      # → LRD UDM SE. Requires Safari (not HA Companion's in-app browser) to
+      # reuse the persistent unifi.ui.com session — set Companion → Appearance
+      # & Display → "Open Page In" to External Browser.
+      protect_url: >-
+        {% if triggered_door == 'binary_sensor.east_ext_door' %}https://unifi.ui.com/physical-security/devices/67c4c93c0284da03e40032cd
+        {%- elif triggered_door == 'binary_sensor.west_ext_door' %}https://unifi.ui.com/physical-security/devices/67c4e2a100f9da03e4003b71
+        {%- endif %}
       snapshot_filename: >-
         {% set side = 'east' if triggered_door == 'binary_sensor.east_ext_door' else 'west' %}
         lanai_perimeter_{{ side }}_{{ now().strftime('%Y%m%d_%H%M%S') }}.jpg
@@ -207,7 +216,7 @@ automation:
                     tag: "lanai_perimeter_{{ triggered_door }}"
                     # Default tap → camera more-info dialog in HA Companion, which
                     # streams live video for that camera.
-                    url: "entityId:{{ camera_entity }}"
+                    url: "{{ protect_url }}"
                     push:
                       interruption-level: critical
                       sound:
@@ -221,7 +230,7 @@ automation:
                     actions:
                       - action: URI
                         title: View Live
-                        uri: "entityId:{{ camera_entity }}"
+                        uri: "{{ protect_url }}"
                       - action: URI
                         title: View Snapshot
                         uri: "{{ snapshot_url }}"
@@ -241,7 +250,7 @@ automation:
                 {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
               data:
                 tag: "lanai_perimeter_{{ triggered_door }}"
-                url: "entityId:{{ camera_entity }}"
+                url: "{{ protect_url }}"
                 push:
                   interruption-level: time-sensitive
                 attachment:
@@ -250,7 +259,7 @@ automation:
                 actions:
                   - action: URI
                     title: View Live
-                    uri: "entityId:{{ camera_entity }}"
+                    uri: "{{ protect_url }}"
                   - action: URI
                     title: View Snapshot
                     uri: "{{ snapshot_url }}"
