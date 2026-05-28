@@ -205,7 +205,9 @@ automation:
                     {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
                   data:
                     tag: "lanai_perimeter_{{ triggered_door }}"
-                    url: "{{ snapshot_url }}"
+                    # Default tap → camera more-info dialog in HA Companion, which
+                    # streams live video for that camera.
+                    url: "entityId:{{ camera_entity }}"
                     push:
                       interruption-level: critical
                       sound:
@@ -215,6 +217,14 @@ automation:
                     attachment:
                       url: "{{ snapshot_url }}"
                       content-type: jpeg
+                    # Long-press the notification for these buttons.
+                    actions:
+                      - action: URI
+                        title: View Live
+                        uri: "entityId:{{ camera_entity }}"
+                      - action: URI
+                        title: View Snapshot
+                        uri: "{{ snapshot_url }}"
               - action: persistent_notification.create
                 data:
                   notification_id: "lanai_perimeter_{{ triggered_door }}"
@@ -231,12 +241,19 @@ automation:
                 {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
               data:
                 tag: "lanai_perimeter_{{ triggered_door }}"
-                url: "{{ snapshot_url }}"
+                url: "entityId:{{ camera_entity }}"
                 push:
                   interruption-level: time-sensitive
                 attachment:
                   url: "{{ snapshot_url }}"
                   content-type: jpeg
+                actions:
+                  - action: URI
+                    title: View Live
+                    uri: "entityId:{{ camera_entity }}"
+                  - action: URI
+                    title: View Snapshot
+                    uri: "{{ snapshot_url }}"
           - action: persistent_notification.create
             data:
               notification_id: "lanai_perimeter_{{ triggered_door }}"
