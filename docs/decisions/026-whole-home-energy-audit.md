@@ -190,6 +190,88 @@ shifted later by ~30 min to clear LTS flush stragglers.
   `packages/energy/templates.yaml` to close the O3 gap, then tighten the
   A4 threshold.
 
+---
+
+## Amendment 2026-05-27 — vacation-mode profile (v1.1.0)
+
+Scott leaves LRD 2026-05-30 for the summer. v1.0.0's occupied-baseline
+thresholds would misbehave during the transition (A1/A2 false-positives
+across a mix-mode rolling avg, A10 false-positives on legitimately-low
+vacation panel totals, A7 silent on a re-energized water heater that's
+supposed to be off, O1 weekly scan spamming WoW deltas across the mode
+flip) and miss the canonical vacation anxieties ("did I leave the stove
+on?", "is the pool pump still running?").
+
+### Mechanism
+
+`energy_audit.py` reads `input_boolean.vacation` at run time (CLI override
+`--vacation-override on|off` for backfill or what-ifs) and switches between
+two `Thresholds` profiles defined at the top of the file. The CSV gains a
+`vacation` column (0/1) and migrates the v1.0.0 file in place on first
+v1.1.0 run, backing up the original as `energy_audit.csv.pre-v1.1.0.bak`.
+
+Rolling averages (A1/A2/A4) compute over **same-mode rows only**, which
+eliminates the mixed-baseline noise during transitions. A safety guard
+requires ≥3 same-mode rows before A1/A2 fire and ≥5 before A4 fires, so
+the first few days post-flip operate purely on absolute checks.
+
+A one-time `[MODE]` notification fires on the day the flag changes, so
+Scott sees the transition logged explicitly.
+
+### Threshold deltas
+
+| ID | Occupied | Vacation | Why |
+|---|---|---|---|
+| A3 (overnight baseload) | > 2500 W | **> 1200 W** | Catches "AC running unexpectedly" when nobody's home |
+| A5 (Air 1/2 per day) | > 40 kWh | **> 15 kWh** | HVAC should cycle far less at raised setpoints |
+| A7 (WH per day) | > 30 kWh | unchanged (fallback) | Real signal is V1 |
+| A8 (Garage MS per day) | > 25 kWh | unchanged (fallback) | Real signal is V2 |
+| A10 (panel total low) | enabled | **disabled** | Vacation totals can legitimately drop into the teens |
+
+### New vacation-only checks (V1–V7)
+
+| ID | Signal | Threshold | Rationale |
+|---|---|---|---|
+| V1 | Water heater daily | > 1.0 kWh | Off in vacation per Scott's policy; any draw is signal |
+| V2 | Garage MS daily | > 8.0 kWh | Dehumidify-only ceiling per Scott's policy |
+| V3 | Whole-home daily cap | > 80 kWh | Vacation mode isn't really engaged |
+| V4 | Pool subpanel daily | **< 1.0 kWh** | Inverted floor — pump unexpectedly off = stagnant pool (P1) |
+| V5 | Cooktop / oven / stove | > 0.3 / 0.3 / 2.0 kWh | "Did I leave it on?" — stove threshold higher to allow for ~0.5 kWh/day digital-clock standby |
+| V6 | Dryer daily | > 0.3 kWh | Dryer accidentally running while away |
+| V7 | Recirc pump full-day mean power | > 10 W | Off in vacation per Scott's policy |
+
+V4 is the standout — a floor, not a ceiling. A stagnant pool in FL summer
+is a P1 condition (algae bloom, equipment damage from off-spec chemistry).
+Other V-checks are nuisance prevention; V4 is real consequence prevention.
+
+### O1 weekly scan suppression
+
+`days_since_mode_flip()` counts the run length since the most recent
+vacation-flag change. If < 14 days, Monday's WoW scan is suppressed —
+WoW deltas spanning a mode transition are meaningless. If history shows
+no flip (long-stable in one mode), the function returns 999 and weekly
+scans run normally.
+
+### What still needs validation
+
+The vacation thresholds were chosen from policy + standby-load
+measurement, not from observed vacation-mode baselines (we don't have
+any yet). Plan: review the first 14 days of vacation CSV rows after
+Scott leaves, tune V1–V7 + A3-vac if any are noisy or silent on real
+signals. Most likely candidate for retuning is V5 kitchen-stove
+(threshold may need to come down to 1.0 kWh if standby is lower than
+expected) and A3-vac baseload (1200 W is a guess — could be too tight
+if some unexpected always-on load survives the vacation prep).
+
+### Schema migration
+
+v1.0.0 CSV (20 cols) → v1.1.0 CSV (27 cols). New columns:
+`vacation`, `recirc_w_avg`, `cooktop_kwh`, `wall_oven_kwh`,
+`kitchen_stove_kwh`, `dryer_kwh`. Old rows get `0` defaults for new
+columns and `audit_version = "energy-audit-1.0.0-migrated"`. The
+migration runs automatically on the first v1.1.0 invocation; original
+file preserved as `.pre-v1.1.0.bak`.
+
 ## Sources
 
 - 2026-05-27 conversation: 14-day trend analysis identifying the three

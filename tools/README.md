@@ -152,6 +152,30 @@ Pattern + rationale: `docs/decisions/026-whole-home-energy-audit.md`.
 
 Thresholds are tunable in the top of `energy_audit.py` — review after ~30 days of CSV history when seasonal patterns are clear.
 
+### Vacation profile (v1.1.0)
+
+When `input_boolean.vacation` is on (ADR-012), the audit switches to a
+tighter, mode-aware threshold profile. The full table lives in
+ADR-026's 2026-05-27 amendment, but in short:
+
+- **Tightened absolute thresholds:** A3 baseload 2500 W → 1200 W, A5 Air-system 40 → 15 kWh/day. Disabled A10 (low panel) and Monday O1 (WoW) for 14 days after a mode flip.
+- **New vacation-only checks:**
+  - **V1** Water heater > 1.0 kWh/day — should be off
+  - **V2** Garage MS > 8.0 kWh/day — dehumidify-only ceiling
+  - **V3** Whole-home > 80 kWh/day — vacation-mode-not-engaged guard
+  - **V4** Pool subpanel **< 1.0 kWh/day** — stagnant-pool floor (P1 condition)
+  - **V5** Cooktop > 0.3, oven > 0.3, kitchen stove > 2.0 kWh — "left on?"
+  - **V6** Dryer > 0.3 kWh/day — dryer running
+  - **V7** Recirc pump mean power > 10 W — should be off
+- **Mode-aware rolling avg:** A1/A2/A4 compute over same-mode rows only. Guard: A1/A2 need ≥3 same-mode rows, A4 needs ≥5.
+- **Mode-flip notification:** one-time push the day the flag changes.
+
+Backfill historical days with explicit mode:
+
+```
+python3 tools/energy_audit.py --for-date 2026-05-14 --vacation-override off --no-notify --print-clean
+```
+
 ### CSV schema (`~/energy-audit/energy_audit.csv`)
 
 | Column | Meaning |
