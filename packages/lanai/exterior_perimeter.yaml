@@ -1,0 +1,248 @@
+# Lanai Exterior Perimeter
+#
+# Watch east/west lanai exterior doors. On open within the activation window:
+#   1. Cancel the interior-door automation's timer so it can't expire mid-incident.
+#   2. Bring lanai cans + summer kitchen cans to 100%.
+#   3. Delay 3s, snapshot the matching camera (catches the person in frame, not
+#      an empty doorway), save under /config/www/snapshots/.
+#   4. Push to notify.scott_and_ha with the snapshot attached. iOS critical=1
+#      added when in vacation mode (bypasses DND if Critical Alerts permission
+#      is granted in iOS Settings → Notifications → Home Assistant).
+#   5. Start the perimeter incident timer for auto-off.
+#
+# Activation window:
+#   - input_boolean.vacation ON  → fire any time sun is below horizon
+#   - input_boolean.vacation OFF → fire only when input_boolean.bed_time_active is on
+#
+# bed_time_active is a latched helper defined in this file. It mirrors the
+# existing input_boolean.bed_time pulse (which is set ON by multiple callers
+# then cleared in seconds by script.bed_time_script) into a stable signal that
+# stays ON from bed-time through sunrise.
+#
+# Interaction with existing Lanai Door Activated Lights with Motion Keep-Alive
+# (automations.yaml id 1775916297031):
+#   That automation triggers on interior door sensors (lanai_slider_door,
+#   bathroom_lanai_door, lanai_master), turns light.lanai_wall_dimmer_switch
+#   to 58%, and starts timer.lanai_lights_timer for 10 min. If that timer is
+#   mid-run when our trip fires, it would expire and turn the lights off mid-
+#   incident. We cancel it explicitly. Its skip_if_lights_on: true prevents it
+#   from re-firing at 58% while we hold the lights at 100%.
+#
+# Entity references:
+#   binary_sensor.east_ext_door  / .west_ext_door                  — Z-Wave contact sensors
+#   camera.g5_bullet_lanai_east_high_resolution_channel            — UniFi Protect, lanai East
+#   camera.g5_bullet_lanai_west_high_resolution_channel            — UniFi Protect, lanai West
+#   light.lanai_wall_dimmer_switch                                 — HomeSeer WX300, "Lanai Cans"
+#   light.s2_dimmer_2                                              — Zooz S2, "Summer Kitchen Lights"
+#                                                                    (legacy stem, rename candidate per ADR-021)
+#   input_boolean.vacation                                         — packages/pool/pool_modes.yaml (ADR-012)
+#   input_boolean.bed_time                                         — pulse helper, existing (untouched)
+#   timer.lanai_lights_timer                                       — owned by interior door automation
+#   notify.scott_and_ha                                            — packages/notify/notify_groups.yaml
+#
+# One-time setup before first reload:
+#   From SCS terminal:  mkdir -p /config/www/snapshots
+#   Files saved here are served at /local/snapshots/ for the iOS attachment URL.
+#
+# Open follow-ups (post-deploy):
+#   - Snapshot retention. /config/www/snapshots/ grows unbounded. Add a launchd
+#     or shell_command purge after a few weeks of accumulated incidents.
+#   - Person-detection cross-check. UniFi Protect exposes
+#     binary_sensor.g5_bullet_lanai_<side>_person_detected. Adding a second
+#     notification with the "person confirmed" payload reduces false positives
+#     from wind / animals / cleaners.
+#   - ADR-028 — document the perimeter pattern + bed_time_active latch
+#     decision after first incident is reviewed in production.
+
+input_boolean:
+  bed_time_active:
+    name: Bed Time Active
+    icon: mdi:bed-clock
+
+timer:
+  lanai_perimeter_incident:
+    name: Lanai Perimeter Incident
+    duration: "00:10:00"
+    restore: true
+
+automation:
+  # ---------------------------------------------------------------------------
+  # 1) Latch — mirror input_boolean.bed_time ON transition into bed_time_active.
+  # ---------------------------------------------------------------------------
+  - id: bed_time_active_latch
+    alias: "Bed Time Active: Latch from bed_time pulse"
+    description: >
+      input_boolean.bed_time is a transient pulse (set ON by various
+      callers, cleared by script.bed_time_script). This automation mirrors
+      its ON transition into input_boolean.bed_time_active so downstream
+      consumers (lanai perimeter, future HVAC setback, etc.) have a stable
+      "we're in bed-time mode" signal to condition on.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.bed_time
+        to: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.bed_time_active
+
+  # ---------------------------------------------------------------------------
+  # 2) Clear — sunrise clears bed_time_active.
+  # ---------------------------------------------------------------------------
+  - id: bed_time_active_clear_at_sunrise
+    alias: "Bed Time Active: Clear at sunrise"
+    description: >
+      Sun rising above the horizon is the off signal for bed_time_active.
+      Tracks daylight regardless of clock / DST / seasonal drift.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: sun.sun
+        to: above_horizon
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.bed_time_active
+
+  # ---------------------------------------------------------------------------
+  # 3) Main — east/west exterior door opened within activation window.
+  # ---------------------------------------------------------------------------
+  - id: lanai_exterior_perimeter_trip
+    alias: "Lanai Perimeter: Exterior door trip"
+    description: >
+      East or West lanai exterior door opens: cancel the interior-door
+      automation's timer, bring lanai cans + summer kitchen to 100%,
+      delayed snapshot from the matching camera, push notification with
+      attachment, start the incident timer.
+    mode: queued
+    max: 4
+    triggers:
+      - trigger: state
+        entity_id:
+          - binary_sensor.east_ext_door
+          - binary_sensor.west_ext_door
+        from: "off"
+        to: "on"
+    conditions:
+      - condition: or
+        conditions:
+          - condition: and
+            conditions:
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "on"
+              - condition: state
+                entity_id: sun.sun
+                state: below_horizon
+          - condition: and
+            conditions:
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "off"
+              - condition: state
+                entity_id: input_boolean.bed_time_active
+                state: "on"
+    variables:
+      triggered_door: "{{ trigger.to_state.entity_id }}"
+      door_label: >-
+        {% if triggered_door == 'binary_sensor.east_ext_door' %}East exterior
+        {%- elif triggered_door == 'binary_sensor.west_ext_door' %}West exterior
+        {%- else %}Unknown{% endif %}
+      camera_entity: >-
+        {% if triggered_door == 'binary_sensor.east_ext_door' %}camera.g5_bullet_lanai_east_high_resolution_channel
+        {%- elif triggered_door == 'binary_sensor.west_ext_door' %}camera.g5_bullet_lanai_west_high_resolution_channel
+        {%- endif %}
+      snapshot_filename: >-
+        {% set side = 'east' if triggered_door == 'binary_sensor.east_ext_door' else 'west' %}
+        lanai_perimeter_{{ side }}_{{ now().strftime('%Y%m%d_%H%M%S') }}.jpg
+      snapshot_path: "/config/www/snapshots/{{ snapshot_filename | trim }}"
+      snapshot_url: "/local/snapshots/{{ snapshot_filename | trim }}"
+      is_vacation: "{{ is_state('input_boolean.vacation', 'on') }}"
+    actions:
+      # Cancel the interior-door automation's timer so it can't expire mid-incident.
+      - action: timer.cancel
+        target:
+          entity_id: timer.lanai_lights_timer
+      # Full bright on both light groups.
+      - action: light.turn_on
+        target:
+          entity_id:
+            - light.lanai_wall_dimmer_switch
+            - light.s2_dimmer_2
+        data:
+          brightness_pct: 100
+      # 3s delay so the person is in frame, not an empty doorway.
+      - delay:
+          seconds: 3
+      # Snapshot the matching camera.
+      - action: camera.snapshot
+        data:
+          entity_id: "{{ camera_entity }}"
+          filename: "{{ snapshot_path }}"
+      # Push notification with attachment. Two shapes via choose: vacation uses
+      # iOS critical=1 (bypasses DND/silent if permission granted), at-home uses
+      # time-sensitive interruption-level (matches existing pool-alert pattern).
+      # Split avoids rendering critical/volume as string-templated values, which
+      # the iOS Companion handles inconsistently in nested data blocks.
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ is_vacation }}"
+            sequence:
+              - action: notify.scott_and_ha
+                data:
+                  title: "Lanai {{ door_label }} door opened (VACATION)"
+                  message: >-
+                    {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
+                  data:
+                    tag: "lanai_perimeter_{{ triggered_door }}"
+                    push:
+                      interruption-level: critical
+                      sound:
+                        name: default
+                        critical: 1
+                        volume: 1.0
+                    attachment:
+                      url: "{{ snapshot_url }}"
+                      content-type: jpeg
+        default:
+          - action: notify.scott_and_ha
+            data:
+              title: "Lanai {{ door_label }} door opened"
+              message: >-
+                {{ door_label }} door opened at {{ now().strftime('%I:%M %p') }}.
+              data:
+                tag: "lanai_perimeter_{{ triggered_door }}"
+                push:
+                  interruption-level: time-sensitive
+                attachment:
+                  url: "{{ snapshot_url }}"
+                  content-type: jpeg
+      # Start (or restart) the incident timer.
+      - action: timer.start
+        target:
+          entity_id: timer.lanai_perimeter_incident
+
+  # ---------------------------------------------------------------------------
+  # 4) Incident timer expired → lights off.
+  # ---------------------------------------------------------------------------
+  - id: lanai_perimeter_incident_timer_expired
+    alias: "Lanai Perimeter: Incident timer expired"
+    description: >
+      Auto-off after timer.lanai_perimeter_incident finishes. Turns off
+      the same lights we brought up. The interior-door automation's
+      skip_if_lights_on guard prevents it from racing us while these
+      are still on.
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.lanai_perimeter_incident
+    actions:
+      - action: light.turn_off
+        target:
+          entity_id:
+            - light.lanai_wall_dimmer_switch
+            - light.s2_dimmer_2
