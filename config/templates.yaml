@@ -152,8 +152,8 @@
       state_class: measurement
       icon: mdi:thermometer-water
       state: >
-        {%- set ext = states.sensor.pool_water_temp_external -%}
-        {%- set ext_val = states('sensor.pool_water_temp_external') | float(none) -%}
+        {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
+        {%- set ext_val = states('sensor.pool_water_temp_external_corrected') | float(none) -%}
         {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
         {%- set ext_fresh = ext_age <= 35 and ext_val is not none -%}
         {%- set local_val = states('sensor.omnilogic_pool_watersensor') | float(none) -%}
@@ -168,8 +168,8 @@
         {%- else -%}{{ none }}{%- endif -%}
       attributes:
         source: >
-          {%- set ext = states.sensor.pool_water_temp_external -%}
-          {%- set ext_val = states('sensor.pool_water_temp_external') | float(none) -%}
+          {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
+          {%- set ext_val = states('sensor.pool_water_temp_external_corrected') | float(none) -%}
           {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
           {%- set ext_fresh = ext_age <= 35 and ext_val is not none -%}
           {%- set local_val = states('sensor.omnilogic_pool_watersensor') | float(none) -%}
@@ -181,11 +181,11 @@
           {%- elif local_reliable -%}local
           {%- else -%}target{%- endif -%}
         external_age_min: >
-          {%- set ext = states.sensor.pool_water_temp_external -%}
+          {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
           {%- if ext -%}{{ ((now() - ext.last_changed).total_seconds() / 60) | round(1) }}
           {%- else -%}unknown{%- endif -%}
         external_fresh: >
-          {%- set ext = states.sensor.pool_water_temp_external -%}
-          {%- set ext_val = states('sensor.pool_water_temp_external') | float(none) -%}
+          {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
+          {%- set ext_val = states('sensor.pool_water_temp_external_corrected') | float(none) -%}
           {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
           {{ ext_age <= 35 and ext_val is not none }}
