@@ -1,0 +1,83 @@
+# NH occupancy logger config — STUB
+#
+# Two separate zones at NH, each with its own mini split:
+#   - nh_lab    (24x32 ft, precision work / quiet activities)
+#   - nh_garage (3-car, primarily storage + occasional projects)
+#
+# This file is a placeholder. NH HA is not yet online — entity names below
+# are guesses based on the LRD pattern. When NH HA comes up:
+#   1. Update HA_BASE in occupancy_log.py to support multi-base routing,
+#      OR run a sibling logger instance on the NH always-on host
+#   2. Replace the placeholder entity names with real ones (search HA via
+#      /api/states for the actual entity_ids)
+#   3. Set `enabled: true` on each zone
+#   4. Deploy a bench-presence (LD2410) sensor at the lab bench using the
+#      esphome/bench-presence.yaml firmware with device_name: nh-lab-bench-presence
+#   5. Re-run the logger; verify rows land in ~/occupancy-log/nh_lab_*.csv
+
+zones:
+  - name: nh_lab
+    property: nh
+    enabled: false   # flip true when NH entities exist
+    timezone_offset_hours: -4   # EDT (NH same as LRD in summer; will need to adjust to EST in winter)
+    description: >
+      NH lab — 24x32, lab/workshop space. Primary precision-work zone.
+      Mini split is independent of the 3-car garage's unit.
+
+    classifier:
+      sustained_min_minutes: 10
+      transient_window_minutes: 30
+      lights_sustained_min_minutes: 10
+      bench_power_sustained_min_minutes: 5
+
+    signals:
+      golf_sim_flag: null   # no sim at NH (unless future expansion)
+
+      bench_presence: null   # TBD: binary_sensor.nh_lab_bench_presence (LD2410)
+      bench_power: null      # TODO: which Vue circuit at NH? Confirm when HA installed
+
+      lights:
+        - light.nh_lab        # placeholder
+      person_detect:
+        - binary_sensor.nh_lab_camera_person_detected   # placeholder; only if a camera is added
+
+      doors:
+        - binary_sensor.nh_lab_overhead_door   # placeholder
+      walk_in_door: binary_sensor.nh_lab_walk_in_door
+
+      climate_entity: climate.nh_lab_mini_split   # placeholder
+      climate_setpoint_attr: temperature
+      humidity_entity: sensor.nh_lab_humidity     # placeholder
+
+  - name: nh_garage
+    property: nh
+    enabled: false
+    timezone_offset_hours: -4
+    description: >
+      NH 3-car garage — car parking and storage. Lower activity than lab;
+      mini split policy likely more permissive (higher Storage setpoint).
+
+    classifier:
+      sustained_min_minutes: 15   # garage thresholds slightly tighter — less foot traffic
+      transient_window_minutes: 30
+      lights_sustained_min_minutes: 15
+      bench_power_sustained_min_minutes: 10
+
+    signals:
+      golf_sim_flag: null
+      bench_presence: null   # no bench in garage proper
+      bench_power: null
+
+      lights:
+        - light.nh_garage   # placeholder
+      person_detect: []   # add NH garage camera entities if present
+
+      doors:
+        - binary_sensor.nh_garage_overhead_door_1   # placeholder per bay
+        - binary_sensor.nh_garage_overhead_door_2
+        - binary_sensor.nh_garage_overhead_door_3
+      walk_in_door: null
+
+      climate_entity: climate.nh_garage_mini_split   # placeholder
+      climate_setpoint_attr: temperature
+      humidity_entity: sensor.nh_garage_humidity     # placeholder

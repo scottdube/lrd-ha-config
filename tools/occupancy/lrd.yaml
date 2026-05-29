@@ -1,0 +1,81 @@
+# LRD occupancy logger config
+#
+# One zone at LRD: the garage. Contains bench, golf simulator, car parking,
+# and golf cart storage — single HVAC zone (climate.garage_ms).
+#
+# Signal hierarchy for the sustained-vs-transient classifier — ANY of these
+# satisfies SUSTAINED (logical OR, not strict tiers — none is required):
+#   - Bench mmWave presence (>5 min sustained)             — best signal, post-install
+#   - Bench-circuit power above standby + delta (>5 min)   — tools running = work
+#   - Lights on (>10 min) AND any person-detect event      — workshop session
+#   - Golf sim flag (input_boolean.golfing) on (>1 min)    — corroborating signal,
+#                                                            not 100% used (Scott
+#                                                            doesn't always run the
+#                                                            "Let's Go Golfing"
+#                                                            script before sessions)
+#
+# Future enhancement — SkyTrak Mac Mini network signal:
+#   The sim runs on a Mac Mini behind the UDM SE on port 8 (not PoE — admin
+#   shutdown only). When sim is active, the Mac Mini draws power and pushes
+#   network traffic. To use this as a signal we need either:
+#     (a) UniFi Network integration tracking that MAC as a named client with
+#         bandwidth sensors exposed, OR
+#     (b) Direct UniFi controller API polling from this logger.
+#   Stubbed below; activate when configured. Would catch sim use even when
+#   the golfing input_boolean isn't toggled.
+#
+# Transient examples this classifier correctly rejects:
+#   - Mon/Thu trash-out: walk-in door open + 60-90 sec motion + no lights >10 min
+#   - Quick golf cart trip: overhead door open + door close + no sustained signal
+#   - Dropping mail: walk-in door + lights 1 min + walk-in door close
+
+zones:
+  - name: lrd_garage
+    property: lrd
+    enabled: true
+    timezone_offset_hours: -4   # EDT
+    description: >
+      LRD garage with bench, golf sim, and car parking. Single thermal
+      zone driven by climate.garage_ms (ADR-027).
+
+    classifier:
+      # Tunables — calibrate after first 30 days of post-return data (2026-10-15+)
+      sustained_min_minutes: 10
+      transient_window_minutes: 30
+      lights_sustained_min_minutes: 10
+      bench_power_sustained_min_minutes: 5
+
+    signals:
+      # Strong sustained signals — any one classifies SUSTAINED
+      bench_presence: null   # TBD: binary_sensor.lrd_bench_presence (LD2410, post-return install)
+      bench_power:
+        entity: sensor.emporia_vue_panel_b_circuit_15_garage_gfi_panel_wall_power
+        standby_w: 80
+        delta_threshold_w: 50
+
+      # Corroborating signal — set by script.let_s_go_golfing but not 100%
+      # used; treat as supporting evidence, not a deterministic short-circuit
+      golf_sim_flag: input_boolean.golfing
+
+      # Future: SkyTrak Mac Mini network presence + bandwidth (see header comment)
+      skytrak_network_tracker: null   # e.g. device_tracker.skytrak_mac_mini once configured
+      skytrak_bandwidth: null         # e.g. sensor.skytrak_mac_mini_rx_bandwidth (UniFi integration)
+
+      # Supporting context — lights + person-detect together = workshop session
+      lights:
+        - light.garage_lights
+        - light.garage_cans
+      person_detect:
+        - binary_sensor.g5_bullet_person_detected      # G5 Garage Left or Right
+        - binary_sensor.g5_bullet_person_detected_2    # G5 Garage Right or Left
+
+      # Transient indicators — events without sustaining backing = TRANSIENT
+      doors:
+        - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor    # Big overhead
+        - binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor_2  # Golf cart overhead
+      walk_in_door: binary_sensor.garage_door
+
+      # Climate state — captured for context but not in classifier
+      climate_entity: climate.garage_ms
+      climate_setpoint_attr: temperature
+      humidity_entity: sensor.garage_ms_humidity
