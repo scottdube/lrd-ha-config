@@ -1,0 +1,167 @@
+# AFCI watcher — Panel B Circuit 6 General Utils
+#
+# Background: 2026-05-28 evening saw three trips of the Eaton BRAF 15A AFCI
+# breaker labeled "General Utils" (kitchen cans + kitchen 4 cans + under cab
+# + nook chandelier + laundry fluor + garage fluor + chime). Investigation
+# tonight isolated the cause to `light.wall_dimmer_switch_kitche_4` — a
+# Z-Wave dimmer wired WITHOUT a neutral. Its trickle-current return path
+# through the LED bulbs produces a chopped, asymmetric waveform that the
+# AFCI's arc-detection algorithm correctly flags. Whisker Ting (installed
+# this week, still in 30-day learning mode) independently confirmed real
+# arc-fault waveform via 72 anomaly markers overnight, 0 trips.
+#
+# This branch ALSO feeds the doorbell chime transformer which powers the
+# G4 Doorbell Pro camera (17V draw). So we cannot simply open the breaker
+# during Scott's 2026-05-30 → mid-Oct departure — opening the breaker
+# kills the doorbell camera. Instead: watch the branch and alert on trip
+# OR sustained anomaly-rate spike that suggests escalation toward trip.
+#
+# Two watcher layers:
+#
+#   1. TRIP alert: sensor.emporia_vue_panel_b_circuit_6_general_loads_power
+#      dropping below 1 W for >2 min indicates the breaker opened. (Steady
+#      branch baseline = chime transformer ~6.8 W; cannot go below ~5 W
+#      without a real trip.) Push-notify via notify.scott_and_ha.
+#
+#   2. ANOMALY RATE: count Ting 208.78 V anomaly markers daily and alert
+#      if count exceeds the established "current dirty baseline" by a
+#      meaningful margin. Overnight baseline observed 2026-05-29 = 72
+#      anomalies / 9.4 h ≈ 180/day projected. Spike threshold set at 300
+#      daily (~1.7× baseline) — escalation that warrants checking the
+#      branch even if breaker holds.
+#
+# Fix path for after Scott returns mid-Oct: Aeotec ZWA042 or Lutron LUT-MLC
+# wire-saver / bypass capacitor at the kitche_4 fixture's last junction
+# box, wired line↔neutral in parallel with the LED load. Eliminates the
+# need for trickle current and should drop the anomaly rate to near-zero.
+#
+# Related: docs/incident-2026-05-28-afci-pb-c6-trips.md, task #35, #36, #37
+
+
+input_number:
+  ting_anomaly_today:
+    name: Ting Anomalies Today
+    icon: mdi:flash-alert
+    unit_of_measurement: "events"
+    min: 0
+    max: 10000
+    step: 1
+    initial: 0
+    mode: box
+
+  ting_anomaly_yesterday:
+    name: Ting Anomalies Yesterday
+    icon: mdi:flash-alert-outline
+    unit_of_measurement: "events"
+    min: 0
+    max: 10000
+    step: 1
+    initial: 0
+    mode: box
+
+
+automation:
+  # ---------- Layer 1: TRIP alert ----------
+  - alias: "AFCI: Alert on Panel B C6 trip"
+    id: afci_alert_on_pb_c6_trip
+    description: >
+      Fires when the General Utils branch power drops below 1 W for >2
+      minutes. Branch baseline is ~6.8 W from the chime transformer feeding
+      the doorbell camera; sub-1 W = breaker opened. Push notify so Scott
+      knows the doorbell is offline and needs the breaker reset by a
+      neighbor / property manager / service call.
+    mode: single
+    max_exceeded: silent
+    trigger:
+      - platform: template
+        value_template: >
+          {{ states('sensor.emporia_vue_panel_b_circuit_6_general_loads_power')
+             | float(99) < 1 }}
+        for: "00:02:00"
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "AFCI: General Utils breaker tripped"
+          message: >
+            Panel B Circuit 6 dropped to
+            {{ states('sensor.emporia_vue_panel_b_circuit_6_general_loads_power') }} W.
+            Likely the kitche_4 no-neutral dimmer arc fault recurring.
+            Doorbell camera is OFFLINE until breaker reset.
+            See docs/incident-2026-05-28-afci-pb-c6-trips.md.
+          data:
+            push:
+              interruption-level: time-sensitive
+            tag: afci_pb_c6_trip
+
+  # ---------- Layer 2: Ting anomaly counter ----------
+  - alias: "AFCI: Ting anomaly counter increment"
+    id: ting_anomaly_counter_increment
+    description: >
+      Increments the daily Ting-anomaly counter on every 208.78 V marker
+      from sensor.lrd_current_voltage. The marker is the ha-whisker-ting
+      integration's placeholder for "arc precursor detected" while Ting
+      is in 30-day learning mode (will become explicit hazard alerts
+      after ~2026-06-26). Mode: queued so back-to-back anomalies all
+      count.
+    mode: queued
+    max: 100
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.lrd_current_voltage
+        above: 150
+    action:
+      - service: input_number.increment
+        target:
+          entity_id: input_number.ting_anomaly_today
+
+  - alias: "AFCI: Ting anomaly daily roll-over"
+    id: ting_anomaly_counter_daily_reset
+    description: >
+      At midnight EDT, move today's count → yesterday and reset today.
+      Provides one-day-back comparison for trend visibility.
+    mode: single
+    trigger:
+      - platform: time
+        at: "00:00:00"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ting_anomaly_yesterday
+        data:
+          value: "{{ states('input_number.ting_anomaly_today') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ting_anomaly_today
+        data:
+          value: 0
+
+  # ---------- Layer 2b: Anomaly spike alert ----------
+  - alias: "AFCI: Alert on Ting anomaly rate spike"
+    id: afci_alert_on_ting_anomaly_spike
+    description: >
+      Fires when today's anomaly count crosses 300 — ~1.7× the established
+      ~180/day baseline observed 2026-05-29 with the kitche_4 dimmer in
+      its current no-neutral state. Threshold gives meaningful escalation
+      signal without firing on the existing baseline. Mode: single fires
+      once per day (counter resets at midnight).
+    mode: single
+    max_exceeded: silent
+    trigger:
+      - platform: numeric_state
+        entity_id: input_number.ting_anomaly_today
+        above: 300
+    action:
+      - service: notify.scott_and_ha
+        data:
+          title: "AFCI: Ting anomaly rate spiked"
+          message: >
+            {{ states('input_number.ting_anomaly_today') | int }} arc-precursor
+            anomalies today on P-B C6 vs ~180 baseline.
+            Yesterday: {{ states('input_number.ting_anomaly_yesterday') | int }}.
+            Branch power right now:
+            {{ states('sensor.emporia_vue_panel_b_circuit_6_general_loads_power') }} W.
+            Fault may be escalating toward a real trip.
+          data:
+            push:
+              interruption-level: active
+            tag: afci_pb_c6_anomaly_spike
