@@ -341,3 +341,66 @@ NH), `sensor.lrd_electrical_fire_hazard_status` will start raising
 explicit hazard alerts on this kind of pattern — providing a third
 independent watcher on top of the AFCI breaker and our energy-audit
 integration.
+
+---
+
+## Amendment 2026-05-29 afternoon — kit_cans cleared, residual quantified
+
+Follow-up A/B test 2026-05-29 morning isolated kit_cans
+(`light.kit_cans_wall_dimmer_switch`) by pulling its air gap at 10:09
+EDT (14:09 UTC) on top of the already-pulled kitche_4 air gap. Six-hour
+window result: **kit_cans is NOT a contributor to the anomaly rate**.
+
+| Configuration | Window | Anomalies | Rate |
+|---|---|---|---|
+| Pre-fix (all loads live) | Overnight 2026-05-29 03:30-12:43 UTC | 72 / 9.4 h | 1 per 7.8 min |
+| kitche_4 air-gapped only | 12:43 → 14:09 UTC (1.4 h, AM) | 7 / 82.9 min | 1 per 11.8 min |
+| Both air-gapped | 14:09 → 20:56 UTC (6.6 h, daytime) | 44 / 397.6 min | 1 per 9.0 min |
+
+The "both air-gapped" rate actually rose vs "kitche_4 only" — not because
+kit_cans helps, but because the kit_cans window covers daytime when HVAC
+inverters cycle more, pool pump runs more, and bus harmonic activity is
+higher. Confounded sample. If kit_cans were no-neutral and contributing,
+we'd see a clear DROP regardless of time-of-day variation.
+
+**Conclusions:**
+
+1. **kit_cans is correctly wired with a neutral.** Push its air gap back
+   in. Bulbs will come on at HA's commanded state.
+2. **kitche_4 is the sole no-neutral contributor on this branch** (~37%
+   of pre-fix anomaly rate). Keep its air gap pulled until the Jasco
+   bypass lands and gets installed.
+3. **Residual ~63% of pre-fix anomaly rate** (~1 per 12 min, sustained)
+   is **almost certainly benign harmonic content from new HVAC
+   variable-speed inverter drives + 2.5-yr Hayward pool pump VFD**, not
+   arc fault. Ting's learning mode (graduates ~2026-06-26) will
+   incorporate these as "normal for this house" and stop flagging them.
+4. **Order 1× Jasco Direct-Wire LED Lighting Bypass**, not 2.
+
+### HA counter undercount vs Vue history
+
+`input_number.ting_anomaly_today` shows 17 vs the 44 anomalies counted
+from Vue history in the same window (~50% undercount). Root cause:
+HA's `numeric_state` trigger only fires on the transition FROM below
+the threshold TO above — when the sensor stays at 208.78 V across
+multiple 250 ms samples in a burst, only the first sample triggers the
+counter automation.
+
+Doesn't break the spike alert — the 300/day threshold has wide margin
+even at the undercount rate. Future refinement: replace the
+`numeric_state` trigger with a `state` trigger using
+`to: "208.78"` to catch every individual sample. Low priority — the
+counter's purpose is trend visibility, not precision audit.
+
+### What's running on the branch right now
+
+For the LRD departure window (2026-05-30 → mid-Oct):
+
+- **kitche_4 (kitchen 4 cans)** — air gap PULLED, fixture dark
+- **kit_cans (main kitchen cans)** — air gap pushed back IN, fixture
+  normal
+- All other branch loads (chime/doorbell, under cab, nook chandelier,
+  laundry fluor, garage fluor) — normal operation
+- Watcher package monitoring P-B C6 power + Ting anomaly rate
+- AFCI alert test fired live 09:25 EDT 2026-05-29, push confirmed
+  landed on phone
