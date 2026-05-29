@@ -11,13 +11,13 @@
 #   5. Start the perimeter incident timer for auto-off.
 #
 # Activation window:
-#   - input_boolean.vacation ON  → fire any time sun is below horizon
-#   - input_boolean.vacation OFF → fire only when input_boolean.bed_time_active is on
+#   - input_boolean.vacation ON  → fire any time (day or night)
+#   - input_boolean.vacation OFF → fire only when sun is below horizon
+#                                  (between sunset and sunrise)
 #
-# bed_time_active is a latched helper defined in this file. It mirrors the
-# existing input_boolean.bed_time pulse (which is set ON by multiple callers
-# then cleared in seconds by script.bed_time_script) into a stable signal that
-# stays ON from bed-time through sunrise.
+# input_boolean.bed_time_active + its latch/clear automations are kept in
+# this file as no-op infrastructure for future consumers (HVAC night setback,
+# etc.). The perimeter automation no longer reads it.
 #
 # Interaction with existing Lanai Door Activated Lights with Motion Keep-Alive
 # (automations.yaml id 1775916297031):
@@ -125,24 +125,15 @@ automation:
         from: "off"
         to: "on"
     conditions:
+      # Fire if vaca ON (anytime), OR if vaca OFF and sun is below horizon.
       - condition: or
         conditions:
-          - condition: and
-            conditions:
-              - condition: state
-                entity_id: input_boolean.vacation
-                state: "on"
-              - condition: state
-                entity_id: sun.sun
-                state: below_horizon
-          - condition: and
-            conditions:
-              - condition: state
-                entity_id: input_boolean.vacation
-                state: "off"
-              - condition: state
-                entity_id: input_boolean.bed_time_active
-                state: "on"
+          - condition: state
+            entity_id: input_boolean.vacation
+            state: "on"
+          - condition: state
+            entity_id: sun.sun
+            state: below_horizon
     variables:
       triggered_door: "{{ trigger.to_state.entity_id }}"
       door_label: >-
