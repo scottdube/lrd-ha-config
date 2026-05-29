@@ -1,0 +1,55 @@
+# Pool Float v2 - temporary in-situ offset correction
+#
+# Background: 2026-05-27 bench investigation identified a ~3 deg F baseline
+# offset between the deployed float's published temperature and the
+# OmniLogic in-line probe (cross-validated against an independent reference
+# thermometer at multiple times of day). The offset is attributable to:
+#
+#   1. The v2 rework's NTC ADC pin move (GPIO0 -> GPIO1 per ADR-025).
+#      ADC channel calibration constants differ subtly between channels
+#      on the ESP32-C6, shifting the apparent Steinhart-Hart fit.
+#   2. ESPHome's resistance platform assumes a fixed V_supply = 3.3 V
+#      when computing R_ntc from the divider midpoint voltage. The
+#      actual supply on this hardware drifts from ~3.4 V (fresh L91)
+#      down toward ~2.9 V (depleted), and the assumed-fixed reference
+#      introduces a voltage-dependent error in the reported temperature.
+#
+# Effect direction: float reads LOW vs actual water temp. Magnitude
+# is currently ~4.5 deg F on fresh cells (post-2026-05-29 swap) and
+# was ~2-2.5 deg F mid-discharge yesterday. A static +3 deg F is
+# approximately the season average for the L91 discharge range.
+#
+# Limitations:
+# - The offset is not truly constant. Expect +/-2 deg F drift around
+#   the +3 baseline as the cells discharge from ~3.4 V fresh to ~2.9 V
+#   near end-of-life. For the authoritative-temp fallback chain
+#   (ADR-013), this accuracy is well within useful for swim-day
+#   decisioning and heat-pump cycling logic.
+# - Battery discharge effect could be more accurately corrected via a
+#   battery-voltage-dependent template, but that's deferred until v2.1
+#   hardware rework ships.
+#
+# Will be removed when v2.1 hardware (GPIO-gated NTC divider with full
+# Steinhart-Hart recalibration on the new ADC channel) ships in the
+# next-season hardware revision.
+#
+# Related:
+#   - docs/decisions/025-pool-float-v2-hardware-revision.md
+#   - scratch/pool-float-v2-status-2026-05-27.md (investigation section)
+
+template:
+  - sensor:
+      - name: "Pool Water Temp External Corrected"
+        unique_id: pool_water_temp_external_corrected
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer-water
+        availability: >
+          {{ states('sensor.pool_water_temp_external_filtered') not in ['unavailable', 'unknown', 'none'] }}
+        state: >
+          {{ (states('sensor.pool_water_temp_external_filtered') | float + 3.0) | round(1) }}
+        attributes:
+          offset_applied_f: 3.0
+          source_sensor: sensor.pool_water_temp_external_filtered
+          calibration_note: "Static +3°F offset for v2 wiring/ADC offset. See ADR-025 amendment + scratch/pool-float-v2-status-2026-05-27.md investigation section."
