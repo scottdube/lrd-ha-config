@@ -36,6 +36,8 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 | 32 | ZEN75 | Zooz | Master Suite — shower fan | `switch.shower_fan` | FW v1.30.0; renamed from `switch.heavy_duty_switch_shower` 2026-05-20 |
 | 51 | ZEN75 | Zooz | Master Suite — toilet fan | `switch.toilet_fan` | Re-included 2026-05-20 as Z-Wave Classic. Previously node 256 on Z-Wave LR — single-link failures in bathroom RF environment; Classic re-include gave 29 mesh neighbors, health check 10/10. FW v1.30.0 |
 | 55 | Fibaro FGD212 | Fibaro | Outside / lamp post | `light.lamp_post_dimmer` | FW v3.5. Re-included 2026-05-23 (previously node 43 as `light.dimmer_2`). Sunrise/sunset automations verified end-to-end same day. Signal marginal post-reinclusion but functional — heal + repeater work pending if it stays weak. Dual-channel; second channel `light.lamp_post_dimmer_2` renamed to "Lamp Post - Unused Channel", unexposed from Assist. |
+| 47 | Zooz ZSE41 | Zooz | Lanai — East exterior screen door | `binary_sensor.east_ext_door` | CR2032, last replaced 2026-05-18 (100% at install). Wired into ADR-028 lanai perimeter. Entity stems renamed 2026-05-28 from auto-generated `open_close_xs_sensor` to `east_ext_door` via tools/rename_entities.py for parity with West. |
+| 49 | Zooz ZSE41 | Zooz | Lanai — West exterior screen door | `binary_sensor.west_ext_door` | CR2032, last replaced 2026-05-18 (100% at install). Wired into ADR-028 lanai perimeter. Stem already clean at inclusion. |
 | ? | Kwikset 916 | Kwikset | Lanai door | `lock.?` | Battery drain issue — neighbors:[] on mesh |
 | ? | ZEN77 | Zooz | ? | ? | 700-series beaming repeater for lock |
 | ? | 14314 / ZW4002 ×6 | Jasco | Lanai L/R, Living Room, Master Bedroom, Guest Bedroom 1+2 | `fan.<area>_ceiling[_<position>]` | 6× in-wall fan speed controllers; entity_ids renamed from auto-generated stems to location-first + `_ceiling` type marker 2026-05-20 via tools/rename_entities.py |
@@ -102,7 +104,10 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 |---|---|---|---|
 | UniFi G5 Bullet | Garage interior (Left) | UniFi Protect | `binary_sensor.g5_bullet_person_detected`. Covers main bay + bench area. Person detection is motion-gated bursts, not continuous presence — see `packages/presence/garage_occupied.yaml`. |
 | UniFi G5 Bullet (2nd) | Garage interior (Right) | UniFi Protect | `binary_sensor.g5_bullet_person_detected_2` — combined into `binary_sensor.garage_person_detected` template helper |
-| (more?) | ? | ? | List others |
+| UniFi G5 Bullet | Lanai East (mounted east, looks west) | UniFi Protect | `camera.g5_bullet_lanai_east_high_resolution_channel`. Protect UUID `67c4e2a100f9da03e4003b71`. Covers West door view per the mount-vs-view convention in ADR-028. `binary_sensor.g5_bullet_lanai_east_person_detected` exposed for future cross-check. |
+| UniFi G5 Bullet | Lanai West (mounted west, looks east) | UniFi Protect | `camera.g5_bullet_lanai_west_high_resolution_channel`. Protect UUID `67c4c93c0284da03e40032cd`. Covers East door view per the mount-vs-view convention in ADR-028. `binary_sensor.g5_bullet_lanai_west_person_detected` exposed for future cross-check. |
+| UniFi G4 Doorbell Pro | Front door | UniFi Protect | `camera.g4_doorbell_pro_high_resolution_channel` (main) + `.._package_camera` (lower angle). Protect UUID `6630eba101ffcb03e400a468`. Drives the Front Door doorbell person/animal alert in automations.yaml (id 1775854571098). |
+| (more?) | ? | ? | Front-east/west, side, doorbell extras — list as added |
 
 ---
 

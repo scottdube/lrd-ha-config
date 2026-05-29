@@ -1,0 +1,55 @@
+# Snapshot directory purge
+#
+# /config/www/snapshots/ accumulates JPGs from two automations:
+#   - Lanai Perimeter: Exterior door trip (lanai_perimeter_<side>_<ts>.jpg)
+#   - Front Door - Doorbell Person/Animal Alert (front_door_<ts>.jpg)
+#
+# Files older than 30 days get purged daily at 03:30 local. Tunable:
+#   - Retention: change `-mtime +30` in the shell_command
+#   - Schedule: change the time trigger
+#
+# Notification on findings only — silent on a clean run, push via
+# notify.scott_and_ha if files were deleted (so unexpected growth or
+# unexpected purges are surfaced rather than silent).
+
+shell_command:
+  # find prints each deleted path so the response_variable carries an
+  # auditable list. -mtime +30 = older than 30 days. The 2>&1 captures
+  # find errors (missing dir, permission) into the response too.
+  snapshot_purge: >
+    find /config/www/snapshots -type f -mtime +30 -print -delete 2>&1
+
+automation:
+  - id: snapshot_purge_daily
+    alias: "Snapshots: Daily purge (>30d)"
+    description: >
+      Daily 03:30 local purge of /config/www/snapshots files older than
+      30 days. Silent when nothing was deleted; notifies via
+      notify.scott_and_ha with the count + first few filenames when files
+      were removed.
+    mode: single
+    triggers:
+      - trigger: time
+        at: "03:30:00"
+    actions:
+      - action: shell_command.snapshot_purge
+        response_variable: purge_result
+      - variables:
+          stdout: "{{ (purge_result.stdout | default('')).strip() }}"
+          deleted_lines: >-
+            {{ stdout.split('\n') | reject('equalto', '') | list }}
+          deleted_count: "{{ deleted_lines | length }}"
+          preview: >-
+            {{ deleted_lines[:5] | join('\n') }}
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ deleted_count | int > 0 }}"
+            sequence:
+              - action: notify.scott_and_ha
+                data:
+                  title: "Snapshots purged"
+                  message: >
+                    {{ deleted_count }} snapshot(s) older than 30 days removed.
+                    {% if deleted_count | int > 5 %}First 5:{% endif %}
+                    {{ preview }}
