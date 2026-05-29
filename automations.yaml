@@ -647,13 +647,45 @@
       state: "off"
   actions:
     - variables:
-        detection_type:
-          "{% if trigger.id == 'person_detected' %}\n  Person\n{% else
-          %}\n  Animal\n{% endif %}\n"
+        detection_type: "{{ 'Person' if trigger.id == 'person_detected' else 'Animal' }}"
+        camera_entity: camera.g4_doorbell_pro_high_resolution_channel
+        snapshot_filename: "front_door_{{ now().strftime('%Y%m%d_%H%M%S') }}.jpg"
+        snapshot_path: "/config/www/snapshots/{{ snapshot_filename }}"
+        snapshot_url: "/local/snapshots/{{ snapshot_filename }}"
+        protect_url: "https://unifi.ui.com/physical-security/devices/6630eba101ffcb03e400a468"
+    - delay:
+        seconds: 3
+    - action: camera.snapshot
+      data:
+        entity_id: "{{ camera_entity }}"
+        filename: "{{ snapshot_path }}"
     - action: notify.mobile_app_iphone_sd
       data:
         title: Front Door Alert
         message: "{{ detection_type }} detected near front door"
+        data:
+          tag: front_door_doorbell
+          url: "{{ protect_url }}"
+          push:
+            interruption-level: time-sensitive
+          attachment:
+            url: "{{ snapshot_url }}"
+            content-type: jpeg
+          actions:
+            - action: URI
+              title: View Live
+              uri: "{{ protect_url }}"
+            - action: URI
+              title: View Snapshot
+              uri: "{{ snapshot_url }}"
+    - action: persistent_notification.create
+      data:
+        notification_id: front_door_doorbell
+        title: Front Door Alert
+        message: |
+          {{ detection_type }} detected near front door at {{ now().strftime('%I:%M %p') }}.
+
+          ![snapshot]({{ snapshot_url }})
   mode: parallel
   max_exceeded: silent
 - id: "1775916297031"
