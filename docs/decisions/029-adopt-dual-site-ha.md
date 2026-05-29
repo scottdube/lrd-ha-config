@@ -3,7 +3,12 @@
 **Status:** Accepted
 **Date:** 2026-05-29
 **Supersedes:** N/A
-**Related:** ADR-024 (pre-departure freeze + summer update policy — applies per-site once SLN is live)
+**Related:**
+- LRD ADR-024 (pre-departure freeze + summer update policy — applies per-site once SLN is live)
+- network-docs ADR-017 — SLN HA Install + Hubitat Retirement (the network-side counterpart to this ADR: defines SLN-Servers VLAN 51 at `192.168.51.0/24`, HA NUC at `192.168.51.11`, six firewall rule exceptions, parallel-run-then-retire sequencing, cross-site SLN HA → LRD Mac Mini Ollama/Open WebUI dependency)
+- network-docs ADR-008 — SLN zone restructuring (Phase A is a hard prerequisite for the SLN HA NUC install)
+- network-docs ADR-009 — LRD NUC migration (template for the SLN execution per ADR-017)
+- network-docs ADR-011 — broadcast adjacency methodology (applies pre-cutover at SLN if Tapo / WeatherFlow / SSDP discovery integrations need IoT-VLAN listen-only adjacency)
 
 ---
 
@@ -96,6 +101,8 @@ Tracked separately in `docs/current-state.md`. High-level:
 
 ## Open questions
 
-- **SLN VLAN / IP plan.** Pending — should mirror LRD's pattern (servers VLAN for HA NUC, IoT VLAN sub-interface for broadcast/multicast adjacency) but the actual subnet numbers come from network-docs. Resolve when network-docs is mounted into the project.
+- ~~**SLN VLAN / IP plan.** Pending — should mirror LRD's pattern (servers VLAN for HA NUC, IoT VLAN sub-interface for broadcast/multicast adjacency) but the actual subnet numbers come from network-docs. Resolve when network-docs is mounted into the project.~~ **Resolved 2026-05-29 per network-docs ADR-017:** SLN-Servers VLAN 51 / `192.168.51.0/24`, HA NUC at `192.168.51.11`. Broadcast/multicast adjacency via `eno1.30` tagged sub-interface to IoT VLAN (`192.168.30.0/24`) — required only if Tapo / WeatherFlow / SSDP discovery integrations turn out to need it; pre-flight classification is a checklist step in network-docs ADR-017 §Broadcast/multicast pre-flight.
 - **Blueprints repo.** Currently `scottdube/lrd-ha-blueprints` is LRD-named. If SLN builds materially divergent blueprints, decide: rename to `scottdube/ha-blueprints` (drop site prefix, accept shared scope) or fork to `scottdube/sln-ha-blueprints`. Defer.
 - **Nabu Casa subscription.** One Nabu Casa account; can a single subscription cover two HA instances? Verify before SLN's first remote-access need. Pricing/policy check needed.
+- **MQTT broker scope at SLN.** Per network-docs ADR-017, defer to "independent broker at SLN" by default (matches the "each site independently functional" principle). Reopen only if cross-site MQTT bridging is specifically needed.
+- **Sonos placement at SLN.** Currently on LAN at `192.168.1.213` per network-docs ADR-017. LRD has Sonos on IoT. Recommend moving SLN Sonos to IoT to match LRD, but defer until HA Sonos integration is proven against current placement. Resolution drives the source-zone of network-docs ADR-017 Rule 2.
