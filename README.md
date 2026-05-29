@@ -1,19 +1,34 @@
-# home-assistant
+# home-assistant — LRD site
 
-Home Assistant configuration, automations, integrations, and adjacent maker work for the LRD smart home.
+Home Assistant configuration, automations, integrations, and adjacent maker work for the **LRD** smart home (FL vacation house).
 
-**HA host:** NUC @ 192.168.50.11 on LRD-Servers VLAN; `eno1.4` sub-interface (`192.168.11.155`) on IoT VLAN for broadcast/multicast adjacency only (no gateway). HA OS 17.2 / Core 2026.4.1
-**Network:** UDM SE, WireGuard for remote access, Nabu Casa as backup remote
-**Canonical config repo:** [`scottdube/lrd-ha-config`](https://github.com/scottdube/lrd-ha-config) (this repo)
-**Public blueprints:** [`scottdube/lrd-ha-blueprints`](https://github.com/scottdube/lrd-ha-blueprints)
+**This repo is LRD-specific.** As of 2026-05-29 the HA project is becoming dual-site (LRD + SLN). The SLN site has its own sibling repo. See [Sites](#sites) below.
+
+**HA host (LRD):** NUC @ 192.168.50.11 on LRD-Servers VLAN; `eno1.4` sub-interface (`192.168.11.155`) on IoT VLAN for broadcast/multicast adjacency only (no gateway). HA OS 17.2 / Core 2026.4.1
+**Network (LRD):** UDM SE, WireGuard for remote access, Nabu Casa as backup remote
+**Canonical config repo (this site):** [`scottdube/lrd-ha-config`](https://github.com/scottdube/lrd-ha-config)
+**Public blueprints (shared):** [`scottdube/lrd-ha-blueprints`](https://github.com/scottdube/lrd-ha-blueprints)
+
+---
+
+## Sites
+
+The HA project spans two physical sites, paralleling the site-code convention from the `network-docs` project:
+
+| Code | Location | Repo | Status |
+|---|---|---|---|
+| **LRD** | Lake Ridge Drive (FL vacation house) | `scottdube/lrd-ha-config` (this repo) | Live; ~28 ADRs, ~35 Z-Wave nodes, OmniLogic pool stack, photo-frame, Carrier/Midea HVAC |
+| **SLN** | NH primary residence (basement network rack) | `scottdube/sln-ha-config` | **In flight 2026-05-29.** Hardware: NUC10i5FNH + Nabu Casa Connect ZWA-2. Clean HA OS install — see LRD ADR-029. |
+
+**Convention:** when speaking about HA artifacts across sites, refer to them by site code (e.g., "the SLN ZWA-2", "LRD's vacation-mode boolean"). Cross-site network infrastructure is owned by the `network-docs` project, not either HA repo.
 
 ---
 
 ## What's in this project
 
-This project covers all Home Assistant work — configuration, automations, blueprints, dashboards, and integrations — plus adjacent hardware/maker work that's part of the HA ecosystem (ESP32-S3 voice satellites, custom enclosures).
+This project covers all Home Assistant work for both sites — configuration, automations, blueprints, dashboards, and integrations — plus adjacent hardware/maker work that's part of the HA ecosystem (ESP32-S3 voice satellites, custom enclosures).
 
-**What's NOT here:** Network infrastructure (firewalls, VLANs, ADRs about zones, cross-site routing) lives in a separate `network-docs` project. HA is a *consumer* of network policy, not a contributor to it. This project references network decisions (e.g., network-docs ADR-009 governing HA NUC placement on LRD-Servers VLAN, and network-docs ADR-011 governing the dual-VLAN broadcast/multicast adjacency for IoT-side local integrations) but doesn't own them.
+**What's NOT here:** Network infrastructure (firewalls, VLANs, ADRs about zones, cross-site routing) lives in a separate `network-docs` project. HA is a *consumer* of network policy, not a contributor to it. This project references network decisions (e.g., network-docs ADR-009 governing the LRD HA NUC placement on LRD-Servers VLAN, and network-docs ADR-011 governing the dual-VLAN broadcast/multicast adjacency for IoT-side local integrations) but doesn't own them. The SLN HA build will reference its own network-docs ADRs once the SLN VLAN/IP plan is locked.
 
 ---
 
