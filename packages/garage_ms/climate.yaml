@@ -139,9 +139,14 @@ template:
       - name: "Garage Overhead Door Open"
         unique_id: garage_overhead_door_open
         device_class: door
-        # ON whenever either overhead door is open. delay_off keeps the
-        # "open" state for 5 minutes after the last underlying door closes,
-        # giving the climate entity time to stabilize before resuming.
+        # ON only when an overhead door has been open for 5+ minutes
+        # (delay_on suppresses normal in/out traffic from triggering the
+        # MS shutdown — quick door cycles for car parking, taking out
+        # trash, getting tools don't pause the climate). delay_off keeps
+        # the "open" state for 5 minutes after the last underlying door
+        # closes, giving the climate entity time to stabilize before
+        # resuming.
+        delay_on: "00:05:00"
         delay_off: "00:05:00"
         state: >
           {{ is_state('binary_sensor.z_wave_plus_gold_plated_reliability_garage_door_tilt_sensor', 'on')
