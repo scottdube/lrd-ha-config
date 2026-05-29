@@ -12,8 +12,13 @@
 #
 # Activation window:
 #   - input_boolean.vacation ON  → fire any time (day or night)
-#   - input_boolean.vacation OFF → fire only when sun is below horizon
-#                                  (between sunset and sunrise)
+#   - input_boolean.vacation OFF → fire only between local midnight and sunrise
+#                                  (00:00 local → sun above_horizon)
+#
+# Rationale for midnight floor: sunset → midnight is when lanai-side legitimate
+# activity happens (TV on the porch, hot tub, late guests). Post-midnight door
+# opens are the actual late-night-unauthorized-entry signal. Pre-midnight at
+# home generates false alarms with no security gain.
 #
 # input_boolean.bed_time_active + its latch/clear automations are kept in
 # this file as no-op infrastructure for future consumers (HVAC night setback,
@@ -125,15 +130,23 @@ automation:
         from: "off"
         to: "on"
     conditions:
-      # Fire if vaca ON (anytime), OR if vaca OFF and sun is below horizon.
+      # Fire if vaca ON (anytime), OR if vaca OFF AND we're between local
+      # midnight and sunrise (hour < 12 AND sun still below horizon).
       - condition: or
         conditions:
           - condition: state
             entity_id: input_boolean.vacation
             state: "on"
-          - condition: state
-            entity_id: sun.sun
-            state: below_horizon
+          - condition: and
+            conditions:
+              - condition: state
+                entity_id: input_boolean.vacation
+                state: "off"
+              - condition: template
+                value_template: "{{ now().hour < 12 }}"
+              - condition: state
+                entity_id: sun.sun
+                state: below_horizon
     variables:
       triggered_door: "{{ trigger.to_state.entity_id }}"
       door_label: >-
