@@ -155,7 +155,7 @@
         {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
         {%- set ext_val = states('sensor.pool_water_temp_external_corrected') | float(none) -%}
         {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
-        {%- set ext_fresh = ext_age <= 35 and ext_val is not none -%}
+        {%- set ext_fresh = ext_age <= 70 and ext_val is not none -%}
         {%- set local_val = states('sensor.omnilogic_pool_watersensor') | float(none) -%}
         {%- set pump = states.switch.omnilogic_pool_filter_pump -%}
         {%- set pump_on = is_state('switch.omnilogic_pool_filter_pump', 'on') -%}
@@ -171,7 +171,7 @@
           {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
           {%- set ext_val = states('sensor.pool_water_temp_external_corrected') | float(none) -%}
           {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
-          {%- set ext_fresh = ext_age <= 35 and ext_val is not none -%}
+          {%- set ext_fresh = ext_age <= 70 and ext_val is not none -%}
           {%- set local_val = states('sensor.omnilogic_pool_watersensor') | float(none) -%}
           {%- set pump = states.switch.omnilogic_pool_filter_pump -%}
           {%- set pump_on = is_state('switch.omnilogic_pool_filter_pump', 'on') -%}
@@ -188,4 +188,4 @@
           {%- set ext = states.sensor.pool_water_temp_external_corrected -%}
           {%- set ext_val = states('sensor.pool_water_temp_external_corrected') | float(none) -%}
           {%- set ext_age = ((now() - ext.last_changed).total_seconds() / 60) if ext else 9999 -%}
-          {{ ext_age <= 35 and ext_val is not none }}
+          {{ ext_age <= 70 and ext_val is not none }}
