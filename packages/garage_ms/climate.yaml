@@ -122,13 +122,13 @@ input_datetime:
     name: Garage Active Start
     has_date: false
     has_time: true
-    initial: "09:00:00"
+    initial: "10:00:00"
 
   garage_active_end:
     name: Garage Active End
     has_date: false
     has_time: true
-    initial: "13:00:00"
+    initial: "20:00:00"
 
 
 # ---------- Derived sensors ----------
