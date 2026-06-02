@@ -89,13 +89,19 @@ Tracked separately in `docs/current-state.md`. High-level:
 1. README.md updated with Sites section and SLN repo pointer (this commit).
 2. This ADR (029) lands in LRD repo.
 3. Cowork project instructions updated with site-code convention + network-docs read-only mount policy.
-4. When SLN hardware lands (Jun 1–5):
-   - Create `scottdube/sln-ha-config` with scaffold structure.
-   - Write SLN ADR-001 (site bootstrap — hardware, network plan, install procedure).
-   - HA OS USB install on NUC.
-   - Studio Code Server app, wire to SLN repo.
-   - ZWA-2 plug-in, Z-Wave JS install, network creation.
-   - SLN device inventory + inclusion plan.
+4. **Network-docs side complete** (2026-05-29 → 2026-06-01): network-docs ADR-008 Phase A executed (SLN-Servers VLAN 51 + zone live, verified via 2026-05-29 SLN inventory pull); network-docs ADR-017 written + cross-referenced.
+5. **Pre-arrival prep complete** (2026-06-02 on-site): SLN Hubitat backup captured; Hubitat REST API confirmed reachable from sandbox via Site Magic mesh for device + rule inventory extraction; SLN device inventory built (`sln-bootstrap/sln-device-inventory.md`); LRD→SLN integration mapping table (`sln-bootstrap/integration-mapping.md`); NUC bench session plan (`sln-bootstrap/bench-session-plan.md`); HA OS direct-burn CLI procedure documented (`docs/reference/ha-os-install-cli-macos.md`).
+6. **Cross-site decisions from network-docs ADR-017 absorbed:**
+   - **Rule 7 (new vs ADR-017 brief)** — IoT (SLN Fire TV placeholder) → LRD-Servers (Mac Mini Photo Frame) :8000/tcp. Extends LRD's photo-frame stack to SLN if Scott deploys a Fire TV there. Not blocking SLN HA install — flip enabled at cutover only if SLN Fire TV materializes.
+   - **WeatherFlow Tempest at SLN confirmed** — Hubitat already has the WeatherFlow integration installed (id 45) and Tempest hub is DHCP-reserved at `192.168.30.75` (IoT VLAN). HA migration: install HA WeatherFlow integration at SLN, requires `eno1.30` tagged sub-interface (broadcast UDP 50222) — rack-only, not bench. Resolves the earlier open question of whether Tempest was planned at SLN.
+   - **Hubitat identity resolved** — single physical hub, multihomed eth (`192.168.1.241`, LAN) + wifi (`192.168.30.120`, IoT). Both interfaces retire together when HA replaces Hubitat. Resolves an ADR-017 open item.
+   - **OOB plug repurposed** — the existing Hubitat Smart Plug at SLN is now slated for the SLN UDM Pro OOB power-cycle, NOT the HA NUC. HA NUC OOB is a separate gap to address (Task #16: order second smart plug for NUC OOB or accept no-OOB on the UPS-backed rack).
+   - **mDNS reflector scope** — Gateway mDNS reflector enabled with scope `LAN, IoT, SLN-Servers`, Service Scope = All. SSDP/Bonjour cross-zone discovery works (Sonos, Cast TVs, Apple TV, Roku, Denon, ESPHome).
+7. **On-arrival work** (NUC + ZWA-2 + ZBT-2 land Jun 1-5; ZBT-2 ordering still pending):
+   - Direct-burn HA OS to NVMe via ANYOYO enclosure per `docs/reference/ha-os-install-cli-macos.md`.
+   - Bench session per `sln-bootstrap/bench-session-plan.md` — 6 phases, ~3 hours, NUC takes `192.168.51.11` from the bench port (USW Lite 16 PoE configured access:VLAN-51).
+   - Then move to rack, switch port to trunk (native 51, tagged 30), add `eno1.30`, install WeatherFlow.
+   - Begin per-device Z-Wave + Zigbee migration per the Mary-first sequencing in `sln-bootstrap/sln-device-inventory.md`.
 
 ---
 
@@ -103,6 +109,6 @@ Tracked separately in `docs/current-state.md`. High-level:
 
 - ~~**SLN VLAN / IP plan.** Pending — should mirror LRD's pattern (servers VLAN for HA NUC, IoT VLAN sub-interface for broadcast/multicast adjacency) but the actual subnet numbers come from network-docs. Resolve when network-docs is mounted into the project.~~ **Resolved 2026-05-29 per network-docs ADR-017:** SLN-Servers VLAN 51 / `192.168.51.0/24`, HA NUC at `192.168.51.11`. Broadcast/multicast adjacency via `eno1.30` tagged sub-interface to IoT VLAN (`192.168.30.0/24`) — required only if Tapo / WeatherFlow / SSDP discovery integrations turn out to need it; pre-flight classification is a checklist step in network-docs ADR-017 §Broadcast/multicast pre-flight.
 - **Blueprints repo.** Currently `scottdube/lrd-ha-blueprints` is LRD-named. If SLN builds materially divergent blueprints, decide: rename to `scottdube/ha-blueprints` (drop site prefix, accept shared scope) or fork to `scottdube/sln-ha-blueprints`. Defer.
-- **Nabu Casa subscription.** One Nabu Casa account; can a single subscription cover two HA instances? Verify before SLN's first remote-access need. Pricing/policy check needed.
+- **Nabu Casa subscription.** Per Nabu Casa official docs (verified 2026-05-29): each HA instance requires its own account + subscription. Same email on two accounts not supported. **Decision deferred to SLN cutover:** use Nabu Casa 30-day free trial at SLN cutover; decide at day 25 based on actual usage during parallel-run. If subscribing, use `scott+sln@dubecars.com` plus-alias. Full feature comparison + decision framework: `sln-bootstrap/nabu-casa-vs-selfhosted-comparison.md`. Tailscale considered as a lower-friction self-hosted remote-access alternative (does not replace Alexa/TTS/STT bundled features).
 - **MQTT broker scope at SLN.** Per network-docs ADR-017, defer to "independent broker at SLN" by default (matches the "each site independently functional" principle). Reopen only if cross-site MQTT bridging is specifically needed.
 - **Sonos placement at SLN.** Currently on LAN at `192.168.1.213` per network-docs ADR-017. LRD has Sonos on IoT. Recommend moving SLN Sonos to IoT to match LRD, but defer until HA Sonos integration is proven against current placement. Resolution drives the source-zone of network-docs ADR-017 Rule 2.
