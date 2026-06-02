@@ -1,0 +1,159 @@
+# Main Water Valve — vacation, weekly pool fill, manual override
+#
+# State machine that drives switch.main_water_valve from three inputs.
+#
+# Priority (highest wins):
+#   1. input_boolean.water_valve_force_open == on   → valve ON
+#        Manual override for cleaners, plumbers, contractors. Survives
+#        vacation mode. Set/clear from dashboard, Companion app, or voice.
+#   2. schedule.water_valve_weekly_fill == on       → valve ON
+#        Weekly Tuesday 02:00-03:00 window so the pool autofill (which
+#        sits downstream of the main valve) can top off while we're away.
+#   3. input_boolean.vacation == on                 → valve OFF
+#        Default away state — shut the house water off.
+#   4. otherwise                                    → valve ON
+#
+# Notifications:
+#   - Every state change on the valve (debounced 5s), with reason
+#     annotation derived from current inputs.
+#   - Watchdog: valve has been ON > 75 min while vacation is on AND
+#     force-open is off — fires once per long-on period. Catches a
+#     weekly-fill schedule that failed to close, or a manual paddle
+#     during an away period.
+#
+# Hardware references:
+#   switch.main_water_valve                 — main shutoff (Garage)
+#   input_boolean.vacation                  — cross-cutting vacation flag (ADR-012)
+#   input_boolean.water_valve_force_open    — manual valve override (this file)
+#   schedule.water_valve_weekly_fill        — weekly fill window (this file)
+#
+# Related:
+#   packages/garage_ms/climate.yaml — Garage MS — Vacation mode entry notify
+#   ADR-012 — cross-cutting input_boolean.vacation pattern
+
+
+# ---------- Helpers ----------
+
+input_boolean:
+  water_valve_force_open:
+    name: Water Valve Force Open
+    icon: mdi:water-pump
+    # Highest-priority override. Set ON for cleaners/plumber/contractor
+    # access; valve will open and stay open regardless of vacation or
+    # weekly-fill state until cleared.
+
+schedule:
+  water_valve_weekly_fill:
+    name: Water Valve Weekly Fill Window
+    icon: mdi:calendar-clock
+    tuesday:
+      - from: "02:00:00"
+        to: "03:00:00"
+
+
+# ---------- Automations ----------
+
+automation:
+  # ---- 1. Apply desired valve state from input priority chain ----
+  - id: water_valve_apply_desired
+    alias: "Water Valve — Apply desired state"
+    description: >
+      Reconciles switch.main_water_valve to the priority-chain output
+      (force_open > weekly_fill > vacation-off > default-on). Triggered
+      by any input change, by schedule boundary ticks (Tue 02:00 / 03:00),
+      by HA start, and by a 15-min safety re-assert in case the valve
+      gets out of sync externally.
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_boolean.vacation
+          - input_boolean.water_valve_force_open
+          - schedule.water_valve_weekly_fill
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: "/15"
+    actions:
+      - variables:
+          desired: >-
+            {% if is_state('input_boolean.water_valve_force_open', 'on') %}
+            on
+            {% elif is_state('schedule.water_valve_weekly_fill', 'on') %}
+            on
+            {% elif is_state('input_boolean.vacation', 'on') %}
+            off
+            {% else %}
+            on
+            {% endif %}
+      - choose:
+          - conditions: "{{ desired | trim == 'on' and is_state('switch.main_water_valve', 'off') }}"
+            sequence:
+              - action: switch.turn_on
+                target:
+                  entity_id: switch.main_water_valve
+          - conditions: "{{ desired | trim == 'off' and is_state('switch.main_water_valve', 'on') }}"
+            sequence:
+              - action: switch.turn_off
+                target:
+                  entity_id: switch.main_water_valve
+
+  # ---- 2. Notify on every valve state change (debounced) ----
+  - id: water_valve_state_change_notify
+    alias: "Water Valve — State change notify"
+    description: >
+      Audit-trail notification on every settled valve state change.
+      5s debounce so a Z-Wave bounce doesn't spam. Reason line is
+      inferred from the input state at notify time.
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: switch.main_water_valve
+        for: "00:00:05"
+    actions:
+      - action: notify.scott_and_ha
+        data:
+          title: "Main water valve: {{ trigger.to_state.state | upper }}"
+          message: >-
+            {% if is_state('input_boolean.water_valve_force_open', 'on') %}
+            Reason: force-open override active.
+            {% elif is_state('schedule.water_valve_weekly_fill', 'on') %}
+            Reason: weekly fill window.
+            {% elif is_state('input_boolean.vacation', 'on') %}
+            Reason: vacation mode.
+            {% else %}
+            Reason: manual / unknown.
+            {% endif %}
+
+  # ---- 3. Watchdog: valve open > 75 min while vacation + no override ----
+  - id: water_valve_open_while_vacation_watchdog
+    alias: "Water Valve — Open while vacation watchdog"
+    description: >
+      Notifies once if the valve has been continuously ON for >75 min
+      while vacation mode is active and the force-open override is OFF.
+      75 min = 60-min weekly fill window + 15-min buffer. Catches a
+      weekly-fill schedule that failed to auto-close, or an unexpected
+      open via paddle / dashboard / scene during an away period.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: switch.main_water_valve
+        to: "on"
+        for: "01:15:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.vacation
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.water_valve_force_open
+        state: "off"
+    actions:
+      - action: notify.scott_and_ha
+        data:
+          title: "Water valve still open while away"
+          message: >-
+            switch.main_water_valve has been ON > 75 min while vacation
+            mode is active and force-open is off. Check whether the
+            weekly fill schedule failed to close, or someone opened the
+            valve unexpectedly.
