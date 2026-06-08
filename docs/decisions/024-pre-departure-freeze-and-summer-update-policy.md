@@ -84,3 +84,15 @@ Security posture is acceptable: the LRD network is behind UDM Pro with no inboun
 ## Pattern reuse
 
 This policy applies to any future extended absence (snowbird transitions, extended trips, etc.). The 7-day pre-freeze + weekly selective-update pattern is reusable. Document any departure timeline and return date in `docs/current-state.md` so the policy has a clear end date.
+
+## Amendment 2026-06-08 — Dual-site presence-driven generalization
+
+SLN (NH) reached full production (Core 2026.6.1, `zwave_js` + `esphome` live, 665 entities) while Scott is in residence there for the summer, with LRD (FL) unattended. This makes the policy dual-site.
+
+Generalization: **the freeze/defer tier rules above apply to whichever site is currently UNATTENDED.** The site Scott is physically resident at is ATTENDED — its weekly review is informational only (report installed-vs-latest + relevant breaking changes; default "apply at discretion"; still surface CVEs and Z-Wave/ESPHome-breaking regressions). Recovery cost, not the calendar, is what drives conservatism: an attended site can be fixed by hand, an unattended one needs a flight.
+
+Roles flip on residence change. As of 2026-06-08: SLN = attended (informational), LRD = unattended (full ADR-024). On Scott's return to FL (~2026-10-17) the assignment inverts. The weekly review task (`weekly-ha-update-review`) reads the attended site from `docs/current-state.md` departure/return dates rather than hardcoding.
+
+Cross-site real-world signal: a healthy attended site already running a version the unattended site is being told to defer is mild corroboration the release is sound, but does NOT override an unattended DEFER — the two installs run different HA OS / Z-Wave JS Server / add-on versions, so a regression can hit one and not the other. (Concrete case this week: SLN runs 2026.6.1 with Z-Wave working, despite the community-reported 2026.6.0 Z-Wave JS Server incompatibility; LRD still defers 2026.6.x because its Z-Wave JS add-on version and 35-node fleet are not the same risk surface.)
+
+SLN-side note: this amendment lives in the LRD (canonical) repo per the dual-site ADR convention; add a reference stub in `sln-ha-config` when next editing that repo. SLN's `sln-bootstrap/` docs and draft ADR-002 still describe the pre-production bench state (Phase 8 Z-Wave inclusion "deferred") and are stale as of the cutover — they need a production-state update.
