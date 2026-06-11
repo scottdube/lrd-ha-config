@@ -1,0 +1,50 @@
+# Pool audit heartbeat — ADR-030 negative-space / monitor-the-monitor check.
+#
+# The overnight auditor (pool/scripts/audit_yesterday.sh on the Mac mini,
+# launchd at 00:05) stamps input_datetime.pool_audit_last_push ONLY after a
+# successful `git push` of the day's result. This automation checks that
+# stamp at a morning deadline: if no fresh result propagated overnight, the
+# absence itself is the alert.
+#
+# Catches every silent-death mode of the auditor — push failure (the
+# 2026-05-29 → 2026-06-10 outage that motivated ADR-030), auditor.py crash,
+# or the launchd job never firing — because all of them leave the stamp
+# stale. Deliberately lives in HA, independent of the Mac mini, so a
+# mini-side death is exactly what it reports. Rides notify.scott_and_ha.
+
+input_datetime:
+  pool_audit_last_push:
+    name: Pool Audit Last Push
+    has_date: true
+    has_time: true
+
+automation:
+  - alias: "Pool: Audit heartbeat — alert if no fresh result pushed"
+    id: pool_audit_heartbeat
+    description: >
+      ADR-030. Fire if input_datetime.pool_audit_last_push is not from today
+      by the 06:00 deadline (the auditor runs at 00:05). Unknown/unavailable
+      counts as a miss.
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    condition:
+      - condition: template
+        value_template: >
+          {% set last = states('input_datetime.pool_audit_last_push') %}
+          {{ last in ('unknown', 'unavailable', 'none', '')
+             or as_timestamp(last, 0) < today_at('00:00').timestamp() }}
+    action:
+      - action: notify.scott_and_ha
+        data:
+          title: Pool Audit Heartbeat Missed
+          message: >
+            No pool audit result has propagated since
+            {{ states('input_datetime.pool_audit_last_push') }}. The 00:05
+            overnight auditor did not push a result — check the Mac mini
+            (launchd job, git push, ~/.ha_token). Ref ADR-030,
+            pool/docs/auditor.md.
+          data:
+            push:
+              interruption-level: time-sensitive
+    mode: single

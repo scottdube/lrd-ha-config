@@ -58,6 +58,24 @@ python3 "${REPO_ROOT}/pool/scripts/auditor.py" \
     --print
 set -e
 
+# Heartbeat stamp (ADR-030): on a successful push, tell HA the result
+# propagated by setting input_datetime.pool_audit_last_push = now. HA's
+# pool_audit_heartbeat automation alerts at 06:00 if this stamp is stale,
+# so any silent death of this job (push failure, auditor.py crash, launchd
+# no-fire) surfaces as a missed heartbeat. Stamped ONLY on a confirmed push
+# so a local-only commit never reads as propagated. Non-fatal if it fails.
+stamp_heartbeat() {
+    local token
+    token="$(tr -d '\r\n' < "$TOKEN_FILE" 2>/dev/null)"
+    [[ -n "$token" ]] || { echo "WARN: heartbeat stamp skipped — no token" >&2; return 0; }
+    curl -s -o /dev/null -m 10 \
+        -H "Authorization: Bearer ${token}" \
+        -H "Content-Type: application/json" \
+        -d "{\"entity_id\": \"input_datetime.pool_audit_last_push\", \"datetime\": \"$(date '+%Y-%m-%d %H:%M:%S')\"}" \
+        "${HA_BASE}/api/services/input_datetime/set_datetime" \
+        || echo "WARN: heartbeat stamp POST to HA failed (non-fatal)" >&2
+}
+
 # Commit + push the audit JSON so it propagates to GitHub for the daily
 # Claude review scheduled task to read via raw URL. pool/audit/ was
 # un-gitignored 2026-05-21 specifically to enable this flow. Failure to
@@ -70,7 +88,9 @@ if [[ -f "$AUDIT_JSON" ]]; then
         git add "$AUDIT_JSON"
         git -c user.name="Pool Auditor" -c user.email="audit@dubecars.com" \
             commit -m "audit: ${YESTERDAY} result" --quiet
-        if ! git push origin main --quiet 2>&1; then
+        if git push origin main --quiet 2>&1; then
+            stamp_heartbeat
+        else
             echo "WARN: git push failed; audit JSON is on disk but not propagated. Will retry next run." >&2
         fi
     fi
