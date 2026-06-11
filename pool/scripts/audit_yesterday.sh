@@ -40,6 +40,14 @@ fi
 
 mkdir -p "$OUT_DIR"
 
+# Silent-failure fix (2026-06-11, ADR-030): auditor.py exits 1 whenever it
+# records any FAIL (auditor.py:778) — a valid audited result, not a script
+# error. Under `set -e` that nonzero exit aborted this script before the
+# commit/push below, so FAIL nights never propagated to GitHub (auditor was
+# dark 2026-05-29 -> 2026-06-10). Suspend `set -e` across the auditor call;
+# the `[[ -f "$AUDIT_JSON" ]]` guard below is the real "did we get a result"
+# check, and a genuine crash writes no JSON and falls through to its WARN.
+set +e
 python3 "${REPO_ROOT}/pool/scripts/auditor.py" \
     --date "$YESTERDAY" \
     --csv "$LIVE_CSV" \
@@ -48,6 +56,7 @@ python3 "${REPO_ROOT}/pool/scripts/auditor.py" \
     --token-file "$TOKEN_FILE" \
     --notify-target scott_and_ha \
     --print
+set -e
 
 # Commit + push the audit JSON so it propagates to GitHub for the daily
 # Claude review scheduled task to read via raw URL. pool/audit/ was
