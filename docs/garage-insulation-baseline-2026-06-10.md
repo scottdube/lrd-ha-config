@@ -1,7 +1,8 @@
 # Garage door insulation — pre-install baseline
 
 - Captured: 2026-06-10 (one day before install)
-- Install date: 2026-06-11 (scheduled — garage doors at LRD insulated by contractor while Scott is at NH)
+- Install date: 2026-06-11 **(completed by 13:00 EDT — confirmed by Scott)**
+- Clean post-install measurement window starts: 2026-06-12 (skipping the transition day)
 - Baseline window: 2026-05-31 → 2026-06-09 (10 days)
 - Mode during window: vacation (`input_boolean.vacation` = on continuously since 5/31), garage MS in Vacation profile (target 85°F, humidity guardrail above 55% RH)
 - Companion: task #42 (post-return analysis), task #43 (CDD-normalized template sensor)
