@@ -102,9 +102,16 @@ EXTERNAL_WIFI_RSSI_ENTITY = "sensor.pool_water_temp_external_pool_float_wifi_sig
 
 # Freshness threshold for external water temp reading. ESP32-C6 deep-sleeps
 # 30 min between samples (production cadence per ADR-015). Reading is
-# considered fresh if its last_changed timestamp is within 35 min of now
+# considered fresh if its last_reported timestamp is within 35 min of now
 # (30 min sleep + 5 min grace for boot/wifi/publish lag). Bench-test cadence
 # (1 min sleep) would want this set to ~2 min; production = 35 min.
+#
+# Keyed off last_reported (advances on every state report), NOT last_changed
+# (advances only on a value transition). The median-filtered, 0.1F-rounded
+# ADC value repeats across ~half of all wakes when pool temp is stable, which
+# pins last_changed for 60-120 min even though the probe reported on schedule.
+# Using last_changed produced false "stale" rows and a daily false-positive
+# connectivity alert from audit_recent.py. See ADR-031.
 FRESHNESS_THRESHOLD_MIN = 35
 
 # Water-temp reliability threshold: pump must have been on for at least this
@@ -346,6 +353,35 @@ def fetch_entity(
         return "unavailable", {}, None, {}
 
 
+def fetch_last_reported(entity_id: str, token: str) -> str | None:
+    """
+    Return the entity's last_reported ISO timestamp, or None on failure.
+
+    last_reported (HA 2024.8+) advances on EVERY state report, including a
+    report whose state and attributes are identical to the prior one. This is
+    distinct from fetch_entity's last_changed, which advances only on a value
+    transition. The external water-temp probe re-reports an identical
+    median-filtered/rounded value on roughly half its wakes, so last_changed
+    is the wrong signal for "did the probe report recently" — last_reported is
+    the correct one. Separate one-shot fetch (rather than extending
+    fetch_entity's 4-tuple) to avoid churning every existing call site; the
+    external entity is the only consumer that needs report-level freshness.
+    See ADR-031.
+    """
+    req = urllib.request.Request(
+        f"{HA_BASE}/api/states/{entity_id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read()).get("last_reported")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        return None
+
+
 def parse_iso_utc(iso_str: str | None) -> datetime | None:
     """Parse HA's ISO timestamp (e.g. '2026-05-01T13:07:42.123456+00:00')."""
     if not iso_str:
@@ -394,41 +430,46 @@ def compute_water_temp_reliable(
     return "true" if on_for >= WATER_TEMP_SETTLING_SECONDS else "false"
 
 
-def compute_external_water_temp_age_min(last_changed_iso: str | None) -> str:
+def compute_external_water_temp_age_min(last_reported_iso: str | None) -> str:
     """
-    Minutes since the external water temp sensor last reported a new value.
+    Minutes since the external water temp sensor last reported a value.
 
-    Returns 'unavailable' if last_changed is missing or unparseable. Otherwise
+    Returns 'unavailable' if last_reported is missing or unparseable. Otherwise
     a string-formatted float with 1 decimal place (e.g., '4.7').
 
-    Implementation note: uses last_changed (state-value transition) rather
-    than last_updated (every state report). For the ADC-based temp sensor
-    with sub-degree noise, every wake produces a different value in
-    practice, so last_changed ≈ last_updated. If a future firmware revision
-    introduces smoothing or rounding that pins multiple samples to the same
-    value, switch to last_updated by extending fetch_entity.
+    Implementation note: uses last_reported (every state report) rather than
+    last_changed (state-value transition). The earlier assumption that "every
+    wake produces a different value, so last_changed ≈ last_updated" proved
+    false: the median filter + 0.1F rounding pins multiple consecutive samples
+    to an identical value, stalling last_changed for 60-120 min while the probe
+    keeps reporting on its 30-min cadence. last_reported tracks the report, not
+    the value churn. See ADR-031.
     """
-    last_changed = parse_iso_utc(last_changed_iso)
-    if last_changed is None:
+    last_reported = parse_iso_utc(last_reported_iso)
+    if last_reported is None:
         return "unavailable"
-    age_sec = (datetime.now(timezone.utc) - last_changed).total_seconds()
+    age_sec = (datetime.now(timezone.utc) - last_reported).total_seconds()
     return f"{age_sec / 60.0:.1f}"
 
 
-def compute_external_water_temp_fresh(last_changed_iso: str | None) -> str:
+def compute_external_water_temp_fresh(last_reported_iso: str | None) -> str:
     """
-    True iff the external water temp sensor reading is within the freshness
+    True iff the external water temp sensor reported within the freshness
     threshold (FRESHNESS_THRESHOLD_MIN). Per ADR-015 + 2026-05-18 production
     cadence: 35 min (30 min deep-sleep + 5 min grace for boot/wifi/publish).
 
-    Returns 'true' / 'false' string for CSV. Returns 'false' if last_changed
+    Keyed off last_reported, not last_changed — see ADR-031. last_changed
+    stalls when the probe re-reports an identical value, which is normal and
+    must not read as stale.
+
+    Returns 'true' / 'false' string for CSV. Returns 'false' if last_reported
     is unparseable — treat unknown freshness as not-fresh, conservative
     default for the cascading fallback in compute_water_temp_authoritative.
     """
-    last_changed = parse_iso_utc(last_changed_iso)
-    if last_changed is None:
+    last_reported = parse_iso_utc(last_reported_iso)
+    if last_reported is None:
         return "false"
-    age_sec = (datetime.now(timezone.utc) - last_changed).total_seconds()
+    age_sec = (datetime.now(timezone.utc) - last_reported).total_seconds()
     return "true" if age_sec / 60.0 <= FRESHNESS_THRESHOLD_MIN else "false"
 
 
@@ -510,6 +551,11 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
         "switch.omnilogic_pool_filter_pump"
     ]
 
+    # External-probe freshness keys off last_reported (advances every report),
+    # not last_changed (advances only on value change) — ADR-031. Fetched once
+    # here and shared by the age / fresh / authoritative columns below.
+    ext_last_reported = fetch_last_reported(EXTERNAL_WATER_TEMP_ENTITY, token)
+
     def get(entity_id: str) -> tuple[str, dict, str | None, dict]:
         if entity_id not in cache:
             cache[entity_id] = fetch_entity(entity_id, token)
@@ -532,25 +578,21 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
                     compute_water_temp_reliable(pump_state, pump_last_changed)
                 )
             elif name == "external_water_temp_age_min":
-                _, _, ext_last_changed, _ = get(EXTERNAL_WATER_TEMP_ENTITY)
                 row.append(
-                    compute_external_water_temp_age_min(ext_last_changed)
+                    compute_external_water_temp_age_min(ext_last_reported)
                 )
             elif name == "external_water_temp_fresh":
-                _, _, ext_last_changed, _ = get(EXTERNAL_WATER_TEMP_ENTITY)
                 row.append(
-                    compute_external_water_temp_fresh(ext_last_changed)
+                    compute_external_water_temp_fresh(ext_last_reported)
                 )
             elif name == "water_temp_authoritative":
-                ext_state, _, ext_last_changed, _ = get(
-                    EXTERNAL_WATER_TEMP_ENTITY
-                )
+                ext_state, _, _, _ = get(EXTERNAL_WATER_TEMP_ENTITY)
                 local_state, _, _, _ = get("sensor.omnilogic_pool_watersensor")
                 _, heater_attrs, _, _ = get(
                     "water_heater.omnilogic_pool_heater"
                 )
                 target_temp = str(heater_attrs.get("temperature", ""))
-                fresh = compute_external_water_temp_fresh(ext_last_changed)
+                fresh = compute_external_water_temp_fresh(ext_last_reported)
                 local_reliable = compute_water_temp_reliable(
                     pump_state, pump_last_changed
                 )
