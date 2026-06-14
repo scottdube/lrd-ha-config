@@ -750,3 +750,21 @@
                 message: "{{ (pull_result.stdout | string)[:500] }}"
   mode: single
   max_exceeded: silent
+- id: "1781449500000"
+  alias: Adjust Lights
+  description: >-
+    Clock-based nightly light adjustments at 23:05. Turns off the Guest 2 Lamp
+    Dimmer (light.smart_plug_dimmer_2), which "Lights on at Sunset" brings on to
+    65% each evening. Extend the off-list to add more lights.
+  triggers:
+    - trigger: time
+      at: "23:05:00"
+  conditions: []
+  actions:
+    - action: light.turn_off
+      metadata: {}
+      target:
+        entity_id:
+          - light.smart_plug_dimmer_2
+      data: {}
+  mode: single
