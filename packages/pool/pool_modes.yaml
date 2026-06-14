@@ -98,23 +98,34 @@ automation:
       - condition: state
         entity_id: input_boolean.pool_integration_recovering
         state: "off"
+      # ADR-030: why_on gate. A Hayward *schedule* turn-off (Timed Event) and a
+      # manual panel turn-off are indistinguishable at the off event itself
+      # (omni_why_on collapses to "Off" on any turn-off), but the run being
+      # ENDED tells us which: only engage if the pump was running under manual
+      # control. Suppresses the daily 16:00 scheduled-off that was
+      # phantom-engaging the lockout and silently gating the health watchers
+      # ~8h nightly. Known gap: a tech stopping a pump mid-scheduled-run reads
+      # as a schedule end and won't engage — that case is rebuilt precisely by
+      # the camera + lanai-door fusion detector (the ADR-011 hook).
+      - condition: template
+        value_template: >
+          {{ trigger.from_state is not none
+             and trigger.from_state.attributes.get('omni_why_on') == 'Manual On' }}
     action:
       - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.pool_service_lockout
-      - action: notify.scott_and_ha
+      # ADR-030: demoted from a mobile push to a dashboard/log notice. A manual
+      # pump-off is a weak "tech present" signal (only happens on a filter
+      # clean), so the real alert moves to the fusion detector; the lockout
+      # still pauses the blueprint, just quietly.
+      - action: persistent_notification.create
         data:
+          notification_id: pool_service_lockout
           title: Pool Service Lockout Engaged
           message: >
-            Pump turned off externally (likely tech at panel). Pool blueprint
-            paused for service. Will auto-resume when pump turns back on, OR
-            tap action to resume manually, OR auto-clears at midnight.
-          data:
-            push:
-              interruption-level: time-sensitive
-            actions:
-              - action: pool_resume_now
-                title: Resume Pool Automation Now
+            Pump turned off manually at the panel — pool blueprint paused for
+            service. Auto-resumes on a manual pump-on, or clears at midnight.
     mode: single
 
   - alias: "Pool: Detect External Pump-On (clear service lockout)"
@@ -149,16 +160,20 @@ automation:
       - condition: state
         entity_id: input_boolean.pool_integration_recovering
         state: "off"
+      # ADR-030: why_on gate — only a *manual* pump-on clears the lockout. The
+      # 09:00 scheduled start (Timed Event) must not clear a genuine service
+      # lockout.
+      - condition: template
+        value_template: >
+          {{ trigger.to_state is not none
+             and trigger.to_state.attributes.get('omni_why_on') == 'Manual On' }}
     action:
       - action: input_boolean.turn_off
         target:
           entity_id: input_boolean.pool_service_lockout
-      - action: notify.scott_and_ha
+      - action: persistent_notification.dismiss
         data:
-          title: Pool Service Lockout Cleared
-          message: >
-            Pump turned back on externally — service appears complete. Pool
-            blueprint resumed.
+          notification_id: pool_service_lockout
     mode: single
 
   - alias: "Pool: Mobile Notification Action - Resume"
@@ -241,6 +256,9 @@ automation:
       - action: input_boolean.turn_off
         target:
           entity_id: input_boolean.pool_service_lockout
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: pool_service_lockout
       - action: notify.scott_and_ha
         data:
           title: Pool Service Lockout Auto-Cleared
