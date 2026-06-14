@@ -126,6 +126,9 @@ binary_sensor:
       then:
         - logger.log: "OTA mode flag cleared - resuming sleep cycle"
         - deep_sleep.allow: deep_sleep_main
+        # Mark a clean planned sleep here too (ADR-032) — without this, sleeping
+        # out of OTA mode reads as an unclean reset on the next boot.
+        - lambda: 'id(g_clean_sleep) = true;'
         - deep_sleep.enter:
             id: deep_sleep_main
 
