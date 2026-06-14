@@ -33,7 +33,7 @@ zones:
     signals:
       golf_sim_flag: null   # no sim at NH (unless future expansion)
 
-      bench_presence: null   # TBD: binary_sensor.nh_lab_bench_presence (LD2410)
+      bench_presence: binary_sensor.sln_shop_bench_presence   # Seeed XIAO 24GHz mmWave (LD2410) on C6, flashed+adopted 2026-06-13 in sln-ha-config esphome/sln-shop-bench.yaml
       bench_power: null      # TODO: which Vue circuit at NH? Confirm when HA installed
 
       lights:
