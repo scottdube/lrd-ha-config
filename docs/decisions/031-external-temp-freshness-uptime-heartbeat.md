@@ -1,7 +1,7 @@
-# ADR-031: External water-temp freshness keys off `last_reported`, not `last_changed`
+# ADR-031: External water-temp freshness keys off the uptime heartbeat
 
-**Status:** Accepted
-**Date:** 2026-06-12
+**Status:** Accepted (supersedes the `last_reported` approach first recorded here on 2026-06-12; corrected 2026-06-14)
+**Date:** 2026-06-12, corrected 2026-06-14
 **Decider:** Scott
 **Related:** ADR-015 (external water-temp probe + cascading fallback), ADR-025 (pool float v2 hardware), ADR-030 (alerting posture — this fixes a false-positive in the "unexpected happened" bucket), `pool/scripts/state_logger.py`, `pool/scripts/audit_recent.py`.
 
@@ -9,36 +9,46 @@
 
 ## Context
 
-The lanai pool float (`pool-water-temp-external`, XIAO ESP32-C6, ESPHome deep-sleep, 40 s wake / 30 min sleep) was generating a daily "external water temp probe — poor connectivity" alert. The UniFi client log appeared to corroborate it: connect events at irregular multiples of 30 min rather than a clean every-30-min cadence, which read as a flaky probe.
+The lanai pool float (`pool-water-temp-external`, XIAO ESP32-C6, ESPHome deep-sleep, 40 s wake / 30 min sleep) generated a daily "external water temp probe — poor connectivity" alert (`audit_recent.py` check #3: external fresh ratio < 80% over a rolling 3 h window).
 
-Direct inspection of HA state history shows the opposite. Over a continuous 15+ hour window the probe's `uptime` diagnostic — which changes every boot and therefore cannot be deduplicated — recorded on **32 of 32 wakes**, each spaced 29.7 min, with zero misses. WiFi RSSI held −49 to −70 dBm (1 of 49 samples at/below −70) and battery sat at 3.7–4.2 V. The device is connecting and reporting on schedule every cycle. The UniFi log simply under-records: with a static IP (`192.168.11.111`) and a hard-locked BSSID + `fast_connect`, the sub-2-second reconnects frequently don't emit a fresh "client connected" syslog entry. UniFi under-counting is a logging artifact, not a connectivity fault.
+The probe itself is healthy on connectivity: the `uptime` diagnostic — seconds-since-boot, effectively unique every boot, so it cannot be deduplicated — records on **every wake** (117/117 over a 54 h window), spaced 29.7 min. The fault was in the freshness metric, not the device.
 
-The real defect is in the freshness metric. `state_logger.py` computed `external_water_temp_fresh` / `external_water_temp_age_min` from the temp sensor's **`last_changed`** (age ≤ `FRESHNESS_THRESHOLD_MIN` = 35 min). `last_changed` advances only on a **value transition**. The temp sensor runs a median-of-3 filter and reports to 0.1 °F; when pool temp is stable, consecutive 30-min samples land on an identical published value, so HA records no change and `last_changed` stalls for 60–120 min even though the probe reported on time. Over the same wake set, the temp value produced a new record on only **17 of 32 wakes** — versus uptime's 32/32. Simulating the exact metric over one overnight window yields ~55% fresh, well under `audit_recent.py`'s 80% floor (`EXTERNAL_FRESH_RATIO_MIN`), which fires the alert. The metric was measuring value churn, not whether the probe reported.
+`state_logger.py` computed `external_water_temp_fresh` / `external_water_temp_age_min` from the temp sensor's **`last_changed`** (age ≤ `FRESHNESS_THRESHOLD_MIN` = 35 min). `last_changed` advances only on a **value transition**. The temp sensor runs a median-of-3 filter and reports to 0.1 °F; when pool temp is stable, consecutive 30-min samples produce an identical published value, so `last_changed` stalls 60–120 min even though the probe reported on schedule. Result: the fresh ratio collapsed (observed as low as 28%, 5/18 rows) and fired the alert. The metric was measuring value churn, not whether the probe reported.
 
-The original code carried the assumption inline: *"every wake produces a different value in practice, so last_changed ≈ last_updated."* That assumption is false against the median filter + rounding, and the comment even named the remedy ("switch to last_updated"). Empirically `last_updated` is also insufficient — HA pins `last_updated` to `last_changed` on an unchanged-value report. Only **`last_reported`** (HA 2024.8+; live system is on 2026.4.4) advances on every state report regardless of value, which I confirmed on the live state object (`last_reported` 54 ms ahead of a pinned `last_changed`/`last_updated`).
+### First attempt (2026-06-12) and why it failed
+
+The initial fix re-keyed freshness onto **`last_reported`**, on the documented HA semantics that `last_reported` advances on every state report including unchanged ones (HA 2024.8+; live system 2026.4.4). This was deployed (commit `e2f2826`) and **did not work** — the audit still read 28%.
+
+Empirical check on 2026-06-14 (live `/api/states` reads on the float's diagnostic entities right after a wake): the `wifi_signal` sensor had reported on the most recent wake (uptime and battery both showed `last_reported` ≈ 1.2 min) yet its own `last_reported` was stuck at 30.9 min — **identical to its `last_changed`**. So on this HA + ESPHome native-API path, an unchanged re-report advances **neither `last_changed` nor `last_reported`**. The assumption behind the first fix was false for this device, and it should have been verified empirically before shipping rather than trusting the documented behavior. (Likely mechanism: the ESPHome path does not surface a state write to HA's state machine when the value is unchanged, so there is nothing to bump `last_reported`. Not investigated further — the heartbeat approach sidesteps it entirely.)
 
 ## Decision
 
-Base external-probe freshness and age on **`last_reported`**, the timestamp that advances on every state report. Added a dedicated `fetch_last_reported()` helper (a one-shot `/api/states` read that returns `last_reported`) rather than widening `fetch_entity`'s 4-tuple, to avoid churning ~15 existing unpack sites; the external probe is the only consumer that needs report-level freshness. `build_row` fetches it once per row and shares it across the `age_min`, `fresh`, and `water_temp_authoritative` columns. `compute_external_water_temp_fresh` / `compute_external_water_temp_age_min` take the reported timestamp; their parameters and docstrings were renamed accordingly.
+Key external-probe freshness and age off the **uptime heartbeat** — the `last_changed` of `sensor.pool_water_temp_external_pool_float_uptime` (`EXTERNAL_UPTIME_ENTITY`). Uptime's value is unique every boot, so its `last_changed` advances on every wake (directly observed, 117/117 wakes, zero dedup). Since the temp reading is published on the same wake as uptime, "uptime advanced within 35 min" is an exact proxy for "the external temp reading is current."
 
-`FRESHNESS_THRESHOLD_MIN` stays at 35 min — it was always correct (30 min cadence + 5 min grace); it was being fed the wrong clock. `pump/waterfall/heater` `*_last_changed` columns and `compute_water_temp_reliable` are unchanged — they legitimately want transition timing, not report timing.
+`build_row` fetches the uptime entity once and shares its `last_changed` across the `age_min`, `fresh`, and `water_temp_authoritative` columns. The temp **value** still comes from the temp entity. `FRESHNESS_THRESHOLD_MIN` stays at 35 min — it was always correct; it was being fed a clock that stalls. The `fetch_last_reported()` helper added in the first attempt is removed. The pump/waterfall/heater `*_last_changed` columns and `compute_water_temp_reliable` are unchanged — they legitimately want transition timing.
 
 ## Consequences
 
 ### Positive
-- The daily false-positive connectivity alert stops without weakening the threshold or masking a real fault.
-- `external_water_temp_fresh` now reflects reality (~100% on a healthy probe), so the `water_temp_authoritative` cascade (ADR-015) trusts the external reading instead of falling back to the local sensor on stable-temp nights.
-- Establishes the correct field for "did a device report" across future report-vs-change freshness checks.
+- The daily false-positive connectivity alert stops, without weakening the 80% threshold or masking a real fault — uptime stalls only on a genuinely missed wake.
+- `external_water_temp_fresh` reflects reality (~99–100% on a healthy probe, simulated from real wake times), so the `water_temp_authoritative` cascade (ADR-015) trusts the external reading on stable-temp nights instead of needlessly falling back.
+- Establishes the correct pattern for deep-sleep ESPHome freshness: track a monotonic/unique per-wake heartbeat, never a measured value whose repeats stall every HA timestamp.
 
 ### Negative / costs (accepted)
-- One extra `/api/states` GET per logger row (every 10 min, single entity) — negligible.
-- A *genuine* probe outage now surfaces only after 35 min of true silence (`last_reported` truly stops advancing). That is the intended semantic and remains well inside the alerting deadlines; the heartbeat posture of ADR-030 still applies.
+- Freshness now depends on the uptime entity existing and keeping a unique-per-boot value. If a future firmware pins uptime to a constant or removes it, freshness breaks silently — noted alongside the constant. A genuine probe outage surfaces after 35 min of no wake, the intended semantic.
+- Residual real misses remain visible (see Follow-up): the metric is now honest, so true dropped wakes legitimately reduce freshness.
+
+### Belt-and-suspenders (deferred to next float retrieval)
+- Adding `force_update: true` to the ESPHome temp/wifi/battery sensors would make HA record every report even when unchanged, restoring `last_changed` as a valid freshness clock at the source. Deferred because the float is sealed and in the pool; fold it into the firmware update done when the float comes out for its battery swap (see Follow-up).
+
+## Follow-up (separate from the metric fix)
+Around 2026-06-12 the probe began genuinely missing the occasional wake (5 real misses / 54 h vs 0 earlier), correlated with declining loaded battery voltage (daily minimum 3.27 V → 3.19 V; regulator bypassed per ADR-025 → brownout-class wake failures on the radio TX spike). This is a hardware/battery issue, not the metric, and is tracked in `docs/current-state.md` for a battery swap.
 
 ## Verification
-- `python3 -m py_compile pool/scripts/state_logger.py` passes; no remaining `ext_last_changed` references.
-- Re-run `audit_recent.py --print-clean` against a fresh post-deploy CSV window and confirm the external-freshness check passes (expected ratio ~100%).
+- `python3 -m py_compile pool/scripts/state_logger.py` passes; no remaining `last_reported`/`fetch_last_reported` code references.
+- Post-deploy: `external_water_temp_fresh` should read ~100% except across genuine missed wakes; confirm `audit_recent.py` external-freshness check passes.
 
 ## Sources
-- HA state history, wake-by-wake alignment (uptime 32/32 vs temp 17/32, same wakes), live `last_reported` vs `last_changed` on `sensor.pool_water_temp_external` — pulled from `192.168.50.11:8123` REST API, 2026-06-12.
-- ESPHome design: `esphome/pool-water-temp-external.yaml` (deep_sleep 40 s/30 min, median-of-3 filter, 0.1 °F rounding, static IP + locked BSSID + fast_connect).
-- Metric defect: `pool/scripts/state_logger.py` (`compute_external_water_temp_*`, `FRESHNESS_THRESHOLD_MIN`); alert: `pool/scripts/audit_recent.py` check #3 (`EXTERNAL_FRESH_RATIO_MIN`).
+- Live `/api/states` reads of the float's uptime/wifi/battery/temp entities and 54 h of history from `192.168.50.11:8123`, 2026-06-14 (wifi `last_reported` == `last_changed` while reporting; uptime 117/117 wakes; battery trend).
+- Failed first attempt deployed as commit `e2f2826`; audit message "External temp sensor fresh ratio 28% (5/18 rows)".
+- ESPHome design: `esphome/pool-water-temp-external.yaml`. Metric + alert: `pool/scripts/state_logger.py`, `pool/scripts/audit_recent.py` check #3.
