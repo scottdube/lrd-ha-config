@@ -8,7 +8,8 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 
 - **HACS repo:** [`cryptk/haomnilogic-local`](https://github.com/cryptk/haomnilogic-local)
 - **Status:** Stable
-- **Current version:** `1.0.4`
+- **Current version:** `1.0.4` per these notes, but the repo's `custom_components/omnilogic_local/manifest.json` reads `1.0.0b7` (`python-omnilogic-local==0.25.1`). **Drift — confirm the live installed version on the NUC** (HACS → OmniLogic Local, or `manifest.json` in the running `config/custom_components/`). The REST `/api/config` does not expose HACS integration versions.
+- **Latest available:** `2.0.0` (released 2026-05-29). **Deferred — see Deferred upgrade below.**
 - **Communication:** UDP, direct LAN to controller
 - **Controller IP:** `192.168.11.19` (DHCP reservation in UniFi)
 - **Network:** IoT VLAN
@@ -27,6 +28,15 @@ Hayward pool controller. Two integrations running side-by-side. See ADR-001 for 
 
 ### Entity naming convention
 `*.omnilogic_pool_*` (vs cloud's `*.pool_pool_*`). Easy to confuse. Always grep for `omnilogic_pool_` when wiring blueprints.
+
+### Deferred upgrade — 2.0.0 (defer to FL return ~2026-10-17)
+- **Decision (2026-06-11):** do NOT upgrade to `2.0.0` while LRD is unattended. Per ADR-024 this is a HACS integration update (not security-flagged) → DEFER until home; the breaking change makes the defer firmer, not softer.
+- **2.0.0 breaking change:** some `extra_state_attributes` state names were renamed to match OmniLogic's internal naming. The maintainer flags that automations/dashboards reading that extra data must be re-checked. Risk to the pool-control path (blueprint v1.12.0 / ADR-022 PUMP RECONCILE) and any dashboard card reading OmniLogic attributes — exactly the unattended-pool failure mode ADR-024 guards.
+- **Underlying library jumps** `python-omnilogic-local` 0.25.1 → 5.0.0 (large surface). Version gap is also large (~1.0.x → 2.0.0, crossing 1.5.0).
+- **ORP / Timed-Percent default-disable in 2.0.0 applies to NEW installs only** ("only applies when the integration is first set up") — existing LRD entities will not auto-change. Not a reason to upgrade early.
+- **No CVE, nothing urgent for LRD** in 2.0.0 (log-noise silencing + non-user-facing EntityDescription refactors otherwise).
+- **Do not upgrade on top of the open midnight-burst issue** (see Open below) — fix first, upgrade later.
+- **When home:** snapshot/backup → upgrade → audit blueprint `state_attr()` references and OmniLogic dashboard cards against the new internal attribute names before trusting pump automation. Then update Current version above. Source: <https://github.com/cryptk/haomnilogic-local/releases/2.0.0>
 
 ### Known issues
 - **Version churn.** Schema/domain changes have occurred between releases historically. Check release notes; audit blueprint for entity references after every upgrade. Audit unavailable entities in registry.
