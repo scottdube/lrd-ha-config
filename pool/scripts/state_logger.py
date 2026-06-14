@@ -79,7 +79,7 @@ from pathlib import Path
 LOG_FILE = "/config/pool_state_log.csv"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
-SCHEMA_VERSION = "2.0-phase2.1"
+SCHEMA_VERSION = "2.0-phase2.2"
 
 # External water temp sensor entity (ADR-015 deployment, 2026-05-18).
 # Default ESPHome-composed entity_id was
@@ -109,6 +109,17 @@ EXTERNAL_WIFI_RSSI_ENTITY = "sensor.pool_water_temp_external_pool_float_wifi_sig
 # NOR last_reported (confirmed empirically 2026-06-14 — see ADR-031), so their
 # timestamps stall 60-120 min even though the probe reported on schedule.
 EXTERNAL_UPTIME_ENTITY = "sensor.pool_water_temp_external_pool_float_uptime"
+
+# ADR-032 Phase 1 wake-outcome ledger entities. The float publishes these only
+# on a connected wake; the counters accumulate since the last successful publish
+# (zeroed on the firmware side right after publishing), so each fresh row's
+# fails/noassoc/unclean describe everything that happened since the prior row.
+EXTERNAL_BOOT_COUNT_ENTITY = "sensor.pool_water_temp_external_pool_float_boot_count"
+EXTERNAL_CONNECT_MS_ENTITY = "sensor.pool_water_temp_external_pool_float_connect_ms"
+EXTERNAL_FAILS_ENTITY = "sensor.pool_water_temp_external_pool_float_fails_since_last"
+EXTERNAL_NOASSOC_ENTITY = "sensor.pool_water_temp_external_pool_float_wifi_noassoc_since_last"
+EXTERNAL_UNCLEAN_ENTITY = "sensor.pool_water_temp_external_pool_float_unclean_since_last"
+EXTERNAL_WAKE_DIAG_ENTITY = "sensor.pool_water_temp_external_pool_float_wake_diag"
 
 # Freshness threshold for external water temp reading. ESP32-C6 deep-sleeps
 # 30 min between samples (production cadence per ADR-015). Reading is
@@ -240,6 +251,25 @@ COLUMNS: list[dict] = [
     # battery sag under TX load or AP-side intermittent behavior.
     {"name": "external_wifi_rssi", "source": "state",
      "entity": EXTERNAL_WIFI_RSSI_ENTITY},
+
+    # ---------- Phase 2.2: external probe wake-outcome ledger (ADR-032) ----------
+    # boot_count is monotonic (resets only on power loss); diffing across fresh
+    # rows cross-checks the miss count. fails/noassoc/unclean are since-last-
+    # success counters straight from the float. missed_since_last sums the two
+    # miss classes for a single at-a-glance number.
+    {"name": "external_probe_boot_count", "source": "state",
+     "entity": EXTERNAL_BOOT_COUNT_ENTITY},
+    {"name": "external_probe_connect_ms", "source": "state",
+     "entity": EXTERNAL_CONNECT_MS_ENTITY},
+    {"name": "external_probe_fails_since_last", "source": "state",
+     "entity": EXTERNAL_FAILS_ENTITY},
+    {"name": "external_probe_wifi_noassoc_since_last", "source": "state",
+     "entity": EXTERNAL_NOASSOC_ENTITY},
+    {"name": "external_probe_unclean_since_last", "source": "state",
+     "entity": EXTERNAL_UNCLEAN_ENTITY},
+    {"name": "external_probe_wake_diag", "source": "state",
+     "entity": EXTERNAL_WAKE_DIAG_ENTITY},
+    {"name": "external_probe_missed_since_last", "source": "compute"},
 
     # Heater estimated power: HEATER_RATED_POWER_W when compressor binary
     # sensor reports 'on', else 0. Per HP31005T nameplate (33.9A @ 230V).
@@ -579,6 +609,13 @@ def build_row(args: argparse.Namespace, token: str) -> list[str]:
                 row.append(compute_water_temp_delta(
                     ext_state, local_state, pump_state == "on"
                 ))
+            elif name == "external_probe_missed_since_last":
+                fails, _, _, _ = get(EXTERNAL_FAILS_ENTITY)
+                unclean, _, _, _ = get(EXTERNAL_UNCLEAN_ENTITY)
+                try:
+                    row.append(str(int(float(fails)) + int(float(unclean))))
+                except (ValueError, TypeError):
+                    row.append("unavailable")
             elif name == "local_heater_estimated_power_w":
                 heater_equip_state, _, _, _ = get(
                     "binary_sensor.omnilogic_pool_heater_heater_equipment_status"

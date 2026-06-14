@@ -16,6 +16,20 @@ esphome:
             gpio_reset_pin((gpio_num_t)14);
             gpio_set_direction((gpio_num_t)14, GPIO_MODE_OUTPUT);
             gpio_set_level((gpio_num_t)14, 1);
+    - priority: 200
+      then:
+        - lambda: |-
+            // ADR-032 Phase 1 wake bookkeeping. g_clean_sleep is set true only
+            // just before deep_sleep.enter; if it's still false here, the
+            // previous wake never reached a planned sleep (brownout / crash /
+            // external reset) -> count it as UNCLEAN. esp_reset_reason() is
+            // captured as a corroborating signal (it can misreport brownout).
+            if (!id(g_clean_sleep)) {
+              id(g_unclean_count) += 1;
+            }
+            id(g_clean_sleep) = false;
+            id(g_boot_count) += 1;
+            id(g_last_reset_reason) = (int) esp_reset_reason();
     - priority: -100
       then:
         - script.execute: take_reading_and_sleep
@@ -72,6 +86,37 @@ deep_sleep:
   id: deep_sleep_main
   run_duration: 40s
   sleep_duration: 30min
+
+# ADR-032 Phase 1 wake-outcome ledger. restore_value globals persist across
+# deep sleep via NVS (flash; survive power loss too), coalesced by
+# flash_write_interval and flushed on deep_sleep.enter. Counters accumulate
+# since the last successful publish and are zeroed on the next good connect, so
+# every successful row carries "what happened since I last reported."
+globals:
+  - id: g_clean_sleep
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  - id: g_boot_count
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_connect_fail_count
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_wifi_noassoc_count
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_unclean_count
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_last_reset_reason
+    type: int
+    restore_value: yes
+    initial_value: '0'
 
 binary_sensor:
   - platform: homeassistant
@@ -147,6 +192,68 @@ sensor:
     update_interval: never
     entity_category: diagnostic
 
+  # ADR-032 wake-outcome ledger (published only on a connected wake).
+  - platform: template
+    name: "Pool Float Boot Count"
+    id: pool_float_boot_count
+    lambda: 'return id(g_boot_count);'
+    update_interval: never
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Pool Float Connect ms"
+    id: pool_float_connect_ms
+    lambda: 'return (float) millis();'
+    update_interval: never
+    accuracy_decimals: 0
+    unit_of_measurement: "ms"
+    state_class: measurement
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Pool Float Fails Since Last"
+    id: pool_float_fails_since_last
+    lambda: 'return id(g_connect_fail_count);'
+    update_interval: never
+    accuracy_decimals: 0
+    state_class: measurement
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Pool Float WiFi NoAssoc Since Last"
+    id: pool_float_wifi_noassoc_since_last
+    lambda: 'return id(g_wifi_noassoc_count);'
+    update_interval: never
+    accuracy_decimals: 0
+    state_class: measurement
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Pool Float Unclean Since Last"
+    id: pool_float_unclean_since_last
+    lambda: 'return id(g_unclean_count);'
+    update_interval: never
+    accuracy_decimals: 0
+    state_class: measurement
+    entity_category: diagnostic
+
+text_sensor:
+  - platform: template
+    name: "Pool Float Wake Diag"
+    id: pool_float_wake_diag
+    update_interval: never
+    entity_category: diagnostic
+    lambda: |-
+      char buf[96];
+      snprintf(buf, sizeof(buf),
+               "ok boot=%d fails=%d noassoc=%d unclean=%d connms=%lu reset=%d",
+               (int) id(g_boot_count), (int) id(g_connect_fail_count),
+               (int) id(g_wifi_noassoc_count), (int) id(g_unclean_count),
+               (unsigned long) millis(), (int) id(g_last_reset_reason));
+      return std::string(buf);
+
 script:
   - id: take_reading_and_sleep
     then:
@@ -161,8 +268,35 @@ script:
           condition:
             api.connected:
           timeout: 35s
-      - component.update: pool_float_uptime
-      - component.update: pool_float_wifi
+      - if:
+          condition:
+            api.connected:
+          then:
+            # Connected: publish the reading + the wake-outcome ledger, THEN
+            # zero the since-last-success counters (ADR-032 Phase 1).
+            - component.update: pool_float_uptime
+            - component.update: pool_float_wifi
+            - component.update: pool_float_boot_count
+            - component.update: pool_float_connect_ms
+            - component.update: pool_float_fails_since_last
+            - component.update: pool_float_wifi_noassoc_since_last
+            - component.update: pool_float_unclean_since_last
+            - component.update: pool_float_wake_diag
+            - lambda: |-
+                id(g_connect_fail_count) = 0;
+                id(g_wifi_noassoc_count) = 0;
+                id(g_unclean_count) = 0;
+          else:
+            # Connect budget blown: classify and buffer across sleep (no link,
+            # so it ships on the next successful wake). wifi up => API_TIMEOUT;
+            # wifi down => WIFI_NO_ASSOC.
+            - lambda: 'id(g_connect_fail_count) += 1;'
+            - if:
+                condition:
+                  not:
+                    - wifi.connected:
+                then:
+                  - lambda: 'id(g_wifi_noassoc_count) += 1;'
       - wait_until:
           condition:
             lambda: 'return id(ota_mode_flag).has_state();'
@@ -174,5 +308,8 @@ script:
             - logger.log: "OTA mode active - sleep prevented"
             - deep_sleep.prevent: deep_sleep_main
           else:
+            # Mark a clean planned sleep so the next boot doesn't read this wake
+            # as an unclean reset. Preferences flush on deep_sleep.enter.
+            - lambda: 'id(g_clean_sleep) = true;'
             - deep_sleep.enter:
                 id: deep_sleep_main

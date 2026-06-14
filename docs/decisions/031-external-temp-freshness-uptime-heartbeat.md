@@ -42,7 +42,13 @@ Key external-probe freshness and age off the **uptime heartbeat** — the `last_
 - Adding `force_update: true` to the ESPHome temp/wifi/battery sensors would make HA record every report even when unchanged, restoring `last_changed` as a valid freshness clock at the source. Deferred because the float is sealed and in the pool; fold it into the firmware update done when the float comes out for its battery swap (see Follow-up).
 
 ## Follow-up (separate from the metric fix)
-Around 2026-06-12 the probe began genuinely missing the occasional wake (5 real misses / 54 h vs 0 earlier), correlated with declining loaded battery voltage (daily minimum 3.27 V → 3.19 V; regulator bypassed per ADR-025 → brownout-class wake failures on the radio TX spike). This is a hardware/battery issue, not the metric, and is tracked in `docs/current-state.md` for a battery swap.
+Around 2026-06-12 the probe began genuinely missing the occasional wake (5 real misses / 54 h vs 0 earlier; ~4% miss rate). **This is NOT battery depletion** (an earlier draft of this ADR wrongly claimed it was — corrected 2026-06-14):
+
+- Per ADR-025 the 2× L91 stack has a **287–643 day** design runtime at 30-min cadence; deployed 2026-05-26, so ~19 days in = <7% of design life.
+- The `battery_voltage` telemetry is explicitly **trend-only** (ADR-025 cal amendment: published 3.11 V at a *known* 3.300 V, ~6% midrange bowing, fit only over 3.0–3.6 V, "not absolute precision"). The observed ~4.1 V "highs" are extrapolation artifacts above 2× L91's ~3.6 V ceiling; the low-3 V readings map to ~3.4 V actual = mid-plateau-normal (L91 sits at 3.0–3.4 V for most of life).
+- The misses did **not** correlate with the low readings (they occurred at 3.46–3.70 V). The ADR-025 "voltage trap" is a sleep-current/runtime effect, not a brownout mechanism.
+
+Most likely cause of the occasional miss: WiFi/API association intermittently exceeding the 35 s connect budget inside the 40 s `run_duration` on this BSSID-locked `fast_connect` deep-sleep wake — consistent with the original UniFi "strong RSSI but irregular connect" observation. Tracked in `docs/current-state.md` for monitoring; **no battery action indicated.**
 
 ## Verification
 - `python3 -m py_compile pool/scripts/state_logger.py` passes; no remaining `last_reported`/`fetch_last_reported` code references.

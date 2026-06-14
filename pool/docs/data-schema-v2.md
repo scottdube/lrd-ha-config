@@ -172,3 +172,17 @@ Current = phase 1 (this doc).
 - v1 still runs in parallel during phase 1 (~7 days) per spec.
 - v2 starts a fresh CSV at `/config/pool_state_log.csv`. Schemas are different (v2 is much wider) — they don't share rows.
 - v1 retired in `automations.yaml` once v2 validates. Final v1 CSV archived with date suffix.
+
+## Phase 2.2 — external probe wake-outcome ledger (ADR-032, 2026-06-14)
+
+`SCHEMA_VERSION` bumped `2.0-phase2.1` → `2.0-phase2.2`; the logger auto-rotates the live CSV on first run. Seven columns appended (sourced from the float's new diagnostic entities, published only on a connected wake):
+
+| Column | Source | Notes |
+|---|---|---|
+| `external_probe_boot_count` | `sensor.pool_water_temp_external_pool_float_boot_count` | Monotonic wake counter (resets only on power loss). Diff across fresh rows = wakes between connects. |
+| `external_probe_connect_ms` | `..._pool_float_connect_ms` | Boot-to-connect time this wake (ms). Budget-pressure signal vs the 35 s connect window. |
+| `external_probe_fails_since_last` | `..._pool_float_fails_since_last` | Failed-connect wakes since the last successful publish. |
+| `external_probe_wifi_noassoc_since_last` | `..._pool_float_wifi_noassoc_since_last` | Subset of the above where WiFi never associated (WIFI_NO_ASSOC vs API_TIMEOUT). |
+| `external_probe_unclean_since_last` | `..._pool_float_unclean_since_last` | Wakes that never reached a planned sleep (brownout/crash), via the clean-sleep flag. |
+| `external_probe_wake_diag` | `..._pool_float_wake_diag` | Human-readable summary string. |
+| `external_probe_missed_since_last` | computed | `fails_since_last + unclean_since_last`. |
