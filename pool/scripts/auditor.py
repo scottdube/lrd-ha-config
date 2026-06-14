@@ -42,7 +42,7 @@ OUT_DEFAULT = "/config/pool/audit/"
 TOKEN_FILE = "/config/.state_logger_token"
 HA_BASE = "http://localhost:8123"
 NOTIFY_TARGET = "scott_and_ha"
-AUDITOR_VERSION = "1.2.0"
+AUDITOR_VERSION = "1.3.0"
 
 WATERFALL_START_DEFAULT = time(8, 0)
 WATERFALL_END_DEFAULT = time(20, 0)
@@ -250,6 +250,26 @@ def is_swim_day(rows) -> Optional[bool]:
     return None
 
 
+def is_vacation_day(rows) -> bool:
+    """
+    True if input_boolean.vacation (logged as the vacation_mode column) was on
+    for the majority of the audited day. ADR-030 interim gate: the schedule-shape
+    assertions W2/P1/P3/P4 assume the at-home summer schedule (08:00 waterfall,
+    65%/55% pump speeds, swim-window pump-on) and false-FAIL on the legitimate
+    away/vacation schedule. They SKIP on vacation days; the presence-independent
+    checks (commanded-vs-actual H1-H3, P5, cadence, availability, chlorine) still
+    run. The durable fix is the commanded-vs-actual rework (separate ADR).
+    """
+    on = off = 0
+    for row in rows:
+        b = to_bool(row.get("vacation_mode"))
+        if b is True:
+            on += 1
+        elif b is False:
+            off += 1
+    return on > 0 and on >= off
+
+
 def assert_w1(rows, cols) -> Result:
     r = Result("W1", "waterfall_window_only",
                status="PASS",
@@ -280,10 +300,12 @@ def assert_w1(rows, cols) -> Result:
     return r
 
 
-def assert_w2(rows, cols, swim) -> Result:
+def assert_w2(rows, cols, swim, vacation=False) -> Result:
     r = Result("W2", "waterfall_opens_at_start", status="PASS",
                expected="closed→open transition near 08:00 on swim days",
                severity="med")
+    if vacation:
+        r.status = "SKIP"; r.reason = "vacation/away mode — schedule-shape assertion N/A (ADR-030 interim gate)"; return r
     if "local_waterfall_state" not in cols:
         r.status = "SKIP"; r.reason = "column missing"; return r
     if swim is False:
@@ -356,10 +378,12 @@ def heater_active(row) -> Optional[bool]:
     return to_bool(v)
 
 
-def assert_p1(rows, cols, swim) -> Result:
+def assert_p1(rows, cols, swim, vacation=False) -> Result:
     r = Result("P1", "swim_day_pump_window", status="PASS",
                expected="pump on through swim-day filtration window",
                severity="med")
+    if vacation:
+        r.status = "SKIP"; r.reason = "vacation/away mode — schedule-shape assertion N/A (ADR-030 interim gate)"; return r
     if "local_filter_state" not in cols:
         r.status = "SKIP"; r.reason = "column missing"; return r
     if swim is not True:
@@ -397,12 +421,14 @@ def assert_p2(rows, cols, swim) -> Result:
     return r
 
 
-def assert_p3(rows, cols) -> Result:
+def assert_p3(rows, cols, vacation=False) -> Result:
     r = Result("P3", "pump_speed_when_heating", status="PASS",
                expected=f"pump_speed ≥ {HEATER_PUMP_SPEED_MIN}% on heater-active time_pattern rows; "
                         f"first heater-active row of each run skipped (race: logger snapshot at same "
                         f"instant blueprint fires, before pump-speed command lands)",
                severity="high")
+    if vacation:
+        r.status = "SKIP"; r.reason = "vacation/away mode — schedule-shape assertion N/A (ADR-030 interim gate)"; return r
     needed = ["local_filter_speed", "local_heater_equip_status"]
     if any(c not in cols for c in needed):
         r.status = "SKIP"; r.reason = "required columns missing"; return r
@@ -430,12 +456,14 @@ def assert_p3(rows, cols) -> Result:
     return r
 
 
-def assert_p4(rows, cols) -> Result:
+def assert_p4(rows, cols, vacation=False) -> Result:
     r = Result("P4", "pump_speed_when_idle", status="PASS",
                expected=f"pump_speed ≤ {IDLE_PUMP_SPEED_MAX}% on idle time_pattern rows; first idle "
                         f"row after each heater run skipped (race: pump-speed-down command lands "
                         f"after the time_pattern snapshot at the same instant)",
                severity="med")
+    if vacation:
+        r.status = "SKIP"; r.reason = "vacation/away mode — schedule-shape assertion N/A (ADR-030 interim gate)"; return r
     needed = ["local_filter_speed", "local_heater_equip_status", "local_filter_state"]
     if any(c not in cols for c in needed):
         r.status = "SKIP"; r.reason = "required columns missing"; return r
@@ -670,24 +698,29 @@ def assert_i2(rows, cols) -> Result:
     return r
 
 
-def run_audit(rows: list[dict], cols: list[str]) -> dict:
+def run_audit(rows: list[dict], cols: list[str],
+              force_skip_schedule: bool = False) -> dict:
     if not rows:
         return {"date": None, "auditor_version": AUDITOR_VERSION,
                 "summary": {"passed": 0, "failed": 0, "skipped": 0},
                 "assertions": [],
                 "error": "no rows for date"}
     swim = is_swim_day(rows)
+    # ADR-030 interim gate: skip the schedule-shape assertions (W2/P1/P3/P4) on
+    # vacation/away days, when the at-home schedule they assume doesn't apply.
+    # CLI --skip-schedule-check forces it; otherwise read it off the day's data.
+    vacation = force_skip_schedule or is_vacation_day(rows)
     results = [
         assert_d1(rows, cols),
         assert_d2(rows, cols),
         assert_d3(rows, cols),
         assert_w1(rows, cols),
-        assert_w2(rows, cols, swim),
+        assert_w2(rows, cols, swim, vacation),
         assert_w3(rows, cols),
-        assert_p1(rows, cols, swim),
+        assert_p1(rows, cols, swim, vacation),
         assert_p2(rows, cols, swim),
-        assert_p3(rows, cols),
-        assert_p4(rows, cols),
+        assert_p3(rows, cols, vacation),
+        assert_p4(rows, cols, vacation),
         assert_p5(rows, cols),
         assert_h1(rows, cols, swim),
         assert_h2(rows, cols),
@@ -702,6 +735,7 @@ def run_audit(rows: list[dict], cols: list[str]) -> dict:
         "date": parse_ts(rows[0]["timestamp"]).date().isoformat(),
         "auditor_version": AUDITOR_VERSION,
         "swim_day": swim,
+        "vacation_day": vacation,
         "row_count": len(rows),
         "schema_columns": len(cols),
         "summary": summary,
@@ -746,6 +780,10 @@ def main():
                    help=f"path to file containing HA long-lived token (default {TOKEN_FILE})")
     p.add_argument("--notify-target", default=NOTIFY_TARGET,
                    help=f"HA notify service name (default {NOTIFY_TARGET})")
+    p.add_argument("--skip-schedule-check", action="store_true",
+                   help="force-SKIP the schedule-shape assertions (W2/P1/P3/P4) "
+                        "regardless of the logged vacation_mode — parity with "
+                        "audit_recent.py for ad-hoc away-mode runs (ADR-030).")
     args = p.parse_args()
 
     if not args.date and not args.date_range:
@@ -763,7 +801,7 @@ def main():
     exit_code = 0
     for d in targets:
         day_rows = filter_date(rows, d)
-        result = run_audit(day_rows, cols)
+        result = run_audit(day_rows, cols, force_skip_schedule=args.skip_schedule_check)
         out = write_json(result, args.out, d)
         if args.print or args.no_notify:
             print(f"[{d}] {out}")

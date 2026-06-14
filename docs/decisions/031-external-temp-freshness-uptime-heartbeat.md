@@ -50,6 +50,8 @@ Around 2026-06-12 the probe began genuinely missing the occasional wake (5 real 
 
 Most likely cause of the occasional miss: WiFi/API association intermittently exceeding the 35 s connect budget inside the 40 s `run_duration` on this BSSID-locked `fast_connect` deep-sleep wake — consistent with the original UniFi "strong RSSI but irregular connect" observation. Tracked in `docs/current-state.md` for monitoring; **no battery action indicated.**
 
+**Suspicion, not a conclusion (noted 2026-06-14):** the OTA reflash that day pushed a full firmware image over WiFi in ~4 s, and the post-flash `connect_ms` was 3.4 s. This *hints* that link throughput and signal are fine once connected, so the misses may be cold-wake association latency rather than bandwidth or signal — and a clean ~4 s sustained-radio OTA *may* argue the supply holds under load (against brownout). These are working hypotheses only; the `fails` / `wifi_noassoc` / `unclean` distribution from the ADR-032 ledger is what should confirm or refute them. If it leans `API_TIMEOUT`/`WIFI_NO_ASSOC`, the levers to examine are association-side (the hard BSSID lock; AP band-steering / min-RSSI on the Lanai U7), not signal or power.
+
 ## Verification
 - `python3 -m py_compile pool/scripts/state_logger.py` passes; no remaining `last_reported`/`fetch_last_reported` code references.
 - Post-deploy: `external_water_temp_fresh` should read ~100% except across genuine missed wakes; confirm `audit_recent.py` external-freshness check passes.
