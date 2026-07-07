@@ -3,9 +3,12 @@
 # Targets: living room cans, kitchen cans, under-cabinet lights.
 #
 # Phases:
-#   - Cycling (09:00 → sunset-1h): lux below 10000 (5 min) → ON; lux above
-#     13000 (5 min) → OFF. Full-track behavior (option a, no manual override
-#     tracking). 09:00 wake re-evaluates current lux.
+#   - Cycling ON (09:00 → sunset-1h): lux below 10000 (5 min) → ON.
+#     Full-track behavior (option a, no manual override tracking). 09:00
+#     wake re-evaluates current lux.
+#   - Bright-daylight OFF: lux above 13000 (5 min) → OFF. Split into its
+#     own UNGATED automation 2026-07-07 (LRD ADR-035) so stray lights get
+#     swept even in vacation; a 30-min vacation sweep covers the night gap.
 #   - Dusk hold (at sunset-1h): lights ON, latched. Bedtime automation
 #     handles OFF.
 #
@@ -53,11 +56,6 @@ automation:
         below: 10000
         for: "00:05:00"
         id: lux_low
-      - trigger: numeric_state
-        entity_id: sensor.st_00184974_illuminance
-        above: 13000
-        for: "00:05:00"
-        id: lux_high
       - trigger: time
         at: "09:00:00"
         id: wake
@@ -100,18 +98,6 @@ automation:
                   entity_id: light.wall_dimmer_switch_under_cab
                 data:
                   brightness_pct: 100
-
-          # lux_high → all OFF
-          - conditions:
-              - condition: trigger
-                id: lux_high
-            sequence:
-              - action: light.turn_off
-                target:
-                  entity_id:
-                    - light.living_wall_dimmer_switch
-                    - light.kit_cans_wall_dimmer_switch
-                    - light.wall_dimmer_switch_under_cab
 
           # wake (09:00) → re-evaluate current lux, sync state
           - conditions:
@@ -282,3 +268,66 @@ automation:
               entity_id: light.wall_dimmer_switch_under_cab
             data:
               brightness_pct: 100
+
+  - id: main_living_bright_daylight_off
+    alias: "Main Living: Bright-Daylight Off"
+    description: >
+      Janitorial off-sweep for the main-living cans. >13000 lux for 5 min
+      → OFF. Deliberately UNGATED (no vacation / presence condition): a
+      bright-daylight "these shouldn't be on" sweep should run whether or
+      not anyone is home, mirroring ADR-012's rule that maintenance
+      behaviors (pool chlorinator / filtration) keep running in vacation.
+      Split out of "Main Living: Lux Cycling" 2026-07-07 (LRD ADR-035);
+      the ON side stays gated in that automation.
+    mode: single
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.st_00184974_illuminance
+        above: 13000
+        for: "00:05:00"
+    conditions: []
+    actions:
+      - action: light.turn_off
+        target:
+          entity_id:
+            - light.living_wall_dimmer_switch
+            - light.kit_cans_wall_dimmer_switch
+            - light.wall_dimmer_switch_under_cab
+
+  - id: main_living_vacation_stray_light_sweep
+    alias: "Main Living: Vacation Stray-Light Sweep"
+    description: >
+      Night gap-filler for vacation. Bright-Daylight Off only fires when
+      lux > 13000, so a main-living light switched on after dark while away
+      (service tech, bumped paddle, power blip restoring last state) would
+      otherwise burn until the next bright period. Every 30 min while
+      vacation is ON, if any of the three cans are on, turn them off. The
+      sunset presence-simulation targets a DIFFERENT fixture set (porch,
+      lamp post, plug dimmers), so this never fights the lived-in look.
+      LRD ADR-035.
+    mode: single
+    triggers:
+      - trigger: time_pattern
+        minutes: "/30"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.vacation
+        state: "on"
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: light.living_wall_dimmer_switch
+            state: "on"
+          - condition: state
+            entity_id: light.kit_cans_wall_dimmer_switch
+            state: "on"
+          - condition: state
+            entity_id: light.wall_dimmer_switch_under_cab
+            state: "on"
+    actions:
+      - action: light.turn_off
+        target:
+          entity_id:
+            - light.living_wall_dimmer_switch
+            - light.kit_cans_wall_dimmer_switch
+            - light.wall_dimmer_switch_under_cab
