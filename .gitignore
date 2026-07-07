@@ -41,11 +41,14 @@ pool_action_log.csv    # logger v2 phase 4 action log
 # See pool/docs/rsync-setup.md.
 pool/analysis/pool_state_log_live.csv
 
-# Auditor output. Tracked as of 2026-05-21 — original rationale ("re-derivable
-# from CSV") superseded by the need for cross-machine read (daily Claude review
-# scheduled task reads via GitHub raw URL). ~6 KB/day = ~2 MB/year, trivial.
-# Historical audits valuable for longitudinal D3/P5 trend analysis.
-# pool/audit/
+# Auditor output. As of 2026-07-07 (LRD ADR-036) the nightly JSON is
+# published to the dedicated `audit` branch via plumbing in
+# audit_yesterday.sh, NOT committed to main — so main stays human-only and
+# the daily review reads it from the audit branch's raw URL. Ignored here so
+# the Mac mini's main working tree stays clean. The JSONs tracked on main
+# 2026-05-21..2026-07-06 stay in history (optional cleanup:
+# `git rm --cached pool/audit/*.json` in a one-off commit to fully relocate).
+pool/audit/
 
 # Lock files
 *.lock

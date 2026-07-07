@@ -39,6 +39,8 @@ Largely complete as of 2026-05-03. Logger v2 phase 1.5 deployed (44 cols, schema
 
 **Overnight audit** — `pool/scripts/audit_yesterday.sh` + `pool/scripts/launchd/com.scottdube.ha.pool-audit-overnight.plist` on the Mac mini, fires daily at 00:05. Self-pulls latest auditor code via `git pull --ff-only` before each run, so any push to main is picked up the next night. Pushes only on FAIL via `notify.scott_and_ha` (mobile + bell); silent on PASS. HA long-lived token at `~/.ha_token` (mode 600). Logs to `~/Library/Logs/ha-pool-audit.{log,err.log}`.
 
+**Audit JSON now published to the `audit` branch, not `main` (LRD ADR-036, 2026-07-07).** The nightly `git push origin main` of each day's audit JSON was putting every human working tree behind origin (13-deep the day this was found), so normal pushes got rejected. Auditor now publishes to a dedicated append-only `audit` branch via git plumbing (temp index + `commit-tree`, no working-tree touch); `main` is human-only. `pool/audit/` re-gitignored on main. Daily review task URL repointed `/main/` → `/audit/`. **Pending: one-time `git branch audit main && git push origin audit` + deploy updated script to the Mac mini.** Until the branch exists the nightly push WARNs and retries (non-fatal).
+
 **notify.scott_and_ha group** (`packages/notify/notify_groups.yaml`) — fan-out to mobile_app_iphone_sd + persistent_notification. Replaces the previous bare mobile push in all four pool service-lockout automations. Reused by the auditor's overnight FAIL pushes. Reusable for future battery-low alerts (ADR-014) and any other cross-cutting notification.
 
 **Open auditor enhancements:**

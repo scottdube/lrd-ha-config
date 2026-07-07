@@ -76,22 +76,36 @@ stamp_heartbeat() {
         || echo "WARN: heartbeat stamp POST to HA failed (non-fatal)" >&2
 }
 
-# Commit + push the audit JSON so it propagates to GitHub for the daily
-# Claude review scheduled task to read via raw URL. pool/audit/ was
-# un-gitignored 2026-05-21 specifically to enable this flow. Failure to
-# push is non-fatal — the JSON is still on the Mac mini and the FAIL push
-# notification already fired (if applicable); we'll retry on the next run.
+# Publish the audit JSON to the dedicated `audit` branch (LRD ADR-036) via
+# plumbing — a temp index + commit-tree — so it reaches GitHub for the daily
+# review task WITHOUT ever committing to main or touching this working tree's
+# branch. Keeps main human-only and keeps the `git pull --ff-only` above from
+# ever facing an unpushed local commit. The daily review reads it from the
+# audit branch's raw URL. Non-fatal on failure; retried on the next run.
+AUDIT_BRANCH="audit"
 AUDIT_JSON="${OUT_DIR}/pool_audit_${YESTERDAY}.json"
+AUDIT_REPO_PATH="pool/audit/pool_audit_${YESTERDAY}.json"
 if [[ -f "$AUDIT_JSON" ]]; then
     cd "$REPO_ROOT"
-    if ! git diff --quiet "$AUDIT_JSON" 2>/dev/null || ! git ls-files --error-unmatch "$AUDIT_JSON" >/dev/null 2>&1; then
-        git add "$AUDIT_JSON"
-        git -c user.name="Pool Auditor" -c user.email="audit@dubecars.com" \
-            commit -m "audit: ${YESTERDAY} result" --quiet
-        if git push origin main --quiet 2>&1; then
+    if ! git fetch origin "$AUDIT_BRANCH" --quiet 2>&1; then
+        echo "WARN: could not fetch origin/${AUDIT_BRANCH}; JSON on disk only, retry next run." >&2
+    else
+        blob="$(git hash-object -w "$AUDIT_JSON")"
+        existing="$(git rev-parse --quiet --verify "origin/${AUDIT_BRANCH}:${AUDIT_REPO_PATH}" 2>/dev/null || true)"
+        if [[ "$blob" == "$existing" ]]; then
             stamp_heartbeat
         else
-            echo "WARN: git push failed; audit JSON is on disk but not propagated. Will retry next run." >&2
+            tmp_index="$(mktemp)"
+            if GIT_INDEX_FILE="$tmp_index" git read-tree "origin/${AUDIT_BRANCH}" \
+               && GIT_INDEX_FILE="$tmp_index" git update-index --add --cacheinfo "100644,${blob},${AUDIT_REPO_PATH}" \
+               && tree="$(GIT_INDEX_FILE="$tmp_index" git write-tree)" \
+               && commit="$(git -c user.name='Pool Auditor' -c user.email='audit@dubecars.com' commit-tree "$tree" -p "origin/${AUDIT_BRANCH}" -m "audit: ${YESTERDAY} result")" \
+               && git push origin "${commit}:refs/heads/${AUDIT_BRANCH}" --quiet 2>&1; then
+                stamp_heartbeat
+            else
+                echo "WARN: audit-branch push failed; JSON on disk, not propagated, retry next run." >&2
+            fi
+            rm -f "$tmp_index"
         fi
     fi
 else
