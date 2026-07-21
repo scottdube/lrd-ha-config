@@ -52,7 +52,7 @@ What hardware exists, where it lives, what it's paired to, what state it's in.
 
 | Hostname | Hardware | Location | Status | Notes |
 |---|---|---|---|---|
-| `voice-garage` | ESP32-S3 N16R8 + INMP441 + MAX98357A | Garage | Active, wired | Sporadic audio clarity issue |
+| `voice-garage` | ESP32-S3 N16R8 + INMP441 + MAX98357A | — | Relocated to SLN 2026-07-21 | Now `sln-voice-lab` (SLN repo, SLN ADR-029, on-device wake word). Stale HA device entry + 192.168.11.229 reservation intentionally kept for LRD rebuild. Audio-clarity issue follows the unit. |
 | (planned) | ESP32-S3 N16R8 + INMP441 + MAX98357A | ? | Planned | 5 more units |
 | (planned) | ESP32-S3 N16R8 + INMP441 + MAX98357A | ? | Planned | |
 | (planned) | ESP32-S3 N16R8 + INMP441 + MAX98357A | ? | Planned | |

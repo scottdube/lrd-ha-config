@@ -30,9 +30,11 @@ This split is intentional. ESPHome's dashboard insists configs live at `/config/
 
 ## Current state
 
-**Deployed:** 1 unit (garage). Wired, flashed, paired to HA. Recovered 2026-04-28 after an Ollama conversation-agent reference left the device stuck in `voice_assistant.on_error` (red LED). Pipeline restored to HA Cloud.
+**Deployed at LRD:** 0 units. The garage unit (`voice-garage`) was relocated to SLN 2026-07-21 and re-adopted there as `sln-voice-lab` (SLN repo `esphome/sln-voice-lab.yaml`, SLN ADR-029) with on-device wake word. LRD units will be rebuilt when Scott is next on site; the LRD Voice Assistant pipeline, the openWakeWord app on the NUC, the stale `voice-garage` HA device entry, and the 192.168.11.229 reservation are all intentionally left in place for that rebuild (decision 2026-07-21).
 
-**Pipeline:** HA Cloud STT/TTS, Davis voice (High quality). On-device wake word (microWakeWord). See ADR-003 for canonical-vs-experimental agent options (HA Cloud canonical; Ollama and OpenAI both supported as alternatives but expect drift to break things if not actively monitored).
+Unit history: garage unit recovered 2026-04-28 after an Ollama conversation-agent reference left it stuck in `voice_assistant.on_error` (red LED). Pipeline restored to HA Cloud.
+
+**Pipeline (LRD Voice Assistant):** HA Cloud STT/TTS, Davis voice (High quality). Wake word is **server-side** — the device streamed mic audio continuously to the streaming openWakeWord engine on the NUC (`use_wake_word: true`; an earlier revision of this file incorrectly said on-device microWakeWord). On-device `micro_wake_word` (as adopted at SLN, ADR-029) is the intended architecture for rebuilt LRD units. See ADR-003 for canonical-vs-experimental agent options (HA Cloud canonical; Ollama and OpenAI both supported as alternatives but expect drift to break things if not actively monitored).
 
 **Hardware on hand:** 6× ESP32-S3 N16R8, 5× MAX98357A, 5× INMP441. Five more units to build.
 
@@ -42,8 +44,8 @@ This split is intentional. ESPHome's dashboard insists configs live at `/config/
 
 ## Open issues
 
-- **Sporadic audio quality** on garage unit. Suspected I2S clock drift on ESP32-S3 with esp-idf driver. Next step: test fixed MCLK pin on MAX98357A.
-- **"Hey Nabu" wake word latency** — server-side openWakeWord adds latency vs on-device. Decision: accept for now, microWakeWord on-device path is the real fix; revisit later.
+- **Sporadic audio quality** (follows the relocated unit — now `sln-voice-lab` at SLN). Suspected I2S clock drift on ESP32-S3 with esp-idf driver. Next step: test fixed MCLK pin on MAX98357A.
+- **"Okay Nabu" wake word latency** — server-side openWakeWord adds latency vs on-device. Resolved at SLN via on-device `micro_wake_word` (SLN ADR-029); apply the same on LRD rebuilds.
 - **Pipeline drift risk.** A pipeline pointing at a removed/offline conversation agent (e.g. an Ollama server that's down) puts every assigned satellite into a tight error retry loop on the device. Worth a periodic audit of pipeline assignments.
 
 ---
